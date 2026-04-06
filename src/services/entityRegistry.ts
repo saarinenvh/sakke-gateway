@@ -84,7 +84,11 @@ export async function loadEntities(): Promise<void> {
   }));
 
   switchesCache = states
-    .filter((s: any) => s.entity_id.startsWith("switch."))
+    .filter((s: any) =>
+      s.entity_id.startsWith("switch.") &&
+      !s.entity_id.includes("_music_mode") &&
+      !s.entity_id.includes("_dreamview")
+    )
     .map((s: any) => ({
       entity_id: s.entity_id,
       name: s.attributes?.friendly_name ?? s.entity_id,
