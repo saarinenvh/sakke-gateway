@@ -2,9 +2,10 @@ export type LightAction = "light_on" | "light_off" | "light_dim" | "light_color"
 export type MediaAction = "media_play" | "media_pause" | "media_stop" | "media_volume";
 export type SceneAction = "scene_activate";
 export type SwitchAction = "switch_on" | "switch_off";
+export type RoutineAction = "morning_routine";
 export type UnknownAction = "unknown";
 
-export type IntentAction = LightAction | MediaAction | SceneAction | SwitchAction | UnknownAction;
+export type IntentAction = LightAction | MediaAction | SceneAction | SwitchAction | RoutineAction | UnknownAction;
 
 export interface Intent {
   action: IntentAction;

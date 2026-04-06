@@ -73,6 +73,11 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("switch", "turn_off", { entity_id: intent.device });
       return reply("Switch turned off.");
 
+    case "morning_routine":
+      await callService("scene", "turn_on", { entity_id: "scene.default" });
+      await callService("light", "turn_on", { area_id: "bedroom" });
+      return reply("Rise and shine. Lights are on and the default scene is active. The coffee maker won't turn itself on, just so you know.");
+
     case "unknown":
     default:
       return reply("I didn't understand that.");

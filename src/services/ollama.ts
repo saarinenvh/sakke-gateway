@@ -37,6 +37,7 @@ Possible actions:
 - switch_on / switch_off — toggle a switch (device: entity_id)
 - media_play / media_pause / media_stop — media control
 - media_volume — set volume (volume: 0-100)
+- morning_routine — when user says good morning or wants to start their day
 - unknown — if the command is not a smart home command
 
 Use "area" (area_id) for room-level commands, "device" (entity_id) for specific lights or switches.
@@ -74,6 +75,9 @@ User: "turn on dreamview"
 
 User: "activate tv time scene"
 {"action":"scene_activate","scene":"tv_time","response":"TV time scene activated. Don't forget to blink occasionally.","raw":"activate tv time scene"}
+
+User: "good morning"
+{"action":"morning_routine","response":"Rise and shine. Lights are on. The coffee maker won't turn itself on, just so you know.","raw":"good morning"}
 
 Respond with JSON only. No explanation, no markdown.`;
 }
