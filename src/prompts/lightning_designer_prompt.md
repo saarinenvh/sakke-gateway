@@ -41,6 +41,7 @@ Return ONLY a valid JSON object in this exact format:
 Rules for the JSON:
 - `brightness` is 0–255 — controls how dim or bright the light is
 - `color` is [R, G, B] — controls the HUE of the light. Use saturated colors (at least one value near 200–255). Low RGB values like [20,30,50] will appear completely off. To make a dim green light: brightness=80, color=[50,255,50]. To make a dim blue: brightness=80, color=[50,100,255].
+- `effect` is optional — use only on Govee or Wiz lights, only when it enhances the mood. Omit for most lights.
 - Omit `color` for Ikea lights (brightness only)
 - Set `state: "off"` to turn a light off (omit brightness/color)
 - Include ALL lights in the scene — explicitly turn off lights that should be off
@@ -56,8 +57,10 @@ Rules for the JSON:
 - Use color intentionally (not random RGB spam)
 - MINIMUM brightness for any "on" light is 80. Values below 80 will appear off. Do not use them.
 - For atmospheric scenes, typical brightness range is 80–180
-- Use ALL or most lights in every scene — the room needs multiple active sources to be visible. Turning off too many lights makes the scene completely dark.
-- Accent and floor lights are the PRIMARY light sources in this room — always include them
+- MANDATORY: Ceiling lights (wiz_rgbw_tunable_38f16e, 38e39a, 38f12c) MUST always be included and turned ON. They are required for the room to be visible. Never turn all three off.
+- Use ALL or most lights in every scene — the room needs multiple active sources to be visible.
+- Accent and floor lights are the PRIMARY mood drivers — always include them
+- `effect` is optional — use on 1-2 lights max when it genuinely enhances the mood. Omit if not needed.
 
 ---
 

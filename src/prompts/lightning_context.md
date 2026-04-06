@@ -76,10 +76,20 @@ Lights are grouped by purpose and physical zones.
 
 ## Capabilities
 
-- Govee lights (rgbicww_floor_lamp, rgbic_tv_backlight, uplighter_floor_lamp) → full RGB + brightness
-- Wiz lights (wiz_rgbw_tunable_*) → full RGB + brightness
+- Govee lights (rgbicww_floor_lamp, rgbic_tv_backlight, uplighter_floor_lamp) → full RGB + brightness + effects
+- Wiz lights (wiz_rgbw_tunable_*) → full RGB + brightness + effects
 - Hue lights (hue_play_2, hue_play_3) → full RGB + brightness
-- Ikea lights (shelf_light, case_lights) → brightness only, NO color
+- Ikea lights (shelf_light, case_lights) → brightness only, NO color, NO effects
+
+## Available Effects
+
+Use effects purposefully — only when they genuinely enhance the mood. Do not add effects to every light. Pick 1-2 key lights where an effect adds real atmosphere.
+
+Govee effects (rgbicww_floor_lamp, rgbic_tv_backlight, uplighter_floor_lamp):
+Fire, Aurora, Ocean, Forest, Meteor, Rainbow, Sunset, Sunrise, Wave, Breathe, Ripple, Party, Halloween, Christmas, Romantic, Dreamlike, Fight, Flash
+
+Wiz effects (wiz_rgbw_tunable_* lights):
+Candlelight, Fireplace, Forest, Ocean, Cozy, Romance, Relax, Focus, Daylight, Warm white, Cool white, Pulse, Party, Halloween, Christmas, Sunset, Jungle, Steampunk
 
 ---
 

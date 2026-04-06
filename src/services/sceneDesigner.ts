@@ -10,6 +10,7 @@ export interface LightSetting {
   state: "on" | "off";
   brightness?: number;
   color?: [number, number, number];
+  effect?: string;
 }
 
 export interface ScenePlan {
@@ -68,6 +69,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 
       if (light.brightness !== undefined) body.brightness = light.brightness;
       if (light.color) body.rgb_color = light.color;
+      if (light.effect) body.effect = light.effect;
 
       await callHA("light", "turn_on", body);
     } catch (err: any) {
