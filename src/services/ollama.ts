@@ -1,9 +1,22 @@
 import type { Intent } from "../types/intent.js";
+import { getLights, getAreas } from "./entityRegistry.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "llama3";
 
-const SYSTEM_PROMPT = `You are a smart home intent parser.
+function buildSystemPrompt(): string {
+  const lights = getLights();
+  const areas = getAreas();
+
+  const lightList = lights
+    .map(l => `  - "${l.name}" (entity_id: ${l.entity_id}${l.area ? `, area: ${l.area}` : ""})`)
+    .join("\n");
+
+  const areaList = areas
+    .map(a => `  - "${a.name}" (area_id: ${a.area_id})`)
+    .join("\n");
+
+  return `You are a smart home intent parser.
 Given a natural language command, respond with ONLY a valid JSON object describing the intent.
 
 Possible actions:
@@ -15,25 +28,36 @@ Possible actions:
 - media_volume — set volume (volume: 0-100)
 - unknown — if the command is not a smart home command
 
-Optional fields: area (room name in snake_case), device (specific device name), scene, brightness, color, volume.
+Use "area" (area_id) for room-level commands, "device" (entity_id) for specific lights.
+Prefer area over device when the command targets a whole room.
+
+Available areas:
+${areaList}
+
+Available lights:
+${lightList}
 
 Examples:
 User: "turn off the lights"
 {"action":"light_off","raw":"turn off the lights"}
 
-User: "dim the bedroom lights to 50%"
-{"action":"light_dim","area":"bedroom","brightness":128,"raw":"dim the bedroom lights to 50%"}
+User: "turn on living room lights"
+{"action":"light_on","area":"living_room","raw":"turn on living room lights"}
 
-User: "activate cyberpunk scene"
-{"action":"scene_activate","scene":"cyberpunk","raw":"activate cyberpunk scene"}
+User: "dim the desk lamp to 30%"
+{"action":"light_dim","device":"light.led_strip_light_m1","brightness":77,"raw":"dim the desk lamp to 30%"}
+
+User: "set tv backlight to blue"
+{"action":"light_color","device":"light.rgbic_tv_backlight","color":"blue","raw":"set tv backlight to blue"}
 
 Respond with JSON only. No explanation, no markdown.`;
+}
 
 export async function parseIntent(text: string): Promise<Intent> {
   const body = {
     model,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt() },
       { role: "user", content: text },
     ],
     stream: false,
