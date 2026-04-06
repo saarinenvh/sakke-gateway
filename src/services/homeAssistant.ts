@@ -1,4 +1,5 @@
 import type { Intent } from "../types/intent.js";
+import { getLights } from "./entityRegistry.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";
@@ -22,7 +23,8 @@ async function callService(domain: string, service: string, data: Record<string,
 export async function dispatch(intent: Intent): Promise<string> {
   const target: Record<string, unknown> = {};
   if (intent.area) target["area_id"] = intent.area;
-  if (intent.device) target["entity_id"] = intent.device;
+  else if (intent.device) target["entity_id"] = intent.device;
+  else target["entity_id"] = getLights().map(l => l.entity_id);
 
   const reply = (fallback: string) => intent.response ?? fallback;
 
