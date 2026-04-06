@@ -29,50 +29,50 @@ export async function dispatch(intent: Intent): Promise<string> {
   switch (intent.action) {
     case "light_on":
       await callService("light", "turn_on", target);
-      return reply(intent.area ? `Lights on in ${intent.area}.` : "Lights on.");
+      return reply(intent.area ? `${intent.area} valot sytytetty.` : "Valot sytytetty.");
 
     case "light_off":
       await callService("light", "turn_off", target);
-      return reply(intent.area ? `Lights off in ${intent.area}.` : "Lights off.");
+      return reply(intent.area ? `${intent.area} valot sammutettu.` : "Valot sammutettu.");
 
     case "light_dim":
       await callService("light", "turn_on", { ...target, brightness: intent.brightness ?? 128 });
-      return reply("Brightness set.");
+      return reply("Kirkkaus asetettu.");
 
     case "light_color":
       await callService("light", "turn_on", { ...target, color_name: intent.color });
-      return reply(`Color set to ${intent.color}.`);
+      return reply(`Väri vaihdettu.`);
 
     case "scene_activate":
       await callService("scene", "turn_on", { entity_id: `scene.${intent.scene}` });
-      return reply(`Scene "${intent.scene}" activated.`);
+      return reply(`Skene aktivoitu.`);
 
     case "media_play":
       await callService("media_player", "media_play", target);
-      return reply("Playing.");
+      return reply("Toistetaan.");
 
     case "media_pause":
       await callService("media_player", "media_pause", target);
-      return reply("Paused.");
+      return reply("Tauolla.");
 
     case "media_stop":
       await callService("media_player", "media_stop", target);
-      return reply("Stopped.");
+      return reply("Pysäytetty.");
 
     case "media_volume":
       await callService("media_player", "volume_set", { ...target, volume_level: (intent.volume ?? 50) / 100 });
-      return reply(`Volume set to ${intent.volume}%.`);
+      return reply(`Äänenvoimakkuus asetettu ${intent.volume} prosenttiin.`);
 
     case "switch_on":
       await callService("switch", "turn_on", { entity_id: intent.device });
-      return reply("Switch turned on.");
+      return reply("Kytkin päällä.");
 
     case "switch_off":
       await callService("switch", "turn_off", { entity_id: intent.device });
-      return reply("Switch turned off.");
+      return reply("Kytkin pois.");
 
     case "unknown":
     default:
-      return reply(`I didn't understand: "${intent.raw}"`);
+      return reply("En ymmärtänyt komentoa.");
   }
 }

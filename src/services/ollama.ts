@@ -46,7 +46,7 @@ ${lightList}
 Available switches:
 ${switchList}
 
-Always include a short "response" field — a friendly 1-sentence confirmation in the same language as the user's command.
+Always include a short "response" field — a friendly 1-sentence confirmation in Finnish.
 
 Examples:
 User: "turn off the lights"
