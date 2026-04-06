@@ -101,7 +101,6 @@ Lights are grouped by purpose and physical zones.
 
 ## Design Rules
 
-- Avoid ceiling lights in atmospheric scenes
 - Always prefer indirect lighting
 - Combine 2–4 light sources for depth
 - Use color contrast (warm vs cold) when possible

@@ -51,7 +51,6 @@ Rules for the JSON:
 ## Rules
 
 - Prefer ambient and indirect lighting
-- Avoid ceiling lights unless explicitly needed
 - Use contrast and layering
 - Keep 1 main light + supporting lights
 - Use color intentionally (not random RGB spam)
