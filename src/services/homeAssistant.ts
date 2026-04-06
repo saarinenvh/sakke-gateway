@@ -24,53 +24,55 @@ export async function dispatch(intent: Intent): Promise<string> {
   if (intent.area) target["area_id"] = intent.area;
   if (intent.device) target["entity_id"] = intent.device;
 
+  const reply = (fallback: string) => intent.response ?? fallback;
+
   switch (intent.action) {
     case "light_on":
       await callService("light", "turn_on", target);
-      return intent.area ? `Lights on in ${intent.area}.` : "Lights on.";
+      return reply(intent.area ? `Lights on in ${intent.area}.` : "Lights on.");
 
     case "light_off":
       await callService("light", "turn_off", target);
-      return intent.area ? `Lights off in ${intent.area}.` : "Lights off.";
+      return reply(intent.area ? `Lights off in ${intent.area}.` : "Lights off.");
 
     case "light_dim":
       await callService("light", "turn_on", { ...target, brightness: intent.brightness ?? 128 });
-      return `Brightness set.`;
+      return reply("Brightness set.");
 
     case "light_color":
       await callService("light", "turn_on", { ...target, color_name: intent.color });
-      return `Color set to ${intent.color}.`;
+      return reply(`Color set to ${intent.color}.`);
 
     case "scene_activate":
       await callService("scene", "turn_on", { entity_id: `scene.${intent.scene}` });
-      return `Scene "${intent.scene}" activated.`;
+      return reply(`Scene "${intent.scene}" activated.`);
 
     case "media_play":
       await callService("media_player", "media_play", target);
-      return "Playing.";
+      return reply("Playing.");
 
     case "media_pause":
       await callService("media_player", "media_pause", target);
-      return "Paused.";
+      return reply("Paused.");
 
     case "media_stop":
       await callService("media_player", "media_stop", target);
-      return "Stopped.";
+      return reply("Stopped.");
 
     case "media_volume":
       await callService("media_player", "volume_set", { ...target, volume_level: (intent.volume ?? 50) / 100 });
-      return `Volume set to ${intent.volume}%.`;
+      return reply(`Volume set to ${intent.volume}%.`);
 
     case "switch_on":
       await callService("switch", "turn_on", { entity_id: intent.device });
-      return `${intent.device} turned on.`;
+      return reply("Switch turned on.");
 
     case "switch_off":
       await callService("switch", "turn_off", { entity_id: intent.device });
-      return `${intent.device} turned off.`;
+      return reply("Switch turned off.");
 
     case "unknown":
     default:
-      return `I didn't understand: "${intent.raw}"`;
+      return reply(`I didn't understand: "${intent.raw}"`);
   }
 }

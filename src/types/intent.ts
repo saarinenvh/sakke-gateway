@@ -15,4 +15,5 @@ export interface Intent {
   color?: string;      // color name for light_color
   volume?: number;     // 0–100 for media_volume
   raw: string;         // original command text
+  response?: string;   // human-friendly confirmation
 }
