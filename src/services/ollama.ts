@@ -78,7 +78,7 @@ export async function parseIntent(text: string): Promise<Intent> {
       { role: "user", content: text },
     ],
     stream: false,
-    options: { temperature: 0.1, num_predict: 200 },
+    options: { temperature: 0.1, num_predict: 400 },
   };
 
   const res = await fetch(`${baseUrl}/api/chat`, {
