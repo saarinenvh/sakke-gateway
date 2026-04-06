@@ -111,9 +111,10 @@ Lights are grouped by purpose and physical zones.
 
 ## Capabilities
 
-- Govee lights → full RGB, effects
-- Wiz lights → RGB + brightness
-- Ikea lights → brightness only
+- Govee lights (rgbicww_floor_lamp, rgbic_tv_backlight, uplighter_floor_lamp) → full RGB + brightness
+- Wiz lights (wiz_rgbw_tunable_*) → full RGB + brightness
+- Hue lights (hue_play_2, hue_play_3) → full RGB + brightness
+- Ikea lights (shelf_light, case_lights) → brightness only, NO color
 
 ---
 

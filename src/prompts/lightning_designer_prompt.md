@@ -55,6 +55,8 @@ Rules for the JSON:
 - Use contrast and layering
 - Keep 1 main light + supporting lights
 - Use color intentionally (not random RGB spam)
+- Minimum brightness for "on" lights is 60 — never use values below 60 or the light will appear off
+- For atmospheric scenes, typical brightness range is 60–150
 
 ---
 
