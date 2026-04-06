@@ -89,7 +89,12 @@ export async function parseIntent(text: string): Promise<Intent> {
   }
 
   const json = await res.json() as { message?: { content?: string } };
-  const content = json?.message?.content?.trim() ?? "";
+  const raw = json?.message?.content?.trim() ?? "";
+
+  // Strip markdown fences, then extract first JSON object from response
+  const stripped = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  const content = match ? match[0] : stripped;
 
   try {
     const parsed = JSON.parse(content) as Partial<Intent>;
