@@ -26,8 +26,8 @@ async function haGet<T>(path: string): Promise<T> {
 export async function loadEntities(): Promise<void> {
   const [states, entityRegistry, areaRegistry] = await Promise.all([
     haGet<any[]>("/api/states"),
-    haGet<any[]>("/api/config/entity_registry/list"),
-    haGet<any[]>("/api/config/area_registry/list"),
+    haGet<any[]>("/api/config/entity_registry"),
+    haGet<any[]>("/api/config/area_registry"),
   ]);
 
   areasCache = areaRegistry.map((a: any) => ({ area_id: a.area_id, name: a.name }));
