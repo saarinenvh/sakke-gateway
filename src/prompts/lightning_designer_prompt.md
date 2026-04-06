@@ -54,8 +54,10 @@ Rules for the JSON:
 - Use contrast and layering
 - Keep 1 main light + supporting lights
 - Use color intentionally (not random RGB spam)
-- Minimum brightness for "on" lights is 60 — never use values below 60 or the light will appear off
-- For atmospheric scenes, typical brightness range is 60–150
+- MINIMUM brightness for any "on" light is 80. Values below 80 will appear off. Do not use them.
+- For atmospheric scenes, typical brightness range is 80–180
+- Use ALL or most lights in every scene — the room needs multiple active sources to be visible. Turning off too many lights makes the scene completely dark.
+- Accent and floor lights are the PRIMARY light sources in this room — always include them
 
 ---
 
