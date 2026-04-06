@@ -37,7 +37,7 @@ export async function designScene(description: string): Promise<ScenePlan> {
         { role: "user", content: description },
       ],
       stream: false,
-      options: { temperature: 0.7, num_predict: 800 },
+      options: { temperature: 0.7, num_predict: 2000 },
     }),
   });
 
