@@ -52,7 +52,7 @@ Lights are grouped by purpose and physical zones.
   - Vertical LED strip near shelf
   - Adds depth and color accents
 
-- Govee Desk Lamp — entity_id: light.uplighter_floor_lamp
+- Uplighter Floor Lamp (Govee) — entity_id: light.uplighter_floor_lamp
   - Directional + indirect hybrid
   - Can light walls and create effects
 
