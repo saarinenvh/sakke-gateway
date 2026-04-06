@@ -1,5 +1,5 @@
 import type { Intent } from "../types/intent.js";
-import { getLights, getAreas } from "./entityRegistry.js";
+import { getLights, getAreas, getSwitches } from "./entityRegistry.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "llama3";
@@ -7,6 +7,7 @@ const model = process.env.OLLAMA_MODEL ?? "llama3";
 function buildSystemPrompt(): string {
   const lights = getLights();
   const areas = getAreas();
+  const switches = getSwitches();
 
   const lightList = lights
     .map(l => `  - "${l.name}" (entity_id: ${l.entity_id}${l.area ? `, area: ${l.area}` : ""})`)
@@ -14,6 +15,10 @@ function buildSystemPrompt(): string {
 
   const areaList = areas
     .map(a => `  - "${a.name}" (area_id: ${a.area_id})`)
+    .join("\n");
+
+  const switchList = switches
+    .map(s => `  - "${s.name}" (entity_id: ${s.entity_id})`)
     .join("\n");
 
   return `You are a smart home intent parser.
@@ -24,11 +29,12 @@ Possible actions:
 - light_dim — adjust brightness (brightness: 0-255)
 - light_color — change light color (color: string)
 - scene_activate — activate a named scene (scene: string)
+- switch_on / switch_off — toggle a switch (device: entity_id)
 - media_play / media_pause / media_stop — media control
 - media_volume — set volume (volume: 0-100)
 - unknown — if the command is not a smart home command
 
-Use "area" (area_id) for room-level commands, "device" (entity_id) for specific lights.
+Use "area" (area_id) for room-level commands, "device" (entity_id) for specific lights or switches.
 Prefer area over device when the command targets a whole room.
 
 Available areas:
@@ -36,6 +42,9 @@ ${areaList}
 
 Available lights:
 ${lightList}
+
+Available switches:
+${switchList}
 
 Examples:
 User: "turn off the lights"
@@ -49,6 +58,9 @@ User: "dim the desk lamp to 30%"
 
 User: "set tv backlight to blue"
 {"action":"light_color","device":"light.rgbic_tv_backlight","color":"blue","raw":"set tv backlight to blue"}
+
+User: "turn on dreamview"
+{"action":"switch_on","device":"switch.rgbic_tv_backlight_dreamview","raw":"turn on dreamview"}
 
 Respond with JSON only. No explanation, no markdown.`;
 }

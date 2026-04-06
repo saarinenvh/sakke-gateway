@@ -61,6 +61,14 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("media_player", "volume_set", { ...target, volume_level: (intent.volume ?? 50) / 100 });
       return `Volume set to ${intent.volume}%.`;
 
+    case "switch_on":
+      await callService("switch", "turn_on", { entity_id: intent.device });
+      return `${intent.device} turned on.`;
+
+    case "switch_off":
+      await callService("switch", "turn_off", { entity_id: intent.device });
+      return `${intent.device} turned off.`;
+
     case "unknown":
     default:
       return `I didn't understand: "${intent.raw}"`;
