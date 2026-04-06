@@ -60,6 +60,8 @@ Rules for the JSON:
 
 ## Available Lights
 
+IMPORTANT: Always use the exact entity_id values listed below. Never guess or invent entity IDs.
+
 {{lighting_context}}
 
 ---

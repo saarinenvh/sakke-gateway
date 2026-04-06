@@ -58,17 +58,21 @@ export async function designScene(description: string): Promise<ScenePlan> {
 
 export async function applyScene(plan: ScenePlan): Promise<void> {
   await Promise.all(plan.lights.map(async (light) => {
-    const body: Record<string, unknown> = { entity_id: light.entity_id };
+    try {
+      const body: Record<string, unknown> = { entity_id: light.entity_id };
 
-    if (light.state === "off") {
-      await callHA("light", "turn_off", { entity_id: light.entity_id });
-      return;
+      if (light.state === "off") {
+        await callHA("light", "turn_off", { entity_id: light.entity_id });
+        return;
+      }
+
+      if (light.brightness !== undefined) body.brightness = light.brightness;
+      if (light.color) body.rgb_color = light.color;
+
+      await callHA("light", "turn_on", body);
+    } catch (err: any) {
+      console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
     }
-
-    if (light.brightness !== undefined) body.brightness = light.brightness;
-    if (light.color) body.rgb_color = light.color;
-
-    await callHA("light", "turn_on", body);
   }));
 }
 
