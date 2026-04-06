@@ -17,9 +17,16 @@ export interface AreaInfo {
   name: string;
 }
 
+export interface SceneEntity {
+  entity_id: string;
+  name: string;
+  scene_id: string;
+}
+
 let lightsCache: LightEntity[] = [];
 let switchesCache: SwitchEntity[] = [];
 let areasCache: AreaInfo[] = [];
+let scenesCache: SceneEntity[] = [];
 
 async function haGet<T>(path: string): Promise<T> {
   const res = await fetch(`${baseUrl}${path}`, {
@@ -93,6 +100,14 @@ export async function loadEntities(): Promise<void> {
       entity_id: s.entity_id,
       name: s.attributes?.friendly_name ?? s.entity_id,
     }));
+
+  scenesCache = states
+    .filter((s: any) => s.entity_id.startsWith("scene."))
+    .map((s: any) => ({
+      entity_id: s.entity_id,
+      name: s.attributes?.friendly_name ?? s.entity_id,
+      scene_id: s.entity_id.replace("scene.", ""),
+    }));
 }
 
 export function getLights(): LightEntity[] {
@@ -105,4 +120,8 @@ export function getSwitches(): SwitchEntity[] {
 
 export function getAreas(): AreaInfo[] {
   return areasCache;
+}
+
+export function getScenes(): SceneEntity[] {
+  return scenesCache;
 }

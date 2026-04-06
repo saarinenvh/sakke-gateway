@@ -1,5 +1,5 @@
 import type { Intent } from "../types/intent.js";
-import { getLights, getAreas, getSwitches } from "./entityRegistry.js";
+import { getLights, getAreas, getSwitches, getScenes } from "./entityRegistry.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "llama3";
@@ -8,6 +8,7 @@ function buildSystemPrompt(): string {
   const lights = getLights();
   const areas = getAreas();
   const switches = getSwitches();
+  const scenes = getScenes();
 
   const lightList = lights
     .map(l => `  - "${l.name}" (entity_id: ${l.entity_id}${l.area ? `, area: ${l.area}` : ""})`)
@@ -19,6 +20,10 @@ function buildSystemPrompt(): string {
 
   const switchList = switches
     .map(s => `  - "${s.name}" (entity_id: ${s.entity_id})`)
+    .join("\n");
+
+  const sceneList = scenes
+    .map(s => `  - "${s.name}" (scene_id: ${s.scene_id})`)
     .join("\n");
 
   return `You are a smart home intent parser.
@@ -46,6 +51,9 @@ ${lightList}
 Available switches:
 ${switchList}
 
+Available scenes:
+${sceneList}
+
 Always include a "response" field with a confirmation spoken in character as Sakke — a sarcastic, dry-humored, slightly reluctant but ultimately helpful home assistant. Think deadpan butler meets grumpy dwarf. Use irony and wit. Keep it 1-2 sentences max.
 
 Examples:
@@ -63,6 +71,9 @@ User: "set tv backlight to blue"
 
 User: "turn on dreamview"
 {"action":"switch_on","device":"switch.rgbic_tv_backlight_dreamview","response":"Dreamview activated. Enjoy the light show.","raw":"turn on dreamview"}
+
+User: "activate tv time scene"
+{"action":"scene_activate","scene":"tv_time","response":"TV time scene activated. Don't forget to blink occasionally.","raw":"activate tv time scene"}
 
 Respond with JSON only. No explanation, no markdown.`;
 }
