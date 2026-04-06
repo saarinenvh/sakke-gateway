@@ -77,14 +77,56 @@ IMPORTANT: Always use the exact entity_id values listed below. Never guess or in
 
 ---
 
-## Example
+## Examples
 
 Scene: Dungeon Boss Fight
+```json
+{
+  "name": "Dungeon Boss Fight",
+  "description": "Dark oppressive atmosphere with fire-like shadows.",
+  "lights": [
+    {"entity_id": "light.rgbic_tv_backlight", "state": "on", "brightness": 120, "color": [255, 50, 0]},
+    {"entity_id": "light.rgbicww_floor_lamp", "state": "on", "brightness": 100, "color": [255, 80, 0]},
+    {"entity_id": "light.wiz_rgbw_tunable_27e72e", "state": "on", "brightness": 80, "color": [200, 60, 0]},
+    {"entity_id": "light.wiz_rgbw_tunable_24c978", "state": "on", "brightness": 80, "color": [200, 60, 0]},
+    {"entity_id": "light.hue_play_2", "state": "on", "brightness": 100, "color": [255, 30, 0]},
+    {"entity_id": "light.hue_play_3", "state": "on", "brightness": 100, "color": [255, 30, 0]},
+    {"entity_id": "light.uplighter_floor_lamp", "state": "on", "brightness": 90, "color": [180, 40, 0]},
+    {"entity_id": "light.wiz_rgbw_tunable_22b1c8", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_22b05a", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_22b520", "state": "off"},
+    {"entity_id": "light.shelf_light", "state": "on", "brightness": 80},
+    {"entity_id": "light.case_lights", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_38f16e", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_38e39a", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_38f12c", "state": "off"},
+    {"entity_id": "light.wiz_rgbw_tunable_367e46", "state": "off"}
+  ]
+}
+```
 
-- TV Backlight → deep red (low brightness)
-- Govee Floor Lamp → orange flicker
-- Couch Floor Lamp 1 → dim warm
-- All ceiling lights OFF
-
-Description:
-Dark, oppressive atmosphere with fire-like flickering shadows.
+Scene: Focused Office Work
+```json
+{
+  "name": "Focused Office Work",
+  "description": "Bright clean light for productivity, warm white tones.",
+  "lights": [
+    {"entity_id": "light.rgbic_tv_backlight", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_27e72e", "state": "on", "brightness": 200, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_24c978", "state": "on", "brightness": 200, "color": [255, 240, 200]},
+    {"entity_id": "light.rgbicww_floor_lamp", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.uplighter_floor_lamp", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_22b1c8", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_22b05a", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_22b520", "state": "on", "brightness": 180, "color": [255, 240, 200]},
+    {"entity_id": "light.hue_play_2", "state": "on", "brightness": 160, "color": [255, 240, 200]},
+    {"entity_id": "light.hue_play_3", "state": "on", "brightness": 160, "color": [255, 240, 200]},
+    {"entity_id": "light.shelf_light", "state": "on", "brightness": 200},
+    {"entity_id": "light.case_lights", "state": "on", "brightness": 180},
+    {"entity_id": "light.wiz_rgbw_tunable_38f16e", "state": "on", "brightness": 200, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_38e39a", "state": "on", "brightness": 200, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_38f12c", "state": "on", "brightness": 200, "color": [255, 240, 200]},
+    {"entity_id": "light.wiz_rgbw_tunable_367e46", "state": "off"}
+  ]
+}
+```
