@@ -23,36 +23,59 @@ async function haGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function haTemplate(template: string): Promise<string> {
+  const res = await fetch(`${baseUrl}/api/template`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ template }),
+  });
+  if (!res.ok) throw new Error(`HA template API ${res.status}`);
+  return res.text();
+}
+
 export async function loadEntities(): Promise<void> {
-  const [states, entityRegistry, areaRegistry] = await Promise.all([
-    haGet<any[]>("/api/states"),
-    haGet<any[]>("/api/config/entity_registry"),
-    haGet<any[]>("/api/config/area_registry"),
-  ]);
+  const states = await haGet<any[]>("/api/states");
 
-  areasCache = areaRegistry.map((a: any) => ({ area_id: a.area_id, name: a.name }));
+  // Get area name for each light entity via template
+  const lightStates = states.filter((s: any) =>
+    s.entity_id.startsWith("light.") &&
+    !s.entity_id.includes("_segment_")
+  );
 
-  const areaById = new Map(areasCache.map(a => [a.area_id, a.name]));
+  // Build area map using template API
+  const areaMap = new Map<string, string>();
+  const areaTemplate = lightStates
+    .map(s => `${s.entity_id}:{{ area_name('${s.entity_id}') or '' }}`)
+    .join("\n");
 
-  // Build entity_id -> area_id from entity registry
-  const entityAreaMap = new Map<string, string>();
-  for (const e of entityRegistry) {
-    if (e.area_id) entityAreaMap.set(e.entity_id, e.area_id);
+  try {
+    const areaResult = await haTemplate(areaTemplate);
+    for (const line of areaResult.split("\n")) {
+      const [entityId, areaName] = line.split(":");
+      if (entityId && areaName) areaMap.set(entityId.trim(), areaName.trim());
+    }
+  } catch {
+    // area info is optional, continue without it
   }
 
-  lightsCache = states
-    .filter((s: any) =>
-      s.entity_id.startsWith("light.") &&
-      !s.entity_id.includes("_segment_")
-    )
-    .map((s: any) => {
-      const areaId = entityAreaMap.get(s.entity_id);
-      return {
-        entity_id: s.entity_id,
-        name: s.attributes?.friendly_name ?? s.entity_id,
-        area: areaId ? areaById.get(areaId) : undefined,
-      };
-    });
+  // Collect unique areas
+  const areaSet = new Set<string>();
+  for (const area of areaMap.values()) {
+    if (area) areaSet.add(area);
+  }
+  areasCache = [...areaSet].map(name => ({
+    area_id: name.toLowerCase().replace(/\s+/g, "_"),
+    name,
+  }));
+
+  lightsCache = lightStates.map((s: any) => ({
+    entity_id: s.entity_id,
+    name: s.attributes?.friendly_name ?? s.entity_id,
+    area: areaMap.get(s.entity_id) || undefined,
+  }));
 }
 
 export function getLights(): LightEntity[] {
