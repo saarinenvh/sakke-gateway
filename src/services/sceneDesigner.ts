@@ -76,6 +76,15 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
   }));
 }
 
+export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
+  const sceneId = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  await callHA("scene", "create", {
+    scene_id: sceneId,
+    snapshot_entities: entityIds,
+  });
+  return `scene.${sceneId}`;
+}
+
 async function callHA(domain: string, service: string, data: Record<string, unknown>): Promise<void> {
   const res = await fetch(`${haBaseUrl}/api/services/${domain}/${service}`, {
     method: "POST",
