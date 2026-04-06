@@ -47,6 +47,9 @@ export async function dispatch(intent: Intent): Promise<string> {
 
     case "scene_activate":
       await callService("scene", "turn_on", { entity_id: `scene.${intent.scene}` });
+      if (intent.scene === "tv_time") {
+        await callService("media_player", "turn_on", { entity_id: "media_player.tv" });
+      }
       return reply(`Scene activated.`);
 
     case "media_play":
@@ -72,6 +75,12 @@ export async function dispatch(intent: Intent): Promise<string> {
     case "switch_off":
       await callService("switch", "turn_off", { entity_id: intent.device });
       return reply("Switch turned off.");
+
+    case "bedtime_routine":
+      await callService("light", "turn_off", { entity_id: getLights().map(l => l.entity_id) });
+      await callService("media_player", "turn_off", { entity_id: "media_player.tv" });
+      await callService("media_player", "turn_on", { entity_id: "media_player.chromecast" });
+      return reply("Lights off, TV off, bedroom Chromecast on. Don't forget to brush your teeth. I won't remind you again. Tonight.");
 
     case "morning_routine":
       await callService("scene", "turn_on", { entity_id: "scene.default" });
