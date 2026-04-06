@@ -22,7 +22,7 @@ async function callService(domain: string, service: string, data: Record<string,
 
 export async function dispatch(intent: Intent): Promise<string> {
   const target: Record<string, unknown> = {};
-  if (intent.area) target["area_id"] = intent.area;
+  if (intent.area) target["area_id"] = intent.area.toLowerCase().replace(/\s+/g, "_");
   else if (intent.device) target["entity_id"] = intent.device;
   else target["entity_id"] = getLights().map(l => l.entity_id);
 
