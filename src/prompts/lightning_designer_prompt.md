@@ -39,8 +39,8 @@ Return ONLY a valid JSON object in this exact format:
 ```
 
 Rules for the JSON:
-- `brightness` is 0–255
-- `color` is [R, G, B] — only for RGB-capable lights (Govee, Wiz)
+- `brightness` is 0–255 — controls how dim or bright the light is
+- `color` is [R, G, B] — controls the HUE of the light. Use saturated colors (at least one value near 200–255). Low RGB values like [20,30,50] will appear completely off. To make a dim green light: brightness=80, color=[50,255,50]. To make a dim blue: brightness=80, color=[50,100,255].
 - Omit `color` for Ikea lights (brightness only)
 - Set `state: "off"` to turn a light off (omit brightness/color)
 - Include ALL lights in the scene — explicitly turn off lights that should be off

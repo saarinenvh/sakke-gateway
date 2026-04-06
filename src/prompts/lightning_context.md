@@ -31,71 +31,37 @@ Lights are grouped by purpose and physical zones.
 
 ### Ambient Lights (base mood)
 
-- TV Backlight (Govee) — entity_id: light.rgbic_tv_backlight
-  - Strong wall glow behind TV
-  - Primary mood driver
-  - Supports full RGB
-
-- Couch Floor Lamp 1 (Wiz) — entity_id: light.wiz_rgbw_tunable_27e72e
-  - Indirect upward light
-  - Soft room fill
-
-- Couch Floor Lamp 2 (Wiz) — entity_id: light.wiz_rgbw_tunable_24c978
-  - Indirect upward light
-  - Soft room fill
+- entity_id: light.rgbic_tv_backlight — TV Backlight, strong wall glow behind TV, primary mood driver, RGB
+- entity_id: light.wiz_rgbw_tunable_27e72e — Couch Floor Lamp 1, indirect upward light, RGB
+- entity_id: light.wiz_rgbw_tunable_24c978 — Couch Floor Lamp 2, indirect upward light, RGB
 
 ---
 
 ### Accent Lights (depth & atmosphere)
 
-- Govee Floor Lamp — entity_id: light.rgbicww_floor_lamp
-  - Vertical LED strip near shelf
-  - Adds depth and color accents
-
-- Uplighter Floor Lamp (Govee) — entity_id: light.uplighter_floor_lamp
-  - Directional + indirect hybrid
-  - Can light walls and create effects
-
-- Cone Floor Lamp 1 (Wiz) — entity_id: light.wiz_rgbw_tunable_22b1c8
-  - Directional warm light near cabinet
-
-- Cone Floor Lamp 2 (Wiz) — entity_id: light.wiz_rgbw_tunable_22b05a
-  - Directional warm light near cabinet
-
-- Cone Floor Lamp 3 (Wiz) — entity_id: light.wiz_rgbw_tunable_22b520
-  - Directional warm light near cabinet
-
-- Hue Play 2 — entity_id: light.hue_play_2
-  - Bias lighting, RGB
-
-- Hue Play 3 — entity_id: light.hue_play_3
-  - Bias lighting, RGB
+- entity_id: light.rgbicww_floor_lamp — Govee Floor Lamp, vertical LED strip near shelf, RGB
+- entity_id: light.uplighter_floor_lamp — Uplighter Floor Lamp, wall accent light, RGB
+- entity_id: light.wiz_rgbw_tunable_22b1c8 — Cone Floor Lamp 1, directional near cabinet, RGB
+- entity_id: light.wiz_rgbw_tunable_22b05a — Cone Floor Lamp 2, directional near cabinet, RGB
+- entity_id: light.wiz_rgbw_tunable_22b520 — Cone Floor Lamp 3, directional near cabinet, RGB
+- entity_id: light.hue_play_2 — Hue Play 2, bias lighting behind TV, RGB
+- entity_id: light.hue_play_3 — Hue Play 3, bias lighting behind TV, RGB
 
 ---
 
-### Decorative Lights (static / non-RGB)
+### Decorative Lights (no color)
 
-- Shelf Light (Ikea) — entity_id: light.shelf_light
-  - Top of cabinet, warm, no color
-
-- Case Lights (Ikea) — entity_id: light.case_lights
-  - Inside cabinet, subtle highlights, no color
+- entity_id: light.shelf_light — Shelf Light, top of cabinet, brightness only
+- entity_id: light.case_lights — Case Lights, inside cabinet, brightness only
 
 ---
 
 ### Ceiling Lights (functional)
 
-- Livingroom ceiling 1 (Wiz) — entity_id: light.wiz_rgbw_tunable_38f16e
-  - Main brightness, OFF in mood scenes
-
-- Livingroom ceiling 2 (Wiz) — entity_id: light.wiz_rgbw_tunable_38e39a
-  - Main brightness, OFF in mood scenes
-
-- Livingroom ceiling 3 (Wiz) — entity_id: light.wiz_rgbw_tunable_38f12c
-  - Main brightness, OFF in mood scenes
-
-- Hall (Wiz) — entity_id: light.wiz_rgbw_tunable_367e46
-  - Entrance light
+- entity_id: light.wiz_rgbw_tunable_38f16e — Livingroom ceiling 1, main brightness
+- entity_id: light.wiz_rgbw_tunable_38e39a — Livingroom ceiling 2, main brightness
+- entity_id: light.wiz_rgbw_tunable_38f12c — Livingroom ceiling 3, main brightness
+- entity_id: light.wiz_rgbw_tunable_367e46 — Hall, entrance light
 
 ---
 
