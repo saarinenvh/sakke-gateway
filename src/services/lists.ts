@@ -42,7 +42,8 @@ async function haPost(path: string, body: object): Promise<any> {
 
 async function getItems(entityId: string): Promise<TodoItem[]> {
   const data = await haPost(`/api/services/todo/get_items?return_response=true`, { entity_id: entityId });
-  return (data[entityId]?.items ?? []) as TodoItem[];
+  const root = data?.service_response ?? data;
+  return (root[entityId]?.items ?? []) as TodoItem[];
 }
 
 function findItem(items: TodoItem[], query: string): TodoItem | undefined {
