@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "./homeAssistant.js";
 import { webSearch } from "./webSearch.js";
+import { getWeather } from "./weather.js";
 import { getLights, getAreas, getScenes } from "./entityRegistry.js";
 import type { Intent } from "../types/intent.js";
 
@@ -100,6 +101,18 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_weather",
+      description: "Get current weather and forecast for the user's location (Espoo, Finland)",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 async function executeTool(
@@ -117,6 +130,18 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ HA tool error");
       return `Error: ${err.message}`;
+    }
+  }
+
+  if (name === "get_weather") {
+    log.info({ tool: "get_weather" }, "🌤️  Tool call: weather");
+    try {
+      const result = await getWeather();
+      log.info({ result }, "✅ Weather result");
+      return result;
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Weather error");
+      return `Weather fetch failed: ${err.message}`;
     }
   }
 
