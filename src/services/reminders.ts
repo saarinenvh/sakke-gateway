@@ -117,8 +117,13 @@ export async function getTasksText(period = "today"): Promise<string> {
 
 export async function getCalendarText(period = "today"): Promise<string> {
   const { start, end } = getDateRange(period);
-  const startDt = new Date(start + "T00:00:00");
-  const endDt = new Date(end + "T23:59:59");
+  // Construct dates in the configured timezone by using the offset-aware format
+  const startDt = new Date(`${start}T00:00:00`);
+  const endDt = new Date(`${end}T23:59:59`);
+  // Adjust for timezone offset so API receives correct UTC bounds
+  const tzOffset = new Date().getTimezoneOffset() * 60000;
+  startDt.setTime(startDt.getTime() + tzOffset);
+  endDt.setTime(endDt.getTime() + tzOffset);
   const parts: string[] = [];
   for (const calendarId of CALENDAR_ENTITIES) {
     const events = await getTodayEvents(calendarId, startDt, endDt);
