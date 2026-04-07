@@ -1,5 +1,5 @@
-import { readFileSync, existsSync, writeFileSync } from "fs";
-import { join } from "path";
+import { readFileSync } from "fs";
+import { join } from "path"; // used by loadPrompt
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "llama3";
 const haBaseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -80,9 +80,6 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
   const sceneId = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-  const scenesPath = process.env.HA_CONFIG_PATH
-    ? join(process.env.HA_CONFIG_PATH, "scenes.yaml")
-    : null;
 
   // Fetch current states for all requested entities
   const res = await fetch(`${haBaseUrl}/api/states`, {
@@ -102,26 +99,19 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     entities[state.entity_id] = entry;
   }
 
-  if (scenesPath) {
-    // Read existing scenes.yaml or start fresh
-    let existing: any[] = [];
-    if (existsSync(scenesPath)) {
-      const { load } = await import("js-yaml");
-      const content = readFileSync(scenesPath, "utf-8");
-      existing = (load(content) as any[]) ?? [];
-    }
-    // Remove scene with same id if exists
-    existing = existing.filter((s: any) => s.id !== sceneId);
-    existing.push({ id: sceneId, name, entities });
+  // Use HA config API to create a persistent, editable scene
+  const configRes = await fetch(`${haBaseUrl}/api/config/scene/config/${sceneId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${haToken}`,
+    },
+    body: JSON.stringify({ id: sceneId, name, entities }),
+  });
 
-    const { dump } = await import("js-yaml");
-    writeFileSync(scenesPath, dump(existing, { lineWidth: -1 }), "utf-8");
-
-    // Reload scenes in HA
-    await callHA("scene", "reload", {});
-  } else {
-    // Fallback to API if no config path
-    await callHA("scene", "create", { scene_id: sceneId, snapshot_entities: entityIds });
+  if (!configRes.ok) {
+    const body = await configRes.text();
+    throw new Error(`HA config API ${configRes.status}: ${body}`);
   }
 
   return `scene.${sceneId}`;
