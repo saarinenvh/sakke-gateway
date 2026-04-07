@@ -66,6 +66,24 @@ function formatEventTime(event: CalendarEvent): string {
   return `${event.summary} at ${time}`;
 }
 
+export async function getTasksText(): Promise<string> {
+  const tasks = await getPendingTasks();
+  if (tasks.length === 0) return "No pending tasks.";
+  return "Pending tasks: " + tasks.map(t => t.summary).join(", ") + ".";
+}
+
+export async function getCalendarText(): Promise<string> {
+  const parts: string[] = [];
+  for (const calendarId of CALENDAR_ENTITIES) {
+    const events = await getTodayEvents(calendarId);
+    if (events.length > 0) {
+      parts.push(...events.map(formatEventTime));
+    }
+  }
+  if (parts.length === 0) return "Nothing on the calendar today.";
+  return "Today's events: " + parts.join(", ") + ".";
+}
+
 export async function getMorningGreeting(): Promise<string> {
   const parts: string[] = [];
 

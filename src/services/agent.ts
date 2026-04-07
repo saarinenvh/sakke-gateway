@@ -5,6 +5,7 @@ import { getWeather } from "./weather.js";
 import { getLights, getAreas, getScenes } from "./entityRegistry.js";
 import { getTodoLists, readList, addToList, completeInList, removeFromList } from "./lists.js";
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "./spotify.js";
+import { getTasksText, getCalendarText } from "./reminders.js";
 import type { Intent } from "../types/intent.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
@@ -179,6 +180,22 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_tasks",
+      description: "Get the user's pending tasks for today from Google Tasks. Use when asked about tasks, chores, reminders, or what needs to be done.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_calendar",
+      description: "Get today's events from the user's Google Calendar. Use when asked about the calendar, schedule, appointments, or what's happening today.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
 ];
 
 async function executeTool(
@@ -249,6 +266,26 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ List error");
       return `List operation failed: ${err.message}`;
+    }
+  }
+
+  if (name === "get_tasks") {
+    log.info({ tool: "get_tasks" }, "✅ Tool call: tasks");
+    try {
+      return await getTasksText();
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Tasks error");
+      return `Tasks fetch failed: ${err.message}`;
+    }
+  }
+
+  if (name === "get_calendar") {
+    log.info({ tool: "get_calendar" }, "📅 Tool call: calendar");
+    try {
+      return await getCalendarText();
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Calendar error");
+      return `Calendar fetch failed: ${err.message}`;
     }
   }
 
