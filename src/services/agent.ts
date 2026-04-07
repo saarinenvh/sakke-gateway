@@ -8,7 +8,7 @@ import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPr
 import type { Intent } from "../types/intent.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const model = process.env.OLLAMA_MODEL ?? "qwen2.5:7b";
+const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
 
 const CONVERSATION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_ITERATIONS = 6;
@@ -46,6 +46,8 @@ async function buildSystemPrompt(): Promise<string> {
   const lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
 
   return `You are Sakke, a home assistant with the personality of a deadpan butler meets grumpy dwarf. Helpful but reluctant about it. Dry humor, wit, short punchy responses — 1-3 sentences max.
+
+ALWAYS respond in Finnish, regardless of what language the user speaks.
 
 You have tools to control the home, search the web, get weather, and manage lists. Rules:
 - Always use control_home_assistant for any home control — never just describe what you'd do.
