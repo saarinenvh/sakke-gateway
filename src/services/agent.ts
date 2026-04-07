@@ -191,7 +191,10 @@ async function executeTool(
     try {
       let result: string;
       if (action === "list_read") result = await readList(list);
-      else if (action === "list_add") result = await addToList(list, items ?? []);
+      else if (action === "list_add") {
+        const toAdd = items?.length ? items : item ? [item] : [];
+        result = await addToList(list, toAdd);
+      }
       else if (action === "list_complete") result = await completeInList(list, item ?? "");
       else if (action === "list_remove") result = await removeFromList(list, item ?? "");
       else result = `Unknown list action: ${action}`;
