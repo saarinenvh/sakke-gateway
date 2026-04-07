@@ -1,6 +1,6 @@
 import type { Intent } from "../types/intent.js";
-import { getLights } from "./entityRegistry.js";
-import { designScene, applyScene } from "./sceneDesigner.js";
+import { getLights, getSwitches } from "./entityRegistry.js";
+import { designScene, applyScene, saveCurrentStateAsScene } from "./sceneDesigner.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";
@@ -54,13 +54,13 @@ export async function dispatch(intent: Intent): Promise<string> {
       return reply(`Scene activated.`);
 
     case "scene_create": {
-      const sceneId = (intent.scene_name ?? "custom_scene").toLowerCase().replace(/\s+/g, "_");
-      const snapshotEntities = getLights().map(l => l.entity_id);
-      await callService("scene", "create", {
-        scene_id: sceneId,
-        snapshot_entities: snapshotEntities,
-      });
-      return reply(`Scene "${sceneId}" saved.`);
+      const name = intent.scene_name ?? "custom_scene";
+      const entityIds = [
+        ...getLights().map(l => l.entity_id),
+        ...getSwitches().map(s => s.entity_id),
+      ];
+      await saveCurrentStateAsScene(name, entityIds);
+      return reply(`Scene "${name}" saved.`);
     }
 
     case "scene_design": {
