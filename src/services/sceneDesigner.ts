@@ -94,9 +94,24 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     const entry: Record<string, any> = { state: state.state };
     const attrs = state.attributes ?? {};
     if (attrs.brightness !== undefined) entry.brightness = attrs.brightness;
-    if (attrs.rgb_color) entry.rgb_color = attrs.rgb_color;
-    else if (attrs.color_temp !== undefined) entry.color_temp = attrs.color_temp;
-    if (attrs.effect && attrs.effect !== "None") entry.effect = attrs.effect;
+    const colorMode = attrs.color_mode;
+    if (colorMode === "color_temp") {
+      // Prefer kelvin, fall back to mireds
+      if (attrs.color_temp_kelvin !== undefined) entry.color_temp_kelvin = attrs.color_temp_kelvin;
+      else if (attrs.color_temp !== undefined) entry.color_temp = attrs.color_temp;
+    } else if (colorMode === "rgb" || colorMode === "rgbw" || colorMode === "rgbww") {
+      if (attrs.rgb_color) entry.rgb_color = attrs.rgb_color;
+    } else if (colorMode === "hs") {
+      if (attrs.hs_color) entry.hs_color = attrs.hs_color;
+    } else if (colorMode === "xy") {
+      if (attrs.xy_color) entry.xy_color = attrs.xy_color;
+    } else if (colorMode === "brightness") {
+      // brightness only, no color to save
+    } else {
+      // fallback
+      if (attrs.rgb_color) entry.rgb_color = attrs.rgb_color;
+    }
+    if (attrs.effect && attrs.effect !== "None" && attrs.effect !== "off") entry.effect = attrs.effect;
     entities[state.entity_id] = entry;
   }
 
