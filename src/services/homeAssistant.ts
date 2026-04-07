@@ -1,5 +1,5 @@
 import type { Intent } from "../types/intent.js";
-import { getLights, getSwitches } from "./entityRegistry.js";
+import { getLights, getSwitches, getScenes } from "./entityRegistry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "./sceneDesigner.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -46,12 +46,20 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("light", "turn_on", { ...target, color_name: intent.color });
       return reply(`Color set to ${intent.color}.`);
 
-    case "scene_activate":
-      await callService("scene", "turn_on", { entity_id: `scene.${intent.scene}` });
-      if (intent.scene === "tv_time") {
+    case "scene_activate": {
+      const scenes = getScenes();
+      const match = scenes.find(s =>
+        s.scene_id === intent.scene ||
+        s.name.toLowerCase() === intent.scene?.toLowerCase() ||
+        s.entity_id === intent.scene
+      );
+      const sceneEntityId = match ? match.entity_id : `scene.${intent.scene}`;
+      await callService("scene", "turn_on", { entity_id: sceneEntityId });
+      if (match?.scene_id === "tv_time" || intent.scene === "tv_time") {
         await callService("media_player", "turn_on", { entity_id: "media_player.tv" });
       }
       return reply(`Scene activated.`);
+    }
 
     case "scene_create": {
       const name = intent.scene_name ?? "custom_scene";
