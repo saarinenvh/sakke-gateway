@@ -95,6 +95,7 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     const attrs = state.attributes ?? {};
     if (attrs.brightness !== undefined) entry.brightness = attrs.brightness;
     if (attrs.rgb_color) entry.rgb_color = attrs.rgb_color;
+    else if (attrs.color_temp !== undefined) entry.color_temp = attrs.color_temp;
     if (attrs.effect && attrs.effect !== "None") entry.effect = attrs.effect;
     entities[state.entity_id] = entry;
   }
