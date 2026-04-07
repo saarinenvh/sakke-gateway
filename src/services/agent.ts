@@ -195,15 +195,35 @@ const tools = [
     function: {
       name: "get_tasks",
       description: "Get pending items from Google Tasks (todo list). Use ONLY for tasks, chores, or to-dos — things the user needs to DO. NOT for calendar events or appointments.",
-      parameters: { type: "object", properties: {}, required: [] },
+      parameters: {
+        type: "object",
+        properties: {
+          period: {
+            type: "string",
+            enum: ["today", "tomorrow", "this_week", "next_week"],
+            description: "Time period to fetch tasks for. Defaults to today.",
+          },
+        },
+        required: [],
+      },
     },
   },
   {
     type: "function",
     function: {
       name: "get_calendar",
-      description: "Get today's events from Google Calendar. Use ONLY for calendar events, appointments, meetings, or scheduled events — things happening at a specific time. NOT for tasks or to-dos.",
-      parameters: { type: "object", properties: {}, required: [] },
+      description: "Get events from Google Calendar. Use ONLY for calendar events, appointments, meetings, or scheduled events — things happening at a specific time. NOT for tasks or to-dos.",
+      parameters: {
+        type: "object",
+        properties: {
+          period: {
+            type: "string",
+            enum: ["today", "tomorrow", "this_week", "next_week"],
+            description: "Time period to fetch events for. Defaults to today.",
+          },
+        },
+        required: [],
+      },
     },
   },
 ];
@@ -280,9 +300,10 @@ async function executeTool(
   }
 
   if (name === "get_tasks") {
-    log.info({ tool: "get_tasks" }, "✅ Tool call: tasks");
+    const period = (args.period as string) ?? "today";
+    log.info({ tool: "get_tasks", period }, "✅ Tool call: tasks");
     try {
-      return await getTasksText();
+      return await getTasksText(period);
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Tasks error");
       return `Tasks fetch failed: ${err.message}`;
@@ -290,9 +311,10 @@ async function executeTool(
   }
 
   if (name === "get_calendar") {
-    log.info({ tool: "get_calendar" }, "📅 Tool call: calendar");
+    const period = (args.period as string) ?? "today";
+    log.info({ tool: "get_calendar", period }, "📅 Tool call: calendar");
     try {
-      return await getCalendarText();
+      return await getCalendarText(period);
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Calendar error");
       return `Calendar fetch failed: ${err.message}`;

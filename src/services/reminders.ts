@@ -13,6 +13,7 @@ interface TodoItem {
   uid?: string;
   summary: string;
   status: "needs_action" | "completed";
+  due?: string; // YYYY-MM-DD
 }
 
 async function haGet(path: string): Promise<any> {
@@ -38,25 +39,65 @@ async function haPost(path: string, body: object): Promise<any> {
   return res.json();
 }
 
-async function getTodayEvents(calendarEntityId: string): Promise<CalendarEvent[]> {
+async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date): Promise<CalendarEvent[]> {
   const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
+  const s = start ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const e = end ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
   const events = await haGet(
-    `/api/calendars/${calendarEntityId}?start=${start.toISOString()}&end=${end.toISOString()}`
+    `/api/calendars/${calendarEntityId}?start=${s.toISOString()}&end=${e.toISOString()}`
   );
   return events as CalendarEvent[];
 }
 
-async function getPendingTasks(): Promise<TodoItem[]> {
+function getDateRange(period: string): { start: string; end: string } {
+  const now = new Date();
+  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: TIMEZONE });
+
+  if (period === "tomorrow") {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowStr = tomorrow.toLocaleDateString("sv-SE", { timeZone: TIMEZONE });
+    return { start: tomorrowStr, end: tomorrowStr };
+  }
+
+  if (period === "this_week") {
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return {
+      start: monday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+      end: sunday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+    };
+  }
+
+  if (period === "next_week") {
+    const day = now.getDay();
+    const nextMonday = new Date(now);
+    nextMonday.setDate(now.getDate() + (day === 0 ? 1 : 8 - day));
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+    return {
+      start: nextMonday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+      end: nextSunday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+    };
+  }
+
+  return { start: todayStr, end: todayStr };
+}
+
+async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
   const data = await haPost("/api/services/todo/get_items?return_response=true", {
     entity_id: TASKS_TODO_ENTITY,
-    status: "needs_action",
   });
-  return (data[TASKS_TODO_ENTITY]?.items ?? []) as TodoItem[];
+  const root = data?.service_response ?? data;
+  const items = (root[TASKS_TODO_ENTITY]?.items ?? []) as TodoItem[];
+  const { start, end } = getDateRange(period);
+  return items.filter(i =>
+    i.status !== "completed" && (!i.due || (i.due >= start && i.due <= end))
+  );
 }
 
 const TIMEZONE = process.env.TIMEZONE ?? "Europe/Helsinki";
@@ -68,22 +109,25 @@ function formatEventTime(event: CalendarEvent): string {
   return `${event.summary} at ${time}`;
 }
 
-export async function getTasksText(): Promise<string> {
-  const tasks = await getPendingTasks();
-  if (tasks.length === 0) return "No pending tasks.";
-  return "Pending tasks: " + tasks.map(t => t.summary).join(", ") + ".";
+export async function getTasksText(period = "today"): Promise<string> {
+  const tasks = await getPendingTasks(period);
+  if (tasks.length === 0) return `No tasks for ${period}.`;
+  return `Tasks (${period}): ` + tasks.map(t => t.summary).join(", ") + ".";
 }
 
-export async function getCalendarText(): Promise<string> {
+export async function getCalendarText(period = "today"): Promise<string> {
+  const { start, end } = getDateRange(period);
+  const startDt = new Date(start + "T00:00:00");
+  const endDt = new Date(end + "T23:59:59");
   const parts: string[] = [];
   for (const calendarId of CALENDAR_ENTITIES) {
-    const events = await getTodayEvents(calendarId);
+    const events = await getTodayEvents(calendarId, startDt, endDt);
     if (events.length > 0) {
       parts.push(...events.map(formatEventTime));
     }
   }
-  if (parts.length === 0) return "Nothing on the calendar today.";
-  return "Today's events: " + parts.join(", ") + ".";
+  if (parts.length === 0) return `Nothing on the calendar for ${period}.`;
+  return `Events (${period}): ` + parts.join(", ") + ".";
 }
 
 export async function getMorningGreeting(): Promise<string> {
