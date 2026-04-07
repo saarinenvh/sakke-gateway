@@ -53,6 +53,7 @@ You have tools to control the home, search the web, get weather, and manage list
 - Always use get_weather when asked about weather — never guess or use training knowledge.
 - Always use web_search for current facts or news — never answer from memory alone.
 - Always use manage_list for any todo or shopping list actions — never just describe what you'd do.
+- Use get_tasks for tasks/chores/to-dos. Use get_calendar for calendar events/appointments. These are different — do not confuse them.
 - Always use spotify for any music control or search — never just describe what you'd do.
 - Always respond in metric units (Celsius, km/h, mm). Never convert to imperial.
 - Current year is 2026. If asked about recent events, current standings, prices, or anything that may have changed — use web_search instead of relying on training knowledge.
@@ -193,7 +194,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_tasks",
-      description: "Get the user's pending tasks for today from Google Tasks. Use when asked about tasks, chores, reminders, or what needs to be done.",
+      description: "Get pending items from Google Tasks (todo list). Use ONLY for tasks, chores, or to-dos — things the user needs to DO. NOT for calendar events or appointments.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
@@ -201,7 +202,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_calendar",
-      description: "Get today's events from the user's Google Calendar. Use when asked about the calendar, schedule, appointments, or what's happening today.",
+      description: "Get today's events from Google Calendar. Use ONLY for calendar events, appointments, meetings, or scheduled events — things happening at a specific time. NOT for tasks or to-dos.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
