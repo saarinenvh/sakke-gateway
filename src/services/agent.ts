@@ -4,6 +4,7 @@ import { webSearch } from "./webSearch.js";
 import { getWeather } from "./weather.js";
 import { getLights, getAreas, getScenes } from "./entityRegistry.js";
 import { getTodoLists, readList, addToList, completeInList, removeFromList } from "./lists.js";
+import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "./spotify.js";
 import type { Intent } from "../types/intent.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
@@ -51,6 +52,7 @@ You have tools to control the home, search the web, get weather, and manage list
 - Always use get_weather when asked about weather — never guess or use training knowledge.
 - Always use web_search for current facts or news — never answer from memory alone.
 - Always use manage_list for any todo or shopping list actions — never just describe what you'd do.
+- Always use spotify for any music control or search — never just describe what you'd do.
 - Always respond in metric units (Celsius, km/h, mm). Never convert to imperial.
 
 For general conversation — coding ideas, architecture discussions, random questions — just respond naturally. You're opinionated and smart.
@@ -136,6 +138,30 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "spotify",
+      description: "Control Spotify playback or search and play music",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["play", "pause", "next", "previous", "volume", "search_and_play"],
+          },
+          query: { type: "string", description: "Search query for search_and_play" },
+          type: {
+            type: "string",
+            enum: ["track", "artist", "playlist", "album"],
+            description: "Type of content to search for",
+          },
+          volume: { type: "number", description: "0-100 for volume action" },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "manage_list",
       description: "Read, add, complete, or remove items from todo and shopping lists",
       parameters: {
@@ -182,6 +208,26 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Weather error");
       return `Weather fetch failed: ${err.message}`;
+    }
+  }
+
+  if (name === "spotify") {
+    const { action, query, type, volume } = args as { action: string; query?: string; type?: "track" | "artist" | "playlist" | "album"; volume?: number };
+    log.info({ tool: "spotify", action, query }, "🎵 Tool call: Spotify");
+    try {
+      let result: string;
+      if (action === "search_and_play") result = await spotifySearchAndPlay(query ?? "", type ?? "track");
+      else if (action === "play") result = await spotifyPlay();
+      else if (action === "pause") result = await spotifyPause();
+      else if (action === "next") result = await spotifyNext();
+      else if (action === "previous") result = await spotifyPrevious();
+      else if (action === "volume") result = await spotifyVolume(volume ?? 50);
+      else result = `Unknown spotify action: ${action}`;
+      log.info({ result }, "✅ Spotify result");
+      return result;
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Spotify error");
+      return `Spotify failed: ${err.message}`;
     }
   }
 
