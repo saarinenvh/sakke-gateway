@@ -57,6 +57,7 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("scene", "turn_on", { entity_id: sceneEntityId });
       if (match?.scene_id === "tv_time" || intent.scene === "tv_time") {
         await callService("media_player", "turn_on", { entity_id: "media_player.tv" });
+        await callService("switch", "turn_on", { entity_id: "switch.rgbic_tv_backlight_dreamview" });
       }
       return reply(`Scene activated.`);
     }
