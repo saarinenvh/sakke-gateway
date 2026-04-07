@@ -59,10 +59,12 @@ async function getPendingTasks(): Promise<TodoItem[]> {
   return (data[TASKS_TODO_ENTITY]?.items ?? []) as TodoItem[];
 }
 
+const TIMEZONE = process.env.TIMEZONE ?? "Europe/Helsinki";
+
 function formatEventTime(event: CalendarEvent): string {
   const dt = event.start.dateTime;
   if (!dt) return event.summary; // all-day event, no time
-  const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE });
   return `${event.summary} at ${time}`;
 }
 
