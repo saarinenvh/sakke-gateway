@@ -21,7 +21,7 @@ export async function getWeather(): Promise<string> {
   url.searchParams.set("forecast_days", "1");
   url.searchParams.set("timezone", "auto");
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
 
   const data = await res.json() as any;
