@@ -32,11 +32,14 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     const conversationId = request.body.conversation_id ?? "default";
 
     let responseText: string;
+    let continueConversation = true;
 
     if (!text) {
       responseText = "Didn't catch that.";
     } else {
-      responseText = await runAgent(text, conversationId, request.log);
+      const result = await runAgent(text, conversationId, request.log);
+      responseText = result.content;
+      continueConversation = result.continueConversation;
     }
 
     return reply.send({
@@ -50,6 +53,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
           finish_reason: "stop",
         },
       ],
+      continue_conversation: continueConversation,
     });
   });
 }

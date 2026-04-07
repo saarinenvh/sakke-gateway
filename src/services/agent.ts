@@ -268,11 +268,14 @@ async function executeTool(
   return `Unknown tool: ${name}`;
 }
 
+const NO_CONTINUE_TOOLS = new Set(["spotify"]);
+const NO_CONTINUE_SPOTIFY_ACTIONS = new Set(["play", "search_and_play"]);
+
 export async function runAgent(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
-): Promise<string> {
+): Promise<{ content: string; continueConversation: boolean }> {
   pruneStale();
 
   const existing = conversations.get(conversationId);
@@ -282,6 +285,8 @@ export async function runAgent(
 
   messages.push({ role: "user", content: userMessage });
   log.info({ conversationId, turns: messages.length - 1 }, "🤖 Agent started");
+
+  let stopConversation = false;
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     log.info({ iteration: i + 1 }, "📡 Calling Ollama");
@@ -312,6 +317,12 @@ export async function runAgent(
       messages.push(message);
 
       for (const call of message.tool_calls) {
+        if (NO_CONTINUE_TOOLS.has(call.function.name)) {
+          const action = call.function.arguments?.action as string | undefined;
+          if (!action || NO_CONTINUE_SPOTIFY_ACTIONS.has(action)) {
+            stopConversation = true;
+          }
+        }
         const result = await executeTool(call.function.name, call.function.arguments, log);
         messages.push({ role: "tool", content: result, tool_call_id: call.id });
       }
@@ -324,8 +335,8 @@ export async function runAgent(
     conversations.set(conversationId, { messages, lastActive: Date.now() });
 
     log.info({ conversationId, turns: messages.length - 1, response: content }, "💬 Agent response");
-    return content;
+    return { content, continueConversation: !stopConversation };
   }
 
-  return "I got confused trying to answer that.";
+  return { content: "I got confused trying to answer that.", continueConversation: !stopConversation };
 }
