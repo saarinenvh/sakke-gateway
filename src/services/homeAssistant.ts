@@ -1,5 +1,6 @@
 import type { Intent } from "../types/intent.js";
 import { getLights } from "./entityRegistry.js";
+import { designScene, applyScene } from "./sceneDesigner.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";
@@ -51,6 +52,23 @@ export async function dispatch(intent: Intent): Promise<string> {
         await callService("media_player", "turn_on", { entity_id: "media_player.tv" });
       }
       return reply(`Scene activated.`);
+
+    case "scene_create": {
+      const sceneId = (intent.scene_name ?? "custom_scene").toLowerCase().replace(/\s+/g, "_");
+      const snapshotEntities = getLights().map(l => l.entity_id);
+      await callService("scene", "create", {
+        scene_id: sceneId,
+        snapshot_entities: snapshotEntities,
+      });
+      return reply(`Scene "${sceneId}" saved.`);
+    }
+
+    case "scene_design": {
+      const description = intent.scene_description ?? intent.raw;
+      const plan = await designScene(description);
+      await applyScene(plan);
+      return reply(`Scene "${plan.name}" applied.`);
+    }
 
     case "media_play":
       await callService("media_player", "media_play", target);

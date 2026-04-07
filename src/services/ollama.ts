@@ -37,6 +37,8 @@ Possible actions:
 - switch_on / switch_off — toggle a switch (device: entity_id)
 - media_play / media_pause / media_stop — media control
 - media_volume — set volume (volume: 0-100)
+- scene_create — save current light states as a new named scene (scene_name: string, use snake_case)
+- scene_design — design and apply a new scene from an atmosphere description (scene_description: string, pass the description verbatim)
 - morning_routine — when user says good morning or wants to start their day
 - bedtime_routine — when user says good night or wants to go to bed
 - unknown — if the command is not a smart home command
@@ -82,6 +84,18 @@ User: "good morning"
 
 User: "good night"
 {"action":"bedtime_routine","response":"Lights off, TV off, Chromecast on. Don't forget to brush your teeth. I won't remind you again. Tonight.","raw":"good night"}
+
+User: "save this as movie time"
+{"action":"scene_create","scene_name":"movie_time","response":"Scene saved as movie time. I've immortalized your lighting choices. You're welcome.","raw":"save this as movie time"}
+
+User: "save current lights as cozy evening"
+{"action":"scene_create","scene_name":"cozy_evening","response":"Cozy evening scene saved. Try not to change the lights immediately after.","raw":"save current lights as cozy evening"}
+
+User: "create a dungeon boss fight scene"
+{"action":"scene_design","scene_description":"dungeon boss fight","response":"Designing your dungeon ambiance. Try not to die while I work.","raw":"create a dungeon boss fight scene"}
+
+User: "make a relaxing reading mood"
+{"action":"scene_design","scene_description":"relaxing reading mood","response":"Crafting a reading scene. Hopefully you're reading something decent.","raw":"make a relaxing reading mood"}
 
 Respond with JSON only. No explanation, no markdown.`;
 }
