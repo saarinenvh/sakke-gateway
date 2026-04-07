@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { parseIntent } from "../services/ollama.js";
-import { dispatch } from "../services/homeAssistant.js";
+import { runAgent } from "../services/agent.js";
 
 interface ChatMessage {
   role: string;
@@ -10,6 +9,7 @@ interface ChatMessage {
 interface ChatCompletionBody {
   model?: string;
   messages: ChatMessage[];
+  conversation_id?: string;
 }
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
@@ -21,23 +21,22 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         properties: {
           model: { type: "string" },
           messages: { type: "array" },
+          conversation_id: { type: "string" },
         },
       },
     },
   }, async (request, reply) => {
-    // Extract the last user message
     const messages = request.body.messages ?? [];
     const last = [...messages].reverse().find((m) => m.role === "user");
     const text = last?.content?.trim() ?? "";
+    const conversationId = request.body.conversation_id ?? "default";
 
     let responseText: string;
 
     if (!text) {
-      responseText = "En kuullut mitään.";
+      responseText = "Didn't catch that.";
     } else {
-      const intent = await parseIntent(text);
-      app.log.info({ intent }, "Parsed intent from voice");
-      responseText = await dispatch(intent);
+      responseText = await runAgent(text, conversationId, request.log);
     }
 
     return reply.send({
