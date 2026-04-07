@@ -25,6 +25,7 @@ export interface SceneEntity {
 
 let lightsCache: LightEntity[] = [];
 let switchesCache: SwitchEntity[] = [];
+let allSwitchesCache: SwitchEntity[] = [];
 let areasCache: AreaInfo[] = [];
 let scenesCache: SceneEntity[] = [];
 
@@ -90,16 +91,19 @@ export async function loadEntities(): Promise<void> {
     area: areaMap.get(s.entity_id) || undefined,
   }));
 
-  switchesCache = states
-    .filter((s: any) =>
-      s.entity_id.startsWith("switch.") &&
-      !s.entity_id.includes("_music_mode") &&
-      !s.entity_id.includes("_dreamview")
-    )
+  const allSwitches = states
+    .filter((s: any) => s.entity_id.startsWith("switch."))
     .map((s: any) => ({
       entity_id: s.entity_id,
       name: s.attributes?.friendly_name ?? s.entity_id,
     }));
+
+  allSwitchesCache = allSwitches;
+
+  switchesCache = allSwitches.filter((s) =>
+    !s.entity_id.includes("_music_mode") &&
+    !s.entity_id.includes("_dreamview")
+  );
 
   scenesCache = states
     .filter((s: any) => s.entity_id.startsWith("scene."))
@@ -116,6 +120,10 @@ export function getLights(): LightEntity[] {
 
 export function getSwitches(): SwitchEntity[] {
   return switchesCache;
+}
+
+export function getAllSwitches(): SwitchEntity[] {
+  return allSwitchesCache;
 }
 
 export function getAreas(): AreaInfo[] {
