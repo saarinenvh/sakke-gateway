@@ -3,6 +3,7 @@ import { dispatch } from "./homeAssistant.js";
 import { webSearch } from "./webSearch.js";
 import { getWeather } from "./weather.js";
 import { getLights, getAreas, getScenes } from "./entityRegistry.js";
+import { getTodoLists, readList, addToList, completeInList, removeFromList } from "./lists.js";
 import type { Intent } from "../types/intent.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
@@ -38,16 +39,18 @@ function pruneStale(): void {
   }
 }
 
-function buildSystemPrompt(): string {
+async function buildSystemPrompt(): Promise<string> {
   const areas = getAreas().map(a => `  - ${a.name} (${a.area_id})`).join("\n");
   const scenes = getScenes().map(s => `  - ${s.name} (${s.scene_id})`).join("\n");
+  const lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
 
   return `You are Sakke, a home assistant with the personality of a deadpan butler meets grumpy dwarf. Helpful but reluctant about it. Dry humor, wit, short punchy responses — 1-3 sentences max.
 
-You have tools to control the home, search the web, and get weather. Rules:
+You have tools to control the home, search the web, get weather, and manage lists. Rules:
 - Always use control_home_assistant for any home control — never just describe what you'd do.
 - Always use get_weather when asked about weather — never guess or use training knowledge.
 - Always use web_search for current facts or news — never answer from memory alone.
+- Always use manage_list for any todo or shopping list actions — never just describe what you'd do.
 - Always respond in metric units (Celsius, km/h, mm). Never convert to imperial.
 
 For general conversation — coding ideas, architecture discussions, random questions — just respond naturally. You're opinionated and smart.
@@ -56,7 +59,20 @@ Available areas:
 ${areas}
 
 Available scenes:
-${scenes}`;
+${scenes}
+
+Available lists:
+${lists}
+
+Store layout (grocery items are sorted in this order automatically):
+1. Produce (fruits, vegetables, herbs)
+2. Bakery (bread, rolls, pastries)
+3. Meat & Fish
+4. Dairy & Eggs
+5. Frozen
+6. Canned & Dry Goods (pasta, rice, sauces, spices)
+7. Drinks
+8. Household & Cleaning`;
 }
 
 const tools = [
@@ -117,6 +133,26 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "manage_list",
+      description: "Read, add, complete, or remove items from todo and shopping lists",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["list_read", "list_add", "list_complete", "list_remove"],
+          },
+          list: { type: "string", description: "Entity ID of the list, e.g. todo.groceries" },
+          items: { type: "array", items: { type: "string" }, description: "Items to add (for list_add)" },
+          item: { type: "string", description: "Item name to complete or remove" },
+        },
+        required: ["action", "list"],
+      },
+    },
+  },
 ];
 
 async function executeTool(
@@ -149,6 +185,24 @@ async function executeTool(
     }
   }
 
+  if (name === "manage_list") {
+    const { action, list, items, item } = args as { action: string; list: string; items?: string[]; item?: string };
+    log.info({ tool: "manage_list", action, list }, "📋 Tool call: list");
+    try {
+      let result: string;
+      if (action === "list_read") result = await readList(list);
+      else if (action === "list_add") result = await addToList(list, items ?? []);
+      else if (action === "list_complete") result = await completeInList(list, item ?? "");
+      else if (action === "list_remove") result = await removeFromList(list, item ?? "");
+      else result = `Unknown list action: ${action}`;
+      log.info({ result }, "✅ List result");
+      return result;
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ List error");
+      return `List operation failed: ${err.message}`;
+    }
+  }
+
   if (name === "web_search") {
     const query = args.query as string;
     log.info({ tool: "web_search", query }, "🔍 Tool call: web search");
@@ -174,7 +228,7 @@ export async function runAgent(
 
   const existing = conversations.get(conversationId);
   const messages: Message[] = existing?.messages ?? [
-    { role: "system", content: buildSystemPrompt() },
+    { role: "system", content: await buildSystemPrompt() },
   ];
 
   messages.push({ role: "user", content: userMessage });
