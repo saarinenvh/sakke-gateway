@@ -80,14 +80,19 @@ Available lists:
 ${lists}
 
 Store layout (grocery items are sorted in this order automatically):
-1. Produce (fruits, vegetables, herbs)
-2. Bakery (bread, rolls, pastries)
-3. Meat & Fish
-4. Dairy & Eggs
-5. Frozen
-6. Canned & Dry Goods (pasta, rice, sauces, spices)
-7. Drinks
-8. Household & Cleaning`;
+1. Electronics & Household
+2. Cleaning & Hygiene
+3. Vegetables & Fruits
+4. Canned & Dry Goods (pasta, rice, sauces, spices)
+5. Sauces (ketchup, salad dressings)
+6. Coffee, tea & sugar
+7. Jucies
+8. Convience food & Redy meal
+9. Meat
+10. Dairy
+11. Bakery (bread, rolls, pastries)
+12. Drinks
+13. Frozen`;
 }
 
 const tools = [
