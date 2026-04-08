@@ -48,8 +48,11 @@ export async function designScene(description: string): Promise<ScenePlan> {
 
   if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${await res.text()}`);
 
+  console.log(`🎨 OpenAI scene design call completed (model: ${openAiModel})`);
+
   const json = await res.json() as { choices?: { message?: { content?: string } }[] };
   const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
+  console.log(`🎨 OpenAI scene response: ${content.slice(0, 200)}...`);
 
   // Strip markdown code fences if present
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
