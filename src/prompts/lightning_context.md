@@ -175,6 +175,8 @@ Only include speed entries when using an effect on that light.
   - on/off
   - brightness
   - RGB color
+  - color temperature
+  - effects (use exact names): candle, fire, prism, sparkle, opal, glisten, underwater, cosmos, sunbeam, enchant, sunrise, sunset
 
 ---
 
@@ -188,6 +190,8 @@ Only include speed entries when using an effect on that light.
   - on/off
   - brightness
   - RGB color
+  - color temperature
+  - effects (use exact names): candle, fire, prism, sparkle, opal, glisten, underwater, cosmos, sunbeam, enchant, sunrise, sunset
 
 ---
 
