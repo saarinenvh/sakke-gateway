@@ -124,7 +124,7 @@ Each light is mapped to a physical wall using wall references from the room layo
   - on/off
   - brightness
   - RGB color
-  - effects
+  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
 
 ---
 
@@ -140,7 +140,7 @@ Each light is mapped to a physical wall using wall references from the room layo
   - on/off
   - brightness
   - RGB color
-  - effects
+  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
 
 ---
 
@@ -202,7 +202,7 @@ Each light is mapped to a physical wall using wall references from the room layo
   - on/off
   - brightness
   - RGB color
-  - effects
+  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
 
 ---
 
@@ -216,7 +216,7 @@ Each light is mapped to a physical wall using wall references from the room layo
   - on/off
   - brightness
   - RGB color
-  - effects
+  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
 
 ---
 
@@ -230,7 +230,7 @@ Each light is mapped to a physical wall using wall references from the room layo
   - on/off
   - brightness
   - RGB color
-  - effects
+  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
 
 ---
 
