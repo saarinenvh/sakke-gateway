@@ -7,10 +7,11 @@ const haToken = process.env.HA_TOKEN ?? "";
 
 export interface LightSetting {
   entity_id: string;
-  state: "on" | "off";
+  state?: "on" | "off";
   brightness?: number;
   color?: [number, number, number];
   effect?: string;
+  value?: number; // for number.* entities (e.g. effect speed)
 }
 
 export interface ScenePlan {
@@ -62,13 +63,17 @@ export async function designScene(description: string): Promise<ScenePlan> {
 export async function applyScene(plan: ScenePlan): Promise<void> {
   await Promise.all(plan.lights.map(async (light) => {
     try {
-      const body: Record<string, unknown> = { entity_id: light.entity_id };
+      if (light.value !== undefined) {
+        await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
+        return;
+      }
 
       if (light.state === "off") {
         await callHA("light", "turn_off", { entity_id: light.entity_id });
         return;
       }
 
+      const body: Record<string, unknown> = { entity_id: light.entity_id };
       if (light.brightness !== undefined) body.brightness = light.brightness;
       if (light.color) body.rgb_color = light.color;
       if (light.effect) body.effect = light.effect;

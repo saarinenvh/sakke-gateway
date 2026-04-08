@@ -6,6 +6,25 @@ This apartment has a layered smart lighting setup with ceiling, ambient, accent,
 
 Each light is mapped to a physical wall using wall references from the room layout context.
 
+### WiZ Effect Speed
+
+WiZ lights have a separate effect speed entity (range 10–200, default ~100).
+To set effect speed, include it in the scene output as a separate entry:
+
+```json
+{ "entity_id": "number.wiz_rgbw_tunable_27e72e_effect_speed", "value": 60 }
+```
+
+Speed entity IDs follow the pattern: `number.{wiz_entity_base}_effect_speed`
+
+- `number.wiz_rgbw_tunable_27e72e_effect_speed`
+- `number.wiz_rgbw_tunable_24c978_effect_speed`
+- `number.wiz_rgbw_tunable_22b1c8_effect_speed`
+- `number.wiz_rgbw_tunable_22b05a_effect_speed`
+- `number.wiz_rgbw_tunable_22b520_effect_speed`
+
+Only include speed entries when using an effect on that light.
+
 ---
 
 ## Wall Reference
