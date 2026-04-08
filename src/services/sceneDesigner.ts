@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path"; // used by loadPrompt
-const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const model = process.env.OLLAMA_MODEL ?? "llama3";
+const openAiApiKey = process.env.OPENAI_API_KEY ?? "";
+const openAiModel = process.env.OPENAI_LIGHTING_MODEL ?? "gpt-4o";
 const haBaseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const haToken = process.env.HA_TOKEN ?? "";
 
@@ -28,24 +28,26 @@ function loadPrompt(): string {
 export async function designScene(description: string): Promise<ScenePlan> {
   const systemPrompt = loadPrompt();
 
-  const res = await fetch(`${baseUrl}/api/chat`, {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openAiApiKey}`,
+    },
     body: JSON.stringify({
-      model,
+      model: openAiModel,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: description },
       ],
-      stream: false,
-      options: { temperature: 0.7, num_predict: 2000 },
+      temperature: 0.7,
     }),
   });
 
-  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${await res.text()}`);
 
-  const json = await res.json() as { message?: { content?: string } };
-  const content = json?.message?.content?.trim() ?? "";
+  const json = await res.json() as { choices?: { message?: { content?: string } }[] };
+  const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
 
   // Strip markdown code fences if present
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
