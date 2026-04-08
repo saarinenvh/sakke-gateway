@@ -12,16 +12,16 @@ WiZ lights have a separate effect speed entity (range 10–200, default ~100).
 To set effect speed, include it in the scene output as a separate entry:
 
 ```json
-{ "entity_id": "number.wiz_rgbw_tunable_27e72e_effect_speed", "value": 60 }
+{ "entity_id": "number.wiz_couch_floor_lamp_1_effect_speed", "value": 60 }
 ```
 
 Speed entity IDs follow the pattern: `number.{wiz_entity_base}_effect_speed`
 
-- `number.wiz_rgbw_tunable_27e72e_effect_speed`
-- `number.wiz_rgbw_tunable_24c978_effect_speed`
-- `number.wiz_rgbw_tunable_22b1c8_effect_speed`
-- `number.wiz_rgbw_tunable_22b05a_effect_speed`
-- `number.wiz_rgbw_tunable_22b520_effect_speed`
+- `number.wiz_couch_floor_lamp_1_effect_speed`
+- `number.wiz_couch_floor_lamp_2_effect_speed`
+- `number.wiz_cone_floor_lamp_1_effect_speed`
+- `number.wiz_cone_floor_lamp_2_effect_speed`
+- `number.wiz_cone_floor_lamp_3_effect_speed`
 
 Only include speed entries when using an effect on that light.
 
@@ -130,7 +130,7 @@ Only include speed entries when using an effect on that light.
 
 ### Sofa Floor Lamp (2 bulbs)
 
-- entity_id: `light.wiz_rgbw_tunable_27e72e`
+- entity_id: `light.wiz_couch_floor_lamp_1`
 - name: Sofa Floor Lamp (Main)
 - wall: wall_3_sofa_desk
 - type: uplight / ambient
@@ -149,7 +149,7 @@ Only include speed entries when using an effect on that light.
 
 ### Sofa Accent Bulb
 
-- entity_id: `light.wiz_rgbw_tunable_24c978`
+- entity_id: `light.wiz_couch_floor_lamp_2`
 - name: Sofa Accent Light
 - wall: wall_3_sofa_desk
 - type: directional accent
@@ -195,6 +195,24 @@ Only include speed entries when using an effect on that light.
 
 ---
 
+### Desk LED Strip
+
+- entity_id: `light.led_strip_light_m1`
+- name: Desk LED Strip
+- wall: wall_3_sofa_desk
+- type: under-desk accent strip
+- role: local desk underglow and low-level ambient support
+- real-world output: low
+- notes:
+  - Mounted under the desk
+  - Best used as a subtle desk-zone accent, not as a main light
+  - Helps separate the desk area from the sofa area
+- capabilities:
+  - on/off
+  - brightness
+  - RGB color
+  - effects (use exact names): Breathe, Candlelight, Aurora-A, Aurora-B, Forest, Sunset, Sunrise, Fire-A, Fire-B, Ripple, Wave-A, Moonlight-A, Meteor, Starry Sky, Rainbow-A, Dreamlike-A, Meditation-A, Romantic, Flow-A, Flash, Twinkle-A
+
 ### Govee Uplighter
 
 - entity_id: `light.uplighter_floor_lamp`
@@ -215,7 +233,7 @@ Only include speed entries when using an effect on that light.
 
 ### Cone Floor Lamp (3 heads)
 
-- entity_id: `light.wiz_rgbw_tunable_22b1c8`
+- entity_id: `light.wiz_cone_floor_lamp_1`
 - name: Cone Lamp 1
 - wall: wall_4_cabinet
 - type: directional accent
@@ -229,7 +247,7 @@ Only include speed entries when using an effect on that light.
 
 ---
 
-- entity_id: `light.wiz_rgbw_tunable_22b05a`
+- entity_id: `light.wiz_cone_floor_lamp_2`
 - name: Cone Lamp 2
 - wall: wall_4_cabinet
 - type: directional accent
@@ -243,7 +261,7 @@ Only include speed entries when using an effect on that light.
 
 ---
 
-- entity_id: `light.wiz_rgbw_tunable_22b520`
+- entity_id: `light.wiz_cone_floor_lamp_3`
 - name: Cone Lamp 3
 - wall: wall_4_cabinet
 - type: directional accent
@@ -279,3 +297,4 @@ Only include speed entries when using an effect on that light.
 - TV and bias lights are not sufficient for visibility
 - Decorative lights should never be used as primary lighting
 - Wall-based lighting creates direction and depth in the room
+- Under-desk lighting is a local accent, not a room-lighting source
