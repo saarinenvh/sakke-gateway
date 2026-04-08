@@ -22,8 +22,9 @@ export interface ScenePlan {
 
 function loadPrompt(): string {
   const context = readFileSync(join(__dirname, "../prompts/lightning_context.md"), "utf-8");
+  const layout = readFileSync(join(__dirname, "../prompts/lightning_layout.md"), "utf-8");
   const template = readFileSync(join(__dirname, "../prompts/lightning_designer_prompt.md"), "utf-8");
-  return template.replace("{{lighting_context}}", context);
+  return template.replace("{{lighting_context}}", `${context}\n\n${layout}`);
 }
 
 export async function designScene(description: string): Promise<ScenePlan> {
