@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "./homeAssistant.js";
 import { webSearch } from "./webSearch.js";
 import { getWeather } from "./weather.js";
-import { getLights, getAreas, getScenes, getScripts } from "./entityRegistry.js";
+import { getAreas, getScenes, getScripts } from "./entityRegistry.js";
 import { getTodoLists, readList, addToList, completeInList, removeFromList } from "./lists.js";
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "./spotify.js";
 import { getTasksText, getCalendarText } from "./reminders.js";
@@ -220,7 +220,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_device_state",
-      description: "Get the current state and attributes of a Home Assistant entity. Use this when you need to know if a device is on/off, what's currently playing, current activity on a TV remote, brightness level, etc.",
+      description: "Get the current state and attributes of a Home Assistant entity. Call this BEFORE acting on a device if you are unsure of its current state. Also use when asked about what is on, what is playing, is something on/off, or any question about current device status.",
       parameters: {
         type: "object",
         properties: {
