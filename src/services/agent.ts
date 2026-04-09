@@ -415,8 +415,9 @@ export async function runAgent(
     messages.push({ role: "assistant", content });
     conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode });
 
-    log.info({ conversationId, turns: messages.length - 1, response: content, chatMode }, "💬 Agent response");
-    return { content, continueConversation: chatMode };
+    const asksQuestion = content.trimEnd().endsWith("?");
+    log.info({ conversationId, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "💬 Agent response");
+    return { content, continueConversation: chatMode || asksQuestion };
   }
 
   return { content: "I got confused trying to answer that.", continueConversation: chatMode };
