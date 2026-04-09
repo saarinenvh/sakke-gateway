@@ -7,6 +7,7 @@ import { getTodoLists, readList, addToList, completeInList, removeFromList } fro
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "./spotify.js";
 import { getTasksText, getCalendarText } from "./reminders.js";
 import type { Intent } from "../types/intent.js";
+import { broadcastState } from "./displayState.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
@@ -426,6 +427,7 @@ export async function runAgent(
 
   messages.push({ role: "user", content: userMessage });
   log.info({ conversationId, turns: messages.length - 1, chatMode }, "🤖 Agent started");
+  broadcastState("thinking");
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     log.info({ iteration: i + 1 }, "📡 Calling Ollama");
@@ -469,6 +471,9 @@ export async function runAgent(
 
     const asksQuestion = content.trimEnd().endsWith("?");
     log.info({ conversationId, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "💬 Agent response");
+    // Estimate TTS duration: ~70ms per character, min 2s
+    const speakingMs = Math.max(2000, content.length * 70);
+    broadcastState("speaking", speakingMs);
     return { content, continueConversation: chatMode || asksQuestion };
   }
 
