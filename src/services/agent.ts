@@ -440,6 +440,7 @@ export async function runAgent(
         messages,
         tools,
         stream: false,
+        think: false,
         options: { temperature: 0.7, num_predict: 500 },
       }),
     });
