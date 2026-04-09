@@ -40,8 +40,8 @@ Only include speed entries when using an effect on that light.
 
 ### Main Ceiling Light
 
-- entity_id: `light.REPLACE_WITH_NEW_HUE_CEILING_ENTITY`
-- name: Hue Ceiling Light
+- entity_id: `light.hue_infuse_ceiling_1`
+- name: Hue Infuse Ceiling
 - type: ceiling / primary room light
 - wall: ceiling_center
 - role: main visibility light
