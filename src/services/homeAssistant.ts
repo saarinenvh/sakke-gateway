@@ -56,7 +56,7 @@ export async function dispatch(intent: Intent): Promise<string> {
       const sceneEntityId = match ? match.entity_id : `scene.${intent.scene}`;
       await callService("scene", "turn_on", { entity_id: sceneEntityId });
       if (match?.scene_id === "tv_time" || intent.scene === "tv_time") {
-        await callService("media_player", "turn_on", { entity_id: "media_player.tv" });
+        await callService("remote", "turn_on", { entity_id: "remote.living_room_tv" });
         await callService("switch", "turn_on", { entity_id: "switch.rgbic_tv_backlight_dreamview" });
       }
       return reply(`Scene activated.`);
@@ -105,8 +105,8 @@ export async function dispatch(intent: Intent): Promise<string> {
 
     case "bedtime_routine":
       await callService("light", "turn_off", { entity_id: getLights().map(l => l.entity_id) });
-      await callService("media_player", "turn_off", { entity_id: "media_player.tv" });
-      await callService("media_player", "turn_on", { entity_id: "media_player.chromecast" });
+      await callService("remote", "turn_off", { entity_id: "remote.living_room_tv" });
+      await callService("remote", "turn_on", { entity_id: "remote.bedroom_tv" });
       return reply("Lights off, TV off, bedroom Chromecast on. Don't forget to brush your teeth. I won't remind you again. Tonight.");
 
     case "morning_routine":
