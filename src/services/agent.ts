@@ -218,6 +218,20 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "get_device_state",
+      description: "Get the current state and attributes of a Home Assistant entity. Use this when you need to know if a device is on/off, what's currently playing, current activity on a TV remote, brightness level, etc.",
+      parameters: {
+        type: "object",
+        properties: {
+          entity_id: { type: "string", description: "The entity ID to query, e.g. remote.living_room_tv, media_player.bedroom_tv, light.ceiling" },
+        },
+        required: ["entity_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "run_routine",
       description: "Run a user-defined routine (HA script). Use this for any named routine the user has created — e.g. 'good night', 'movie time', 'morning lights'. Check available routines in the system prompt.",
       parameters: {
@@ -357,6 +371,21 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Calendar error");
       return `Calendar fetch failed: ${err.message}`;
+    }
+  }
+
+  if (name === "get_device_state") {
+    const entityId = args.entity_id as string;
+    log.info({ tool: "get_device_state", entityId }, "📡 Tool call: device state");
+    try {
+      const res = await fetch(`${process.env.HA_BASE_URL ?? "http://localhost:8123"}/api/states/${entityId}`, {
+        headers: { Authorization: `Bearer ${process.env.HA_TOKEN ?? ""}` },
+      });
+      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      const state = await res.json() as { state: string; attributes: Record<string, unknown> };
+      return JSON.stringify({ state: state.state, attributes: state.attributes });
+    } catch (err: any) {
+      return `Error fetching state: ${err.message}`;
     }
   }
 
