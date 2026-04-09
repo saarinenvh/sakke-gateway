@@ -440,6 +440,7 @@ export async function runAgent(
         messages,
         tools,
         stream: false,
+        think: false,
         options: { temperature: 0.7, num_predict: 500 },
       }),
     });
@@ -465,7 +466,7 @@ export async function runAgent(
       continue;
     }
 
-    const content = message.content?.trim() ?? "I got nothing.";
+    const content = (message.content ?? "I got nothing.").replace(/<think>[\s\S]*?<\/think>/gi, "").trim() || "I got nothing.";
     messages.push({ role: "assistant", content });
     conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode });
 
