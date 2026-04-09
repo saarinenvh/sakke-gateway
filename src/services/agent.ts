@@ -72,6 +72,7 @@ Device rules:
 - Bedroom TV power: use device "remote.bedroom_tv" for turn_on/turn_off.
 - Bedroom TV media: use device "media_player.bedroom_tv" for play/pause/stop/volume.
 - Coffee maker: use device "switch.coffee_maker".
+- To open an app on the TV, use the open_tv_app tool. Supported apps: netflix, youtube, spotify, dgn (Disc Golf Network).
 
 Morning routine — ONLY when the user explicitly says "good morning" or "hyvää huomenta" (not for any other query):
 1. Call run_routine with script_id morning_routine (lights + scene)
@@ -213,6 +214,20 @@ const tools = [
           item: { type: "string", description: "Item name to complete or remove" },
         },
         required: ["action", "list"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "open_tv_app",
+      description: "Open an app on the living room TV. Use when the user asks to open, launch, or switch to Netflix, YouTube, Spotify, or Disc Golf Network on the TV.",
+      parameters: {
+        type: "object",
+        properties: {
+          app: { type: "string", enum: ["netflix", "youtube", "spotify", "dgn"], description: "The app to open" },
+        },
+        required: ["app"],
       },
     },
   },
@@ -372,6 +387,30 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Calendar error");
       return `Calendar fetch failed: ${err.message}`;
+    }
+  }
+
+  if (name === "open_tv_app") {
+    const APP_PACKAGES: Record<string, string> = {
+      netflix: "com.netflix.ninja",
+      youtube: "com.google.android.youtube.tv",
+      spotify: "com.spotify.tv.android",
+      dgn: "com.discgolfprotour",
+    };
+    const app = args.app as string;
+    const pkg = APP_PACKAGES[app];
+    if (!pkg) return `Unknown app: ${app}`;
+    log.info({ tool: "open_tv_app", app, pkg }, "📺 Tool call: open TV app");
+    try {
+      const res = await fetch(`${process.env.HA_BASE_URL ?? "http://localhost:8123"}/api/services/remote/turn_on`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.HA_TOKEN ?? ""}` },
+        body: JSON.stringify({ entity_id: "remote.living_room_tv", activity: pkg }),
+      });
+      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      return `Opened ${app} on the TV.`;
+    } catch (err: any) {
+      return `Failed to open ${app}: ${err.message}`;
     }
   }
 
