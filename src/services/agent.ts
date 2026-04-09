@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "./homeAssistant.js";
 import { webSearch } from "./webSearch.js";
 import { getWeather } from "./weather.js";
-import { getLights, getAreas, getScenes } from "./entityRegistry.js";
+import { getLights, getAreas, getScenes, getScripts } from "./entityRegistry.js";
 import { getTodoLists, readList, addToList, completeInList, removeFromList } from "./lists.js";
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "./spotify.js";
 import { getTasksText, getCalendarText } from "./reminders.js";
@@ -44,6 +44,7 @@ function pruneStale(): void {
 async function buildSystemPrompt(): Promise<string> {
   const areas = getAreas().map(a => `  - ${a.name} (${a.area_id})`).join("\n");
   const scenes = getScenes().map(s => `  - ${s.name} (${s.scene_id})`).join("\n");
+  const scripts = getScripts().map(s => `  - ${s.name} (${s.script_id})`).join("\n") || "  (none defined)";
   const lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
 
   return `You are Sakke, a home assistant with the personality of a deadpan butler meets grumpy dwarf. Helpful but reluctant about it. Dry humor, wit, short punchy responses — 1-3 sentences max.
@@ -71,13 +72,17 @@ Device rules:
 - Coffee maker: use device "switch.coffee_maker".
 
 Morning routine — ONLY when the user explicitly says "good morning" or "hyvää huomenta" (not for any other query):
-1. Call control_home_assistant with action morning_routine (lights + scene)
+1. Call run_routine with script_id morning_routine (lights + scene)
 2. Call get_tasks to get today's pending tasks
 3. Call get_calendar to get today's calendar events
 4. Greet them with a brief summary of the day — tasks and events in a few words
 5. Then ask if they set up the coffee maker last night and if they want it turned on
 6. Wait for their answer — if yes, call control_home_assistant with switch_on on switch.coffee_maker; if no, give a dry remark about their life choices
 For all other queries, respond only to what was asked — do not volunteer the full morning routine.
+
+Good night routine — ONLY when the user explicitly says "good night", "hyvää yötä", or "goodnight":
+1. Call run_routine with script_id good_night (lights off, TV off, bedroom TV on)
+2. Respond with a short dry send-off, max 1-2 sentences
 
 Available areas:
 ${areas}
@@ -87,6 +92,9 @@ ${scenes}
 
 Available lists:
 ${lists}
+
+Available routines (HA scripts — use run_routine to execute):
+${scripts}
 
 Store layout (grocery items are sorted in this order automatically):
 1. Electronics & Household
@@ -203,6 +211,20 @@ const tools = [
           item: { type: "string", description: "Item name to complete or remove" },
         },
         required: ["action", "list"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_routine",
+      description: "Run a user-defined routine (HA script). Use this for any named routine the user has created — e.g. 'good night', 'movie time', 'morning lights'. Check available routines in the system prompt.",
+      parameters: {
+        type: "object",
+        properties: {
+          script_id: { type: "string", description: "Script ID from the available routines list, e.g. good_night" },
+        },
+        required: ["script_id"],
       },
     },
   },
@@ -334,6 +356,27 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Calendar error");
       return `Calendar fetch failed: ${err.message}`;
+    }
+  }
+
+  if (name === "run_routine") {
+    const scriptId = args.script_id as string;
+    log.info({ tool: "run_routine", scriptId }, "🔁 Tool call: routine");
+    try {
+      const res = await fetch(`${process.env.HA_BASE_URL ?? "http://localhost:8123"}/api/services/script/turn_on`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.HA_TOKEN ?? ""}`,
+        },
+        body: JSON.stringify({ entity_id: `script.${scriptId}` }),
+      });
+      if (!res.ok) throw new Error(`HA API ${res.status}: ${await res.text()}`);
+      log.info({ scriptId }, "✅ Routine triggered");
+      return `Routine "${scriptId}" started.`;
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Routine error");
+      return `Routine failed: ${err.message}`;
     }
   }
 

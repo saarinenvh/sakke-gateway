@@ -23,11 +23,18 @@ export interface SceneEntity {
   scene_id: string;
 }
 
+export interface ScriptEntity {
+  entity_id: string;
+  name: string;
+  script_id: string;
+}
+
 let lightsCache: LightEntity[] = [];
 let switchesCache: SwitchEntity[] = [];
 let allSwitchesCache: SwitchEntity[] = [];
 let areasCache: AreaInfo[] = [];
 let scenesCache: SceneEntity[] = [];
+let scriptsCache: ScriptEntity[] = [];
 
 async function haGet<T>(path: string): Promise<T> {
   const res = await fetch(`${baseUrl}${path}`, {
@@ -112,6 +119,14 @@ export async function loadEntities(): Promise<void> {
       name: s.attributes?.friendly_name ?? s.entity_id,
       scene_id: s.entity_id.replace("scene.", ""),
     }));
+
+  scriptsCache = states
+    .filter((s: any) => s.entity_id.startsWith("script."))
+    .map((s: any) => ({
+      entity_id: s.entity_id,
+      name: s.attributes?.friendly_name ?? s.entity_id,
+      script_id: s.entity_id.replace("script.", ""),
+    }));
 }
 
 export function getLights(): LightEntity[] {
@@ -132,4 +147,8 @@ export function getAreas(): AreaInfo[] {
 
 export function getScenes(): SceneEntity[] {
   return scenesCache;
+}
+
+export function getScripts(): ScriptEntity[] {
+  return scriptsCache;
 }
