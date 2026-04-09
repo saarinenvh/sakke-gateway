@@ -30,7 +30,7 @@ interface OllamaToolCall {
   };
 }
 
-const conversations = new Map<string, { messages: Message[]; lastActive: number }>();
+const conversations = new Map<string, { messages: Message[]; lastActive: number; chatMode: boolean }>();
 
 function pruneStale(): void {
   const now = Date.now();
@@ -344,8 +344,19 @@ async function executeTool(
   return `Unknown tool: ${name}`;
 }
 
-const NO_CONTINUE_TOOLS = new Set(["spotify"]);
-const NO_CONTINUE_SPOTIFY_ACTIONS = new Set(["play", "search_and_play"]);
+const CHAT_MODE_PHRASES = new Set([
+  "let's chat", "lets chat", "let's talk", "lets talk",
+  "let's discuss", "lets discuss", "chat mode", "talk to me",
+  "i want to chat", "i want to talk",
+]);
+
+function normalizePunctuation(text: string): string {
+  return text.trim().toLowerCase().replace(/[!.,]+$/, "");
+}
+
+function isChatModeRequest(text: string): boolean {
+  return CHAT_MODE_PHRASES.has(normalizePunctuation(text));
+}
 
 export async function runAgent(
   userMessage: string,
@@ -359,10 +370,10 @@ export async function runAgent(
     { role: "system", content: await buildSystemPrompt() },
   ];
 
-  messages.push({ role: "user", content: userMessage });
-  log.info({ conversationId, turns: messages.length - 1 }, "🤖 Agent started");
+  const chatMode = existing?.chatMode ?? isChatModeRequest(userMessage);
 
-  let stopConversation = false;
+  messages.push({ role: "user", content: userMessage });
+  log.info({ conversationId, turns: messages.length - 1, chatMode }, "🤖 Agent started");
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     log.info({ iteration: i + 1 }, "📡 Calling Ollama");
@@ -393,12 +404,6 @@ export async function runAgent(
       messages.push(message);
 
       for (const call of message.tool_calls) {
-        if (NO_CONTINUE_TOOLS.has(call.function.name)) {
-          const action = call.function.arguments?.action as string | undefined;
-          if (!action || NO_CONTINUE_SPOTIFY_ACTIONS.has(action)) {
-            stopConversation = true;
-          }
-        }
         const result = await executeTool(call.function.name, call.function.arguments, log);
         messages.push({ role: "tool", content: result, tool_call_id: call.id });
       }
@@ -408,11 +413,11 @@ export async function runAgent(
 
     const content = message.content?.trim() ?? "I got nothing.";
     messages.push({ role: "assistant", content });
-    conversations.set(conversationId, { messages, lastActive: Date.now() });
+    conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode });
 
-    log.info({ conversationId, turns: messages.length - 1, response: content }, "💬 Agent response");
-    return { content, continueConversation: !stopConversation };
+    log.info({ conversationId, turns: messages.length - 1, response: content, chatMode }, "💬 Agent response");
+    return { content, continueConversation: chatMode };
   }
 
-  return { content: "I got confused trying to answer that.", continueConversation: !stopConversation };
+  return { content: "I got confused trying to answer that.", continueConversation: chatMode };
 }
