@@ -8,6 +8,8 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Tool calling** — LLM decides which tools to use; results feed back into the conversation
 - **Home control** — lights, scenes, switches, media via Home Assistant API
 - **Routines** — user-defined HA scripts discovered automatically and runnable by voice
+- **TV app launcher** — open Netflix, YouTube, Spotify, Disc Golf Network by voice
+- **Device state queries** — ask if something is on, what's playing, current TV app
 - **AI scene designer** — describe a mood, get a full lighting scene (OpenAI gpt-4o)
 - **Shopping lists** — add/remove items with automatic store-layout ordering
 - **Spotify** — search and play tracks, control playback
@@ -24,6 +26,8 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 |---|---|
 | `control_home_assistant` | Lights, scenes, switches, media |
 | `run_routine` | Run a user-defined HA script by name (routines) |
+| `get_device_state` | Query live state and attributes of any HA entity |
+| `open_tv_app` | Launch Netflix, YouTube, Spotify or DGN on the living room TV |
 | `get_weather` | Current weather + 6h forecast (Espoo) |
 | `web_search` | Web search via local SearXNG |
 | `manage_list` | HA todo lists — shopping lists (store-ordered) and Google Tasks |
@@ -41,6 +45,9 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 | POST | `/scene/save` | Save current light state as a scene |
 | GET | `/reminders/morning` | Morning greeting with tasks + calendar (for HA automations) |
 | GET | `/reminders/check` | Pending tasks check — returns null if all done (for HA automations) |
+| GET | `/display` | Tablet animation display (idle/listening/thinking/speaking orb) |
+| GET | `/display/events` | SSE stream of state changes for display |
+| POST | `/display/state` | Push state change from HA automation |
 | GET | `/health` | Healthcheck |
 
 ## Tech Stack
