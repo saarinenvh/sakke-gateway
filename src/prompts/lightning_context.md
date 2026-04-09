@@ -53,8 +53,9 @@ Only include speed entries when using an effect on that light.
 - capabilities:
   - on/off
   - brightness
-  - RGB color
-  - color temperature
+  - RGB color (xy)
+  - color temperature (2000–6535K)
+  - effects (use exact names): off, candle, fire, prism
 
 ---
 
