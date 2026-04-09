@@ -9,7 +9,7 @@ const HTML = `<!DOCTYPE html>
   <title>Sakke</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #080810; overflow: hidden; }
+    html, body { width: 100%; height: 100%; background: #0d0d1a; overflow: hidden; }
     canvas { display: block; }
     #label {
       position: fixed;
@@ -53,10 +53,10 @@ const HTML = `<!DOCTYPE html>
 
     // --- Colors ---
     const PALETTE = {
-      idle:      { r: 55,  g: 70,  b: 200 },
-      listening: { r: 30,  g: 190, b: 210 },
-      thinking:  { r: 130, g: 50,  b: 220 },
-      speaking:  { r: 70,  g: 150, b: 255 },
+      idle:      { r: 90,  g: 110, b: 255 },
+      listening: { r: 50,  g: 230, b: 250 },
+      thinking:  { r: 180, g: 80,  b: 255 },
+      speaking:  { r: 100, g: 190, b: 255 },
     };
     let cur = { ...PALETTE.idle };
     let tgt = { ...PALETTE.idle };
@@ -169,37 +169,37 @@ const HTML = `<!DOCTYPE html>
       if (state === 'idle') {
         const p = Math.sin(t * 0.7) * 0.5 + 0.5;
         const s = R * (0.82 + p * 0.12);
-        glow(s, 0.08 + p * 0.04);
-        orb(s, 0.38 + p * 0.12);
-        ring(s * 1.18, 1, 0.07 + p * 0.07);
+        glow(s, 0.18 + p * 0.08);
+        orb(s, 0.65 + p * 0.15);
+        ring(s * 1.18, 1, 0.18 + p * 0.12);
 
       } else if (state === 'listening') {
         const p = Math.sin(t * 2.8) * 0.5 + 0.5;
-        glow(R, 0.14);
-        orb(R, 0.65);
-        ring(R * 1.18, 1.5, 0.35 + p * 0.25);
-        ring(R * 1.45, 1, 0.12 + p * 0.1);
+        glow(R, 0.28);
+        orb(R, 0.85);
+        ring(R * 1.18, 1.5, 0.6 + p * 0.3);
+        ring(R * 1.45, 1, 0.25 + p * 0.15);
 
       } else if (state === 'thinking') {
         const p = Math.sin(t * 1.8) * 0.5 + 0.5;
-        glow(R, 0.1 + p * 0.05);
-        orb(R * 0.92, 0.55 + p * 0.08);
+        glow(R, 0.22 + p * 0.08);
+        orb(R * 0.92, 0.75 + p * 0.1);
         // Rotating arcs
         for (let i = 0; i < 3; i++) {
           const rot = t * 1.1 + i * (Math.PI * 2 / 3);
-          arc(R * 1.3 + i * 7, 2.5 - i * 0.5, 0.6 - i * 0.15, rot, Math.PI * 0.45);
+          arc(R * 1.3 + i * 7, 2.5 - i * 0.5, 0.85 - i * 0.15, rot, Math.PI * 0.45);
         }
 
       } else if (state === 'speaking') {
         const scale = 0.88 + amplitude * 0.65;
         const s = R * scale;
-        glow(s, 0.1 + amplitude * 0.12);
-        orb(s, 0.62 + amplitude * 0.28);
-        if (amplitude > 0.25) {
-          const a = (amplitude - 0.25) / 0.75;
-          ring(s * 1.22, 2, a * 0.7);
-          ring(s * 1.55, 1, a * 0.35);
-          ring(s * 1.95, 0.5, a * 0.15);
+        glow(s, 0.22 + amplitude * 0.18);
+        orb(s, 0.82 + amplitude * 0.18);
+        if (amplitude > 0.15) {
+          const a = (amplitude - 0.15) / 0.85;
+          ring(s * 1.22, 2, a * 0.85);
+          ring(s * 1.55, 1, a * 0.5);
+          ring(s * 1.95, 0.5, a * 0.25);
         }
       }
     }
