@@ -401,10 +401,29 @@ async function executeTool(
     const pkg = APP_PACKAGES[app];
     if (!pkg) return `Unknown app: ${app}`;
     log.info({ tool: "open_tv_app", app, pkg }, "📺 Tool call: open TV app");
+    const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
+    const haToken = process.env.HA_TOKEN ?? "";
+    const haHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${haToken}` };
     try {
-      const res = await fetch(`${process.env.HA_BASE_URL ?? "http://localhost:8123"}/api/services/remote/turn_on`, {
+      // Check if TV is on
+      const stateRes = await fetch(`${haBase}/api/states/remote.living_room_tv`, { headers: { Authorization: `Bearer ${haToken}` } });
+      if (!stateRes.ok) throw new Error(`HA API ${stateRes.status}`);
+      const state = await stateRes.json() as { state: string };
+
+      if (state.state !== "on") {
+        // Turn on first, then wait for it to boot
+        await fetch(`${haBase}/api/services/remote/turn_on`, {
+          method: "POST",
+          headers: haHeaders,
+          body: JSON.stringify({ entity_id: "remote.living_room_tv" }),
+        });
+        await new Promise(r => setTimeout(r, 5000));
+      }
+
+      // Launch the app
+      const res = await fetch(`${haBase}/api/services/remote/turn_on`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.HA_TOKEN ?? ""}` },
+        headers: haHeaders,
         body: JSON.stringify({ entity_id: "remote.living_room_tv", activity: pkg }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
