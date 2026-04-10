@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { designScene, applyScene, saveCurrentStateAsScene } from "../services/ha/scenes.js";
-import { getLights, getSwitches } from "../services/ha/registry.js";
+import { getLights } from "../services/ha/registry.js";
 
 interface SceneBody {
   description: string;
@@ -50,10 +50,7 @@ export async function sceneRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const { name, entity_ids } = request.body;
-    const entityIds = entity_ids ?? [
-      ...getLights().map(l => l.entity_id),
-      ...getSwitches().map(s => s.entity_id),
-    ];
+    const entityIds = entity_ids ?? getLights().map(l => l.entity_id);
     const sceneId = await saveCurrentStateAsScene(name, entityIds);
     return reply.send({ ok: true, scene_id: sceneId });
   });

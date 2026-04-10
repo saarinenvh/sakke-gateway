@@ -45,7 +45,6 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 | Method | Path | Description |
 |---|---|---|
 | POST | `/v1/chat/completions` | Main agent endpoint (OpenAI-compatible) |
-| POST | `/command` | Single-turn command dispatch |
 | POST | `/scene` | AI-powered scene designer |
 | POST | `/scene/save` | Save current light state as a scene |
 | GET | `/reminders/morning` | Morning greeting with tasks + calendar (for HA automations) |
