@@ -1,5 +1,5 @@
 import type { Intent } from "../types/intent.js";
-import { getLights, getAllSwitches, getScenes } from "./entityRegistry.js";
+import { getLights, getScenes } from "./entityRegistry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "./sceneDesigner.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -64,10 +64,7 @@ export async function dispatch(intent: Intent): Promise<string> {
 
     case "scene_create": {
       const name = intent.scene_name ?? "custom_scene";
-      const entityIds = [
-        ...getLights().map(l => l.entity_id),
-        ...getAllSwitches().map(s => s.entity_id),
-      ];
+      const entityIds = getLights().map(l => l.entity_id);
       await saveCurrentStateAsScene(name, entityIds);
       return reply(`Scene "${name}" saved.`);
     }
