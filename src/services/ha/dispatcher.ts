@@ -1,6 +1,6 @@
-import type { Intent } from "../types/intent.js";
-import { getLights, getScenes } from "./entityRegistry.js";
-import { designScene, applyScene, saveCurrentStateAsScene } from "./sceneDesigner.js";
+import type { Intent } from "../../types/intent.js";
+import { getLights, getScenes } from "./registry.js";
+import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";

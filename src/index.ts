@@ -1,17 +1,15 @@
 import "dotenv/config";
 import Fastify from "fastify";
-import { commandRoutes } from "./routes/command.js";
 import { sceneRoutes } from "./routes/scene.js";
 import { conversationRoutes } from "./routes/conversation.js";
 import { reminderRoutes } from "./routes/reminders.js";
 import { displayRoutes } from "./routes/display.js";
-import { loadEntities } from "./services/entityRegistry.js";
+import { loadEntities } from "./services/ha/registry.js";
 
 const port = parseInt(process.env.PORT ?? "3100", 10);
 
 const app = Fastify({ logger: true });
 
-app.register(commandRoutes);
 app.register(sceneRoutes);
 app.register(conversationRoutes);
 app.register(reminderRoutes);

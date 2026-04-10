@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { designScene, applyScene, saveCurrentStateAsScene } from "../services/sceneDesigner.js";
-import { getLights, getSwitches } from "../services/entityRegistry.js";
+import { designScene, applyScene, saveCurrentStateAsScene } from "../services/ha/scenes.js";
+import { getLights, getSwitches } from "../services/ha/registry.js";
 
 interface SceneBody {
   description: string;

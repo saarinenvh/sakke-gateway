@@ -60,13 +60,11 @@ async function haTemplate(template: string): Promise<string> {
 export async function loadEntities(): Promise<void> {
   const states = await haGet<any[]>("/api/states");
 
-  // Get area name for each light entity via template
   const lightStates = states.filter((s: any) =>
     s.entity_id.startsWith("light.") &&
     !s.entity_id.includes("_segment_")
   );
 
-  // Build area map using template API
   const areaMap = new Map<string, string>();
   const areaTemplate = lightStates
     .map(s => `${s.entity_id}:{{ area_name('${s.entity_id}') or '' }}`)
@@ -82,7 +80,6 @@ export async function loadEntities(): Promise<void> {
     // area info is optional, continue without it
   }
 
-  // Collect unique areas
   const areaSet = new Set<string>();
   for (const area of areaMap.values()) {
     if (area) areaSet.add(area);

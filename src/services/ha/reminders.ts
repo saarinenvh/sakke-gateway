@@ -3,6 +3,7 @@ const token = process.env.HA_TOKEN ?? "";
 
 const TASKS_TODO_ENTITY = process.env.TASKS_TODO ?? "todo.sakke_tasks";
 const CALENDAR_ENTITIES: string[] = (process.env.CALENDAR_ENTITIES ?? "").split(",").filter(Boolean);
+const TIMEZONE = process.env.TIMEZONE ?? "Europe/Helsinki";
 
 interface CalendarEvent {
   summary: string;
@@ -13,7 +14,7 @@ interface TodoItem {
   uid?: string;
   summary: string;
   status: "needs_action" | "completed";
-  due?: string; // YYYY-MM-DD
+  due?: string;
 }
 
 async function haGet(path: string): Promise<any> {
@@ -100,11 +101,9 @@ async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
   );
 }
 
-const TIMEZONE = process.env.TIMEZONE ?? "Europe/Helsinki";
-
 function formatEventTime(event: CalendarEvent): string {
   const dt = event.start.dateTime;
-  if (!dt) return event.summary; // all-day event, no time
+  if (!dt) return event.summary;
   const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE });
   return `${event.summary} at ${time}`;
 }
@@ -117,7 +116,6 @@ export async function getTasksText(period = "today"): Promise<string> {
 
 export async function getCalendarText(period = "today"): Promise<string> {
   const { start, end } = getDateRange(period);
-  // Construct dates in the configured timezone by using the offset-aware format
   const startDt = new Date(`${start}T00:00:00`);
   const endDt = new Date(`${end}T23:59:59`);
   const parts: string[] = [];
@@ -134,14 +132,12 @@ export async function getCalendarText(period = "today"): Promise<string> {
 export async function getMorningGreeting(): Promise<string> {
   const parts: string[] = [];
 
-  // Pending tasks
   const tasks = await getPendingTasks();
   if (tasks.length > 0) {
     const taskList = tasks.map(t => t.summary).join(", ");
     parts.push(`Tasks for today: ${taskList}`);
   }
 
-  // Calendar events
   for (const calendarId of CALENDAR_ENTITIES) {
     const events = await getTodayEvents(calendarId);
     if (events.length > 0) {

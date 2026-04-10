@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
-import { join } from "path"; // used by loadPrompt
+import { join } from "path";
+
 const openAiApiKey = process.env.OPENAI_API_KEY ?? "";
 const openAiModel = process.env.OPENAI_LIGHTING_MODEL ?? "gpt-4o";
 const haBaseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -11,7 +12,7 @@ export interface LightSetting {
   brightness?: number;
   color?: [number, number, number];
   effect?: string;
-  value?: number; // for number.* entities (e.g. effect speed)
+  value?: number;
 }
 
 export interface ScenePlan {
@@ -21,9 +22,9 @@ export interface ScenePlan {
 }
 
 function loadPrompt(): string {
-  const context = readFileSync(join(__dirname, "../prompts/lightning_context.md"), "utf-8");
-  const layout = readFileSync(join(__dirname, "../prompts/lightning_layout.md"), "utf-8");
-  const template = readFileSync(join(__dirname, "../prompts/lightning_designer_prompt.md"), "utf-8");
+  const context = readFileSync(join(__dirname, "../../prompts/lighting/lightning_context.md"), "utf-8");
+  const layout = readFileSync(join(__dirname, "../../prompts/lighting/lightning_layout.md"), "utf-8");
+  const template = readFileSync(join(__dirname, "../../prompts/lighting/lightning_designer_prompt.md"), "utf-8");
   return template.replace("{{lighting_context}}", `${context}\n\n${layout}`);
 }
 
@@ -54,7 +55,6 @@ export async function designScene(description: string): Promise<ScenePlan> {
   const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
   console.log(`🎨 OpenAI scene response: ${content.slice(0, 200)}...`);
 
-  // Strip markdown code fences if present
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
 
   try {
@@ -92,7 +92,6 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
   const sceneId = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
-  // Fetch current states for all requested entities
   const res = await fetch(`${haBaseUrl}/api/states`, {
     headers: { Authorization: `Bearer ${haToken}` },
   });
@@ -107,7 +106,6 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     if (attrs.brightness !== undefined) entry.brightness = attrs.brightness;
     const colorMode = attrs.color_mode;
     if (colorMode === "color_temp") {
-      // Prefer kelvin, fall back to mireds
       if (attrs.color_temp_kelvin !== undefined) entry.color_temp_kelvin = attrs.color_temp_kelvin;
       else if (attrs.color_temp !== undefined) entry.color_temp = attrs.color_temp;
     } else if (colorMode === "rgb" || colorMode === "rgbw" || colorMode === "rgbww") {
@@ -119,14 +117,12 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     } else if (colorMode === "brightness") {
       // brightness only, no color to save
     } else {
-      // fallback
       if (attrs.rgb_color) entry.rgb_color = attrs.rgb_color;
     }
     if (attrs.effect && attrs.effect !== "None" && attrs.effect !== "off") entry.effect = attrs.effect;
     entities[state.entity_id] = entry;
   }
 
-  // Use HA config API to create a persistent, editable scene
   const configRes = await fetch(`${haBaseUrl}/api/config/scene/config/${sceneId}`, {
     method: "POST",
     headers: {

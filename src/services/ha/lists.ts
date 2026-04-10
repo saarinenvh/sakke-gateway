@@ -2,14 +2,19 @@ const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";
 
 const STORE_LAYOUT = [
-  { section: "Produce", keywords: ["apple", "banana", "orange", "grape", "berry", "lettuce", "tomato", "onion", "potato", "carrot", "cucumber", "pepper", "garlic", "lemon", "lime", "avocado", "mushroom", "spinach", "broccoli", "celery", "zucchini", "cabbage", "kale", "parsley", "basil", "dill", "ginger", "beetroot"] },
-  { section: "Bakery", keywords: ["bread", "roll", "bun", "pastry", "cake", "muffin", "bagel", "croissant", "pita", "tortilla", "cracker"] },
-  { section: "Meat & Fish", keywords: ["chicken", "beef", "pork", "lamb", "turkey", "fish", "salmon", "tuna", "shrimp", "prawn", "sausage", "bacon", "ham", "steak", "mince", "fillet", "crab", "herring", "meatball"] },
+  { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },
+  { section: "Cleaning & Hygiene", keywords: ["soap", "shampoo", "detergent", "cleaner", "tissue", "toilet paper", "paper towel", "laundry", "dishwasher", "conditioner", "toothpaste", "toothbrush", "deodorant", "razor", "sponge", "bleach", "rinse"] },
+  { section: "Vegetables & Fruits", keywords: ["apple", "banana", "orange", "grape", "berry", "lettuce", "tomato", "onion", "potato", "carrot", "cucumber", "pepper", "garlic", "lemon", "lime", "avocado", "mushroom", "spinach", "broccoli", "celery", "zucchini", "cabbage", "kale", "parsley", "basil", "dill", "ginger", "beetroot", "strawberry", "blueberry", "raspberry", "pear", "peach", "mango"] },
+  { section: "Canned & Dry Goods", keywords: ["can", "pasta", "rice", "flour", "oil", "soup", "beans", "lentil", "cereal", "oat", "noodle", "stock", "broth", "vinegar", "salt", "spice", "honey", "jam", "peanut butter", "canned", "dried"] },
+  { section: "Sauces", keywords: ["mustard", "ketchup", "mayo", "mayonnaise", "sauce", "dressing", "salsa", "pesto", "relish", "sriracha", "tabasco"] },
+  { section: "Coffee, Tea & Sugar", keywords: ["coffee", "tea", "sugar", "sweetener", "cocoa", "espresso", "latte", "cappuccino"] },
+  { section: "Juices", keywords: ["juice", "smoothie", "nectar", "lemonade", "squash"] },
+  { section: "Convenience & Ready Meals", keywords: ["ready meal", "ready-meal", "pizza", "lasagna", "lasagne", "wrap", "sandwich", "sushi", "salad", "hummus", "dip", "snack", "crisp", "chip", "nut", "dried fruit"] },
+  { section: "Meat & Fish", keywords: ["chicken", "beef", "pork", "lamb", "turkey", "fish", "salmon", "tuna", "shrimp", "prawn", "sausage", "bacon", "ham", "steak", "mince", "fillet", "crab", "herring", "meatball", "minced", "poultry"] },
   { section: "Dairy & Eggs", keywords: ["milk", "cheese", "yogurt", "yoghurt", "butter", "cream", "egg", "sour cream", "cottage", "kefir", "quark", "curd", "oat milk", "oatmilk"] },
-  { section: "Frozen", keywords: ["frozen", "ice cream", "gelato"] },
-  { section: "Canned & Dry Goods", keywords: ["can", "pasta", "rice", "flour", "sugar", "oil", "sauce", "soup", "beans", "lentil", "cereal", "oat", "noodle", "stock", "broth", "vinegar", "salt", "spice", "honey", "jam", "peanut butter", "mustard", "ketchup", "mayo", "mayonnaise"] },
-  { section: "Drinks", keywords: ["water", "juice", "soda", "beer", "wine", "coffee", "tea", "cola", "drink", "sparkling"] },
-  { section: "Household & Cleaning", keywords: ["soap", "shampoo", "detergent", "cleaner", "tissue", "toilet paper", "paper towel", "laundry", "dishwasher", "conditioner", "toothpaste", "toothbrush", "deodorant", "razor"] },
+  { section: "Bakery", keywords: ["bread", "roll", "bun", "pastry", "cake", "muffin", "bagel", "croissant", "pita", "tortilla", "cracker", "rye", "sourdough"] },
+  { section: "Drinks", keywords: ["water", "soda", "beer", "wine", "cola", "sparkling", "cider", "energy drink", "isotonic"] },
+  { section: "Frozen", keywords: ["frozen", "ice cream", "gelato", "freeze"] },
 ];
 
 function categorizeItem(name: string): number {
