@@ -527,12 +527,12 @@ async function executeTool(
     log.info({ filename }, "📝 Tool call: create_knowledge");
     try {
       await fs.mkdir(docsDir, { recursive: true });
-      await fs.writeFile(filePath, content, { flag: "wx" }); // wx = fail if exists
-      // Append to sakke-index.md
-      await fs.appendFile(indexPath, `- [[${filename}]]\n`);
+      const isNew = !await fs.access(filePath).then(() => true).catch(() => false);
+      await fs.writeFile(filePath, content);
+      // Only append to index if it's a new file
+      if (isNew) await fs.appendFile(indexPath, `- [[${filename}]]\n`);
       return `Saved note "${filename}".`;
     } catch (err: any) {
-      if (err.code === "EEXIST") return `A note named "${filename}" already exists.`;
       return `Failed to save note: ${err.message}`;
     }
   }
