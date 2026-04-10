@@ -42,6 +42,7 @@ Device rules:
 - Bedroom TV power: use device "remote.bedroom_tv" for turn_on/turn_off.
 - Bedroom TV media: use device "media_player.bedroom_tv" for play/pause/stop/volume.
 - Coffee maker: use device "switch.coffee_maker".
+- Dreamview (TV backlight sync): use device "switch.rgbic_tv_backlight_dreamview" for turn_on/turn_off.
 - To open an app on the TV, use the open_tv_app tool. Supported apps: netflix, youtube, spotify, dgn (Disc Golf Network).
 
 Morning routine — ONLY when the user explicitly says "good morning" or "hyvää huomenta" (not for any other query):
