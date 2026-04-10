@@ -19,6 +19,9 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Google Calendar** — query today's or this week's events by voice
 - **Morning routine** — "good morning" triggers lights (via HA script), daily summary and coffee maker prompt
 - **Good night routine** — "good night" triggers lights off and TV switch via HA script
+- **TV Time routine** — "lets watch tv" triggers TV Time scene + TV on + Dreamview on
+- **Conversation reset** — "lets start fresh" wipes conversation history and reloads the index
+- **Wiki context system** — personal knowledge base (Obsidian vault) mounted at `/wiki`; index always in system prompt; `get_context` loads pages on demand; `create_knowledge` saves new notes silently
 
 ## Agent Tools
 
@@ -34,6 +37,8 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 | `spotify` | Play/pause/next/previous/volume/search_and_play |
 | `get_tasks` | Pending Google Tasks for today/tomorrow/this_week/next_week |
 | `get_calendar` | Google Calendar events for today/tomorrow/this_week/next_week |
+| `get_context` | Load a wiki knowledge page on demand (home/lighting, home/devices, etc.) |
+| `create_knowledge` | Save a new note to `sakke-knowledge/` in the Obsidian wiki vault |
 
 ## Routes
 
