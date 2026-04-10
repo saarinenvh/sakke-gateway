@@ -274,7 +274,7 @@ const tools = [
       parameters: {
         type: "object",
         properties: {
-          page: { type: "string", description: "Page name from the knowledge base index, e.g. user_profile" },
+          page: { type: "string", description: "Page path from the knowledge base index, e.g. user/user_profile or discgolf/context. Strip [[ and ]] from wikilinks." },
         },
         required: ["page"],
       },
