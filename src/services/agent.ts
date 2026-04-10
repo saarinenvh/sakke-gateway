@@ -561,6 +561,12 @@ const CHAT_MODE_PHRASES = new Set([
   "i want to chat", "i want to talk",
 ]);
 
+const RESET_PHRASES = new Set([
+  "let's start fresh", "lets start fresh", "start fresh",
+  "new conversation", "start over", "let's start over", "lets start over",
+  "forget everything", "reset",
+]);
+
 function normalizePunctuation(text: string): string {
   return text.trim().toLowerCase().replace(/[!.,]+$/, "");
 }
@@ -569,12 +575,24 @@ function isChatModeRequest(text: string): boolean {
   return CHAT_MODE_PHRASES.has(normalizePunctuation(text));
 }
 
+function isResetRequest(text: string): boolean {
+  return RESET_PHRASES.has(normalizePunctuation(text));
+}
+
 export async function runAgent(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
 ): Promise<{ content: string; continueConversation: boolean }> {
   pruneStale();
+
+  if (isResetRequest(userMessage)) {
+    conversations.delete(conversationId);
+    log.info({ conversationId }, "🔄 Conversation reset");
+    const reply = "Fine. Wiped. We never spoke.";
+    broadcastState("speaking", Math.max(2000, reply.length * 70));
+    return { content: reply, continueConversation: false };
+  }
 
   const existing = conversations.get(conversationId);
   const messages: Message[] = existing?.messages ?? [
