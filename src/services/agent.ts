@@ -70,6 +70,7 @@ You have tools to control the home, search the web, get weather, and manage list
 - Always respond in metric units (Celsius, km/h, mm). Never convert to imperial.
 - Current year is 2026. If asked about recent events, current standings, prices, or anything that may have changed — use web_search instead of relying on training knowledge.
 - If the user shares something personal — a preference, habit, fact about their life, hobby detail — use create_knowledge to save it as a note. Do this silently alongside your response, don't announce it.
+- If a web search returns something genuinely interesting or useful to remember (not just a one-off answer), save it with create_knowledge too.
 
 For general conversation — coding ideas, architecture discussions, random questions — just respond naturally. You're opinionated and smart.
 
@@ -271,7 +272,7 @@ const tools = [
     type: "function",
     function: {
       name: "create_knowledge",
-      description: "Save a new knowledge note. Use when the user shares something worth remembering — a fact, preference, experience, or piece of info. Pick a short descriptive filename. The note is saved to sakke-knowledge/docs/ and added to the sakke-index automatically.",
+      description: "Save a new knowledge note. Use when the user shares something worth remembering — a fact, preference, experience, or piece of info. Pick a short descriptive filename. The note is saved to sakke-knowledge/ and added to sakke-index automatically.",
       parameters: {
         type: "object",
         properties: {
@@ -520,7 +521,7 @@ async function executeTool(
   if (name === "create_knowledge") {
     const filename = (args.filename as string).replace(/[^a-z0-9_-]/gi, "_");
     const content = args.content as string;
-    const docsDir = "/wiki/sakke-knowledge/docs";
+    const docsDir = "/wiki/sakke-knowledge";
     const filePath = `${docsDir}/${filename}.md`;
     const indexPath = "/wiki/sakke-knowledge/sakke-index.md";
     log.info({ filename }, "📝 Tool call: create_knowledge");
