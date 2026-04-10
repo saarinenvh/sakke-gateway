@@ -6,6 +6,7 @@ import { broadcastState } from "./displayState.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
+const think = process.env.OLLAMA_THINK === "true" ? true : process.env.OLLAMA_THINK === "false" ? false : undefined;
 
 const CONVERSATION_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_ITERATIONS = 6;
@@ -98,7 +99,7 @@ export async function runAgent(
         messages,
         tools,
         stream: false,
-        think: false,
+        ...(think !== undefined && { think }),
         options: { temperature: 0.7, num_predict: 2000 },
       }),
     });
