@@ -269,6 +269,21 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "create_knowledge",
+      description: "Save a new knowledge note to the wiki inbox. Use when the user shares something worth remembering — a fact, preference, experience, or piece of info. Pick a short descriptive filename. Notes land in sakke-knowledge/ for the user to review in Obsidian.",
+      parameters: {
+        type: "object",
+        properties: {
+          filename: { type: "string", description: "Short descriptive filename without extension, e.g. espoo_disc_golf_courses or prefers_dark_roast_coffee" },
+          content: { type: "string", description: "Markdown content for the note. Include a # title, the fact, and any relevant context." },
+        },
+        required: ["filename", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_context",
       description: "Load a knowledge base page for detailed context about the user or a topic. Only call when the query is clearly about something in the knowledge base. Check available pages in the system prompt.",
       parameters: {
@@ -498,6 +513,22 @@ async function executeTool(
       return content;
     } catch {
       return `No knowledge base page found for "${page}". Available pages are listed in the system prompt.`;
+    }
+  }
+
+  if (name === "create_knowledge") {
+    const filename = (args.filename as string).replace(/[^a-z0-9_-]/gi, "_");
+    const content = args.content as string;
+    const dir = "/wiki/sakke-knowledge";
+    const filePath = `${dir}/${filename}.md`;
+    log.info({ filename }, "📝 Tool call: create_knowledge");
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(filePath, content, { flag: "wx" }); // wx = fail if exists
+      return `Saved note "${filename}" to your Obsidian inbox.`;
+    } catch (err: any) {
+      if (err.code === "EEXIST") return `A note named "${filename}" already exists in the inbox.`;
+      return `Failed to save note: ${err.message}`;
     }
   }
 
