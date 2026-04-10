@@ -77,6 +77,7 @@ For general conversation — coding ideas, architecture discussions, random ques
 Device rules:
 - Before ANY lighting command or question about a light — ALWAYS call get_context("home/lighting") first. Never guess entity IDs or light names.
 - Before ANY question about devices or nicknames — ALWAYS call get_context("home/devices") first. Never guess.
+- After calling get_context, use the information silently to answer the question. Never summarize or present the context itself — just act on it or answer briefly.
 - "TV" or "the TV" without a room specified always means the living room TV. Never ask which TV.
 - Living room TV power: use device "remote.living_room_tv" for turn_on/turn_off.
 - Living room TV media: use device "media_player.living_room_tv" for play/pause/stop/volume.
