@@ -621,7 +621,10 @@ export async function runAgent(
       continue;
     }
 
-    const content = (message.content ?? "I got nothing.").replace(/<think>[\s\S]*?<\/think>/gi, "").trim() || "I got nothing.";
+    const content = (message.content ?? "I got nothing.")
+  .replace(/<think>[\s\S]*?<\/think>/gi, "")
+  .replace(/<channel\|>[\s\S]*/gi, "") // gemma4 template artifact
+  .trim() || "I got nothing.";
     messages.push({ role: "assistant", content });
     conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode });
 
