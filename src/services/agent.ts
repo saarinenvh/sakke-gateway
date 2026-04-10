@@ -1,3 +1,4 @@
+import { promises as fs } from "fs";
 import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "./homeAssistant.js";
 import { webSearch } from "./webSearch.js";
@@ -47,6 +48,12 @@ async function buildSystemPrompt(): Promise<string> {
   const scenes = getScenes().map(s => `  - ${s.name} (${s.scene_id})`).join("\n");
   const scripts = getScripts().map(s => `  - ${s.name} (${s.script_id})`).join("\n") || "  (none defined)";
   const lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
+
+  let wikiIndex = "";
+  try {
+    const raw = await fs.readFile("/wiki/index.md", "utf-8");
+    wikiIndex = `\n\nKnowledge base — call get_context(page) to load a page when relevant:\n${raw}`;
+  } catch { /* no wiki mounted */ }
 
   return `You are Sakke, a home assistant with the personality of a deadpan butler meets grumpy dwarf. Helpful but reluctant about it. Dry humor, wit, short punchy responses — 1-3 sentences max.
 
@@ -112,7 +119,7 @@ Store layout (grocery items are sorted in this order automatically):
 10. Dairy
 11. Bakery (bread, rolls, pastries)
 12. Drinks
-13. Frozen`;
+13. Frozen${wikiIndex}`;
 }
 
 const tools = [
@@ -256,6 +263,20 @@ const tools = [
           script_id: { type: "string", description: "Script ID from the available routines list, e.g. good_night" },
         },
         required: ["script_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_context",
+      description: "Load a knowledge base page for detailed context about the user or a topic. Only call when the query is clearly about something in the knowledge base. Check available pages in the system prompt.",
+      parameters: {
+        type: "object",
+        properties: {
+          page: { type: "string", description: "Page name from the knowledge base index, e.g. user_profile" },
+        },
+        required: ["page"],
       },
     },
   },
@@ -466,6 +487,17 @@ async function executeTool(
     } catch (err: any) {
       log.error({ err: err.message }, "❌ Routine error");
       return `Routine failed: ${err.message}`;
+    }
+  }
+
+  if (name === "get_context") {
+    const page = args.page as string;
+    log.info({ page }, "📖 Tool call: get_context");
+    try {
+      const content = await fs.readFile(`/wiki/${page}.md`, "utf-8");
+      return content;
+    } catch {
+      return `No knowledge base page found for "${page}". Available pages are listed in the system prompt.`;
     }
   }
 
