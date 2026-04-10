@@ -530,7 +530,7 @@ async function executeTool(
       const isNew = !await fs.access(filePath).then(() => true).catch(() => false);
       await fs.writeFile(filePath, content);
       // Only append to index if it's a new file
-      if (isNew) await fs.appendFile(indexPath, `- [[${filename}]]\n`);
+      if (isNew) await fs.appendFile(indexPath, `- [[sakke-knowledge/${filename}]]\n`);
       return `Saved note "${filename}".`;
     } catch (err: any) {
       return `Failed to save note: ${err.message}`;
