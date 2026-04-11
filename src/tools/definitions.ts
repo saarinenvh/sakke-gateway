@@ -3,12 +3,13 @@ export const tools = [
     type: "function",
     function: {
       name: "control_home_assistant",
-      description: "Control smart home devices: lights, scenes, media, switches, routines",
+      description: "Control smart home devices: lights, scenes, media, switches, routines. IMPORTANT: Always use the exact action values from the enum — never use HA service names like light.turn_on or switch.turn_on.",
       parameters: {
         type: "object",
         properties: {
           action: {
             type: "string",
+            description: "The action to perform. Use scene_design when the user asks to design, create, or generate a lighting scene from a description.",
             enum: [
               "light_on", "light_off", "light_dim", "light_color",
               "scene_activate", "scene_create", "scene_design",
@@ -21,7 +22,7 @@ export const tools = [
           device: { type: "string", description: "Specific entity_id" },
           scene: { type: "string", description: "Scene id for scene_activate" },
           scene_name: { type: "string", description: "Name for scene_create (saves current light state as a scene)" },
-          scene_description: { type: "string", description: "Atmosphere description for scene_design (AI generates and applies a NEW custom lighting scene using OpenAI — use when user says 'design', 'create a scene for', 'make it feel like')" },
+          scene_description: { type: "string", description: "REQUIRED for scene_design: describe the atmosphere or mood and the AI generates and applies a custom lighting scene. Use this when the user says 'design', 'create a scene for', 'make it look like', 'gaming den', etc." },
           brightness: { type: "number", description: "0-255 for light_dim" },
           color: { type: "string", description: "Color name for light_color" },
           volume: { type: "number", description: "0-100 for media_volume" },
