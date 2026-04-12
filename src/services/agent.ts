@@ -88,6 +88,8 @@ export async function runAgent(
   log.info({ conversationId, turns: messages.length - 1, chatMode }, "🤖 Agent started");
   broadcastState("thinking");
 
+  const completedToolCalls = new Set<string>();
+
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     log.info({ iteration: i + 1 }, "📡 Calling Ollama");
 
@@ -110,6 +112,15 @@ export async function runAgent(
     const message = json.message;
 
     if (message.tool_calls?.length) {
+      // Detect repeated identical tool calls — model is stuck in a loop
+      const callKeys = message.tool_calls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
+      const alreadyDone = callKeys.every(k => completedToolCalls.has(k));
+      if (alreadyDone) {
+        log.warn({ tools: callKeys }, "⚠️  Duplicate tool calls detected, forcing response");
+        break;
+      }
+      callKeys.forEach(k => completedToolCalls.add(k));
+
       log.info(
         { tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
         "🛠️  Tool calls requested",
