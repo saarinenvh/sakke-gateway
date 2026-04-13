@@ -123,6 +123,8 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     entities[state.entity_id] = entry;
   }
 
+  console.log(`💡 Scene save entities:`, JSON.stringify(entities, null, 2));
+
   const configRes = await fetch(`${haBaseUrl}/api/config/scene/config/${sceneId}`, {
     method: "POST",
     headers: {
