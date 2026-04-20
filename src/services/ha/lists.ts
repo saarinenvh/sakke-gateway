@@ -17,6 +17,8 @@ const STORE_LAYOUT = [
   { section: "Frozen", keywords: ["frozen", "ice cream", "gelato", "freeze"] },
 ];
 
+export const STORE_LAYOUT_SECTIONS = STORE_LAYOUT.map(s => s.section);
+
 function categorizeItem(name: string): number {
   const lower = name.toLowerCase();
   for (let i = 0; i < STORE_LAYOUT.length; i++) {

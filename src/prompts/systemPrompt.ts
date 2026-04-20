@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import { getAreas, getScenes, getScripts } from "../services/ha/registry.js";
-import { getTodoLists } from "../services/ha/lists.js";
+import { getTodoLists, STORE_LAYOUT_SECTIONS } from "../services/ha/lists.js";
 
 export async function buildSystemPrompt(): Promise<string> {
   const areas = getAreas().map(a => `  - ${a.name} (${a.area_id})`).join("\n");
@@ -66,6 +66,9 @@ ${scenes}
 
 Available lists:
 ${lists}
+
+Shopping list store layout (items are auto-sorted in this order when added):
+${STORE_LAYOUT_SECTIONS.map((s, i) => `  ${i + 1}. ${s}`).join("\n")}
 
 Available routines (HA scripts — use run_routine to execute):
 ${scripts}
