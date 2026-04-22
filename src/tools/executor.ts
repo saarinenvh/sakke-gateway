@@ -6,6 +6,7 @@ import { getWeather } from "../services/integrations/weather.js";
 import { readList, addToList, completeInList, removeFromList, sortList } from "../services/ha/lists.js";
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "../services/integrations/spotify.js";
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
+import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import type { Intent } from "../types/intent.js";
 
 const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -207,6 +208,47 @@ export async function executeTool(
     } catch (err: any) {
       return `Failed to save note: ${err.message}`;
     }
+  }
+
+  if (name === "timer") {
+    const { action, duration_minutes, label, timer_id } = args as {
+      action: string;
+      duration_minutes?: number;
+      label?: string;
+      timer_id?: string;
+    };
+    log.info({ tool: "timer", action }, "⏱️  Tool call: timer");
+
+    if (action === "set") {
+      if (!duration_minutes || duration_minutes <= 0) return "Duration is required to set a timer.";
+      const mins = Math.round(duration_minutes);
+      const timerLabel = label ?? "timer";
+      setTimer(mins * 60 * 1000, timerLabel);
+      const human = mins === 1 ? "1 minute" : `${mins} minutes`;
+      return `Timer set for ${human}. Label: ${timerLabel}.`;
+    }
+
+    if (action === "cancel") {
+      const active = listTimers();
+      if (active.length === 0) return "No active timers.";
+      const key = timer_id ?? (active.length === 1 ? active[0].id : "");
+      if (!key) {
+        return `Multiple timers active: ${active.map(t => `${t.id} (${t.label})`).join(", ")}. Specify a timer ID to cancel.`;
+      }
+      const cancelled = cancelTimer(key);
+      return cancelled ? `Cancelled timer: ${cancelled}.` : "Timer not found.";
+    }
+
+    if (action === "list") {
+      const active = listTimers();
+      if (active.length === 0) return "No active timers.";
+      return active.map(t => {
+        const remaining = Math.max(0, Math.round(t.remainingMs / 1000 / 60));
+        return `${t.id}: "${t.label}" — ${remaining} minute${remaining !== 1 ? "s" : ""} remaining`;
+      }).join("\n");
+    }
+
+    return `Unknown timer action: ${action}`;
   }
 
   if (name === "web_search") {

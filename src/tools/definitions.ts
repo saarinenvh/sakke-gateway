@@ -193,6 +193,35 @@ export const tools = [
   {
     type: "function",
     function: {
+      name: "timer",
+      description: "Set, cancel, or list voice timers. When a timer finishes, the assistant will announce it aloud with full personality. Use for 'remind me in X minutes', 'set a timer for Y', 'wake me up in Z minutes'.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["set", "cancel", "list"],
+          },
+          duration_minutes: {
+            type: "number",
+            description: "Duration in minutes for the 'set' action",
+          },
+          label: {
+            type: "string",
+            description: "What the timer is for, e.g. 'food in the oven', 'meditation'. Used in the announcement when the timer finishes.",
+          },
+          timer_id: {
+            type: "string",
+            description: "Timer ID to cancel (from 'list' action). If omitted for cancel, cancels the only active timer or asks which one.",
+          },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_calendar",
       description: "Get events from Google Calendar. Use ONLY for calendar events, appointments, meetings, or scheduled events — things happening at a specific time. NOT for tasks or to-dos.",
       parameters: {
