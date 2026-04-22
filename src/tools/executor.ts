@@ -3,7 +3,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "../services/ha/dispatcher.js";
 import { webSearch } from "../services/integrations/webSearch.js";
 import { getWeather } from "../services/integrations/weather.js";
-import { readList, addToList, completeInList, removeFromList } from "../services/ha/lists.js";
+import { readList, addToList, completeInList, removeFromList, sortList } from "../services/ha/lists.js";
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "../services/integrations/spotify.js";
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
 import type { Intent } from "../types/intent.js";
@@ -82,6 +82,7 @@ export async function executeTool(
       }
       else if (action === "list_complete") result = await completeInList(list, item ?? "");
       else if (action === "list_remove") result = await removeFromList(list, item ?? "");
+      else if (action === "list_sort") result = await sortList(list);
       else result = `Unknown list action: ${action}`;
       log.info({ result }, "✅ List result");
       return result;

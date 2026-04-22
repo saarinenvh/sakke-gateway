@@ -74,6 +74,20 @@ export async function getTodoLists(): Promise<{ entity_id: string; name: string 
     .map(s => ({ entity_id: s.entity_id, name: s.attributes.friendly_name ?? s.entity_id }));
 }
 
+export async function sortList(entityId: string): Promise<string> {
+  const items = await getItems(entityId);
+  const pending = items.filter(i => i.status === "needs_action").map(i => i.summary);
+  if (pending.length === 0) return "List is empty.";
+  const sorted = [...pending].sort((a, b) => categorizeItem(a) - categorizeItem(b));
+  for (const item of pending) {
+    await haPost("/api/services/todo/remove_item", { entity_id: entityId, item });
+  }
+  for (const item of sorted) {
+    await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
+  }
+  return `Sorted ${sorted.length} items by store layout.`;
+}
+
 export async function readList(entityId: string): Promise<string> {
   const items = await getItems(entityId);
   const pending = items.filter(i => i.status === "needs_action");

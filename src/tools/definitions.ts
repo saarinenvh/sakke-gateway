@@ -91,7 +91,7 @@ export const tools = [
         properties: {
           action: {
             type: "string",
-            enum: ["list_read", "list_add", "list_complete", "list_remove"],
+            enum: ["list_read", "list_add", "list_complete", "list_remove", "list_sort"],
           },
           list: { type: "string", description: "Entity ID of the list, e.g. todo.groceries" },
           items: { type: "array", items: { type: "string" }, description: "Items to add (for list_add)" },
