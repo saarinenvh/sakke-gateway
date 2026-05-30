@@ -65,7 +65,6 @@ export async function dispatch(intent: Intent): Promise<string> {
     case "scene_create": {
       const name = intent.scene_name ?? "custom_scene";
       const entityIds = getLights().map(l => l.entity_id);
-      console.log(`💡 Scene create entityIds (${entityIds.length}):`, entityIds);
       await saveCurrentStateAsScene(name, entityIds);
       return reply(`Scene "${name}" saved.`);
     }
