@@ -6,7 +6,7 @@ const STORE_LAYOUT = [
   { section: "Cleaning & Hygiene", keywords: ["soap", "shampoo", "detergent", "cleaner", "tissue", "toilet paper", "paper towel", "laundry", "dishwasher", "conditioner", "toothpaste", "toothbrush", "deodorant", "razor", "sponge", "bleach", "rinse"] },
   { section: "Vegetables & Fruits", keywords: ["apple", "banana", "orange", "grape", "berry", "lettuce", "tomato", "onion", "potato", "carrot", "cucumber", "pepper", "garlic", "lemon", "lime", "avocado", "mushroom", "spinach", "broccoli", "celery", "zucchini", "cabbage", "kale", "parsley", "basil", "dill", "ginger", "beetroot", "strawberry", "blueberry", "raspberry", "pear", "peach", "mango"] },
   { section: "Canned & Dry Goods", keywords: ["can", "pasta", "rice", "flour", "oil", "soup", "beans", "lentil", "cereal", "oat", "noodle", "stock", "broth", "vinegar", "salt", "spice", "honey", "jam", "peanut butter", "canned", "dried"] },
-  { section: "Sauces", keywords: ["mustard", "ketchup", "mayo", "mayonnaise", "sauce", "dressing", "salsa", "pesto", "relish", "sriracha", "tabasco"] },
+  { section: "Sauces & Oils", keywords: ["olive oil", "mustard", "ketchup", "mayo", "mayonnaise", "sauce", "dressing", "salsa", "pesto", "relish", "sriracha", "tabasco"] },
   { section: "Coffee, Tea & Sugar", keywords: ["coffee", "tea", "sugar", "sweetener", "cocoa", "espresso", "latte", "cappuccino"] },
   { section: "Juices", keywords: ["juice", "smoothie", "nectar", "lemonade", "squash"] },
   { section: "Convenience & Ready Meals", keywords: ["ready meal", "ready-meal", "pizza", "lasagna", "lasagne", "wrap", "sandwich", "sushi", "salad", "hummus", "dip", "snack", "crisp", "chip", "nut", "dried fruit"] },
@@ -77,15 +77,25 @@ export async function getTodoLists(): Promise<{ entity_id: string; name: string 
 export async function sortList(entityId: string): Promise<string> {
   const items = await getItems(entityId);
   const pending = items.filter(i => i.status === "needs_action").map(i => i.summary);
-  if (pending.length === 0) return "List is empty.";
-  const sorted = [...pending].sort((a, b) => categorizeItem(a) - categorizeItem(b));
-  for (const item of pending) {
+  const completed = items.filter(i => i.status === "completed").map(i => i.summary);
+
+  if (pending.length === 0 && completed.length === 0) return "List is empty.";
+
+  const sortedPending = [...pending].sort((a, b) => categorizeItem(a) - categorizeItem(b));
+  const sortedCompleted = [...completed].sort((a, b) => a.localeCompare(b));
+
+  for (const item of [...pending, ...completed]) {
     await haPost("/api/services/todo/remove_item", { entity_id: entityId, item });
   }
-  for (const item of sorted) {
+  for (const item of sortedPending) {
     await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
   }
-  return `Sorted ${sorted.length} items by store layout.`;
+  for (const item of sortedCompleted) {
+    await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
+    await haPost("/api/services/todo/update_item", { entity_id: entityId, item, status: "completed" });
+  }
+
+  return `Sorted ${sortedPending.length} items by store layout, ${sortedCompleted.length} completed items alphabetically.`;
 }
 
 export async function readList(entityId: string): Promise<string> {
