@@ -44,7 +44,7 @@ export async function designScene(description: string): Promise<ScenePlan> {
         { role: "system", content: systemPrompt },
         { role: "user", content: description },
       ],
-      temperature: 0.7,
+      ...(openAiModel.startsWith("o") ? {} : { temperature: 0.7 }),
     }),
   });
 
