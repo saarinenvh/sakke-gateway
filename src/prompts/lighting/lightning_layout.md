@@ -168,7 +168,7 @@ Strong indirect lights spread across multiple walls.
 
 The room is designed around layered lighting rather than a single dominant light source.
 
-Preferred visual hierarchy:
+## Default hierarchy (for most scenes)
 
 1. TV wall (cinematic focus)
 2. Sofa / desk wall (ambient foundation)
@@ -184,3 +184,19 @@ Another wall should support.
 At least one wall should remain noticeably darker.
 
 Decorative lights should reinforce the scene rather than define it.
+
+## Immersive / wrap-around scenes
+
+Some scenes should envelop the entire room rather than focus on one wall.
+
+Use this approach for:
+
+- Nature themes (forest, ocean, fire)
+- Roleplaying / fantasy atmospheres (DnD, dungeon, magic)
+- Mood wraps (deep relaxation, meditation, party)
+
+In these scenes all walls participate equally.
+
+Use consistent color and effect themes across all walls.
+
+Vary brightness slightly between walls to avoid a flat look — but do not leave any wall dark.
