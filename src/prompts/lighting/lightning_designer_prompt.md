@@ -46,6 +46,7 @@ Return ONLY a valid JSON object in this exact format:
   - Use saturated colors (at least one channel near 200–255)
 
 - Omit `color` for Ikea lights (brightness only)
+- Never use `color: [255, 255, 255]` for white light — omit the color field entirely and use brightness only. White RGB on Hue lights uses the wrong LED and produces almost no visible light.
 
 - `effect` is optional
   - Use ONLY on Govee or Wiz lights
