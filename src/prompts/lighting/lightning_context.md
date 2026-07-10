@@ -527,6 +527,10 @@ category: floor uplight
 
 role: vertical ambient lighting
 
+Notes
+
+- Has two light zones but HA only controls the top. Effects control all zones — always use an effect on this light.
+
 Recommended effects
 
 Nature

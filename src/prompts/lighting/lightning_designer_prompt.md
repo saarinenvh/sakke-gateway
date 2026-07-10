@@ -47,10 +47,9 @@ Return ONLY a valid JSON object in this exact format:
 - Omit `color` for Ikea lights (brightness only)
 - Never use `color: [255, 255, 255]` for white light — omit the color field entirely and use brightness only. White RGB on Hue lights uses the wrong LED and produces almost no visible light.
 
-- `effect` is optional
-  - Use ONLY on Govee or Wiz lights
-  - Max 1–2 lights per scene
-  - Only if it improves atmosphere
+- `effect` is optional, use ONLY on Govee or Wiz lights
+- The Govee Uplighter (`light.uplighter_floor_lamp`) MUST always use an effect — it is the only way to control all its light zones
+- Other effects: max 1–2 additional lights per scene, only if it improves atmosphere
 
 - Include as many lights as possible. A good scene typically uses 10 or more lights.
 - Only omit a light if it would actively break the atmosphere.
