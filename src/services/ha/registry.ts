@@ -62,7 +62,8 @@ export async function loadEntities(): Promise<void> {
 
   const lightStates = states.filter((s: any) =>
     s.entity_id.startsWith("light.") &&
-    !s.entity_id.includes("_segment_")
+    !s.entity_id.includes("_segment_") &&
+    !s.attributes?.entity_ids
   );
 
   const areaMap = new Map<string, string>();
