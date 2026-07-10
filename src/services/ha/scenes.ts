@@ -86,7 +86,8 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 
         const body: Record<string, unknown> = { entity_id: light.entity_id };
         if (light.brightness !== undefined) body.brightness = light.brightness;
-        if (light.color) body.rgb_color = light.color;
+        const isWhite = light.color?.[0] === 255 && light.color?.[1] === 255 && light.color?.[2] === 255;
+        if (light.color && !isWhite) body.rgb_color = light.color;
         if (light.effect) body.effect = light.effect;
 
         await callHA("light", "turn_on", body);
