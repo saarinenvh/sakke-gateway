@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import { getLights } from "./registry.js";
 
 const openAiApiKey = process.env.OPENAI_API_KEY ?? "";
 const openAiModel = process.env.OPENAI_LIGHTING_MODEL ?? "gpt-4o";
@@ -65,28 +66,42 @@ export async function designScene(description: string): Promise<ScenePlan> {
 }
 
 export async function applyScene(plan: ScenePlan): Promise<void> {
-  await Promise.all(plan.lights.map(async (light) => {
-    try {
-      if (light.value !== undefined) {
-        await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
-        return;
+  const plannedIds = new Set(plan.lights.map(l => l.entity_id));
+  const unplanned = getLights()
+    .map(l => l.entity_id)
+    .filter(id => !plannedIds.has(id));
+
+  await Promise.all([
+    ...plan.lights.map(async (light) => {
+      try {
+        if (light.value !== undefined) {
+          await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
+          return;
+        }
+
+        if (light.state === "off") {
+          await callHA("light", "turn_off", { entity_id: light.entity_id });
+          return;
+        }
+
+        const body: Record<string, unknown> = { entity_id: light.entity_id };
+        if (light.brightness !== undefined) body.brightness = light.brightness;
+        if (light.color) body.rgb_color = light.color;
+        if (light.effect) body.effect = light.effect;
+
+        await callHA("light", "turn_on", body);
+      } catch (err: any) {
+        console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
       }
-
-      if (light.state === "off") {
-        await callHA("light", "turn_off", { entity_id: light.entity_id });
-        return;
+    }),
+    ...unplanned.map(async (id) => {
+      try {
+        await callHA("light", "turn_off", { entity_id: id });
+      } catch (err: any) {
+        console.error(`Failed to turn off unplanned light ${id}: ${err.message}`);
       }
-
-      const body: Record<string, unknown> = { entity_id: light.entity_id };
-      if (light.brightness !== undefined) body.brightness = light.brightness;
-      if (light.color) body.rgb_color = light.color;
-      if (light.effect) body.effect = light.effect;
-
-      await callHA("light", "turn_on", body);
-    } catch (err: any) {
-      console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
-    }
-  }));
+    }),
+  ]);
 }
 
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {

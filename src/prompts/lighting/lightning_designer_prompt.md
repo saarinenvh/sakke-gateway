@@ -54,7 +54,7 @@ Return ONLY a valid JSON object in this exact format:
 
 - Set `"state": "off"` to disable a light
 
-- ALL lights must be included in every scene
+- ALL lights must be included in every scene — if you don't want a light active, set `"state": "off"`. Never omit a light entirely.
 
 - Return JSON only
 - No explanations
