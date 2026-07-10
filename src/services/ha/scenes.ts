@@ -54,7 +54,7 @@ export async function designScene(description: string): Promise<ScenePlan> {
 
   const json = await res.json() as { choices?: { message?: { content?: string } }[] };
   const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
-  console.log(`🎨 OpenAI scene response: ${content.slice(0, 200)}...`);
+  console.log(`🎨 OpenAI scene response:\n${content}`);
 
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
 
