@@ -80,7 +80,6 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
         }
 
         if (light.state === "off") {
-          await callHA("light", "turn_off", { entity_id: light.entity_id });
           return;
         }
 

@@ -23,7 +23,6 @@ Return ONLY a valid JSON object in this exact format:
   "lights": [
     {
       "entity_id": "light.example",
-      "state": "on",
       "brightness": 180,
       "color": [255, 100, 0]
     },
@@ -53,9 +52,8 @@ Return ONLY a valid JSON object in this exact format:
   - Max 1–2 lights per scene
   - Only if it improves atmosphere
 
-- Set `"state": "off"` to disable a light
-
-- ALL lights must be included in every scene — if you don't want a light active, set `"state": "off"`. Never omit a light entirely.
+- Only include lights you want ON. Omitted lights will be turned off automatically.
+- Every included light must have `"state": "on"`.
 
 - Return JSON only
 - No explanations
@@ -176,7 +174,7 @@ Good:
 - Always have a dominant wall
 - Always create direction across the room
 - Never treat all walls equally
-- Turn OFF lights that break the scene
+- Simply omit lights that don't serve the scene
 
 ---
 
