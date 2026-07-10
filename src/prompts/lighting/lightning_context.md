@@ -2,28 +2,40 @@
 
 ## Overview
 
-This apartment has a layered smart lighting setup with ceiling, ambient, accent, decorative, and bias lights.
+This apartment has a layered smart lighting setup consisting of ceiling, ambient, accent, decorative, and bias lighting.
 
-Each light is mapped to a physical wall using wall references from the room layout context.
+Each light includes:
 
-### WiZ Effect Speed
+- physical location
+- lighting role
+- real-world brightness
+- capabilities
+- recommended effects
 
-WiZ lights have a separate effect speed entity (range 10–200, default ~100).
-To set effect speed, include it in the scene output as a separate entry:
+The AI should think like a lighting designer, not a device controller.
+
+---
+
+## WiZ Effect Speed
+
+WiZ lights support configurable animation speed.
+
+When using a WiZ effect, include a separate speed entity:
 
 ```json
-{ "entity_id": "number.wiz_couch_floor_lamp_1_effect_speed", "value": 60 }
+{
+  "entity_id": "number.wiz_couch_floor_lamp_1_effect_speed",
+  "value": 60
+}
 ```
 
-Speed entity IDs follow the pattern: `number.{wiz_entity_base}_effect_speed`
+Range:
 
-- `number.wiz_couch_floor_lamp_1_effect_speed`
-- `number.wiz_couch_floor_lamp_2_effect_speed`
-- `number.wiz_cone_floor_lamp_1_effect_speed`
-- `number.wiz_cone_floor_lamp_2_effect_speed`
-- `number.wiz_cone_floor_lamp_3_effect_speed`
+- 10 = very slow
+- 100 = default
+- 200 = very fast
 
-Only include speed entries when using an effect on that light.
+Only include speed entities when an effect is used.
 
 ---
 
@@ -36,266 +48,647 @@ Only include speed entries when using an effect on that light.
 
 ---
 
-## Lights
+# Ceiling
 
-### Main Ceiling Light
+## Hue Infuse Ceiling
 
 - entity_id: `light.hue_infuse_ceiling_1`
-- name: Hue Infuse Ceiling
-- type: ceiling / primary room light
 - wall: ceiling_center
-- role: main visibility light
-- real-world output: very strong
-- notes:
-  - Brightest light in the apartment
-  - Can fully illuminate the room alone
-  - White mode is significantly brighter than color
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color (xy)
-  - color temperature (2000–6535K)
-  - effects (use exact names): off, candle, fire, prism
+- category: ceiling
+- role: primary room illumination
+- real-world output: very high
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+- candle
+- fire
+- prism
+- sparkle
+- underwater
+- cosmos
+- sunbeam
+- sunrise
+- sunset
+
+Notes
+
+- Brightest light in the apartment
+- White mode is considerably brighter than RGB
+- Usually provides functional visibility
 
 ---
 
-## Wall 1 — TV Wall
+# Wall 1 — TV Wall
 
-### Govee Floor Lamp
+## Floor Lamp 2 Left
 
-- entity_id: `light.rgbicww_floor_lamp`
-- name: Govee Floor Lamp
-- wall: wall_1_tv
-- type: vertical ambient lamp
-- role: primary mood light on TV wall
+- entity_id: `light.floor_lamp_2_left`
+- category: floor uplight
+- role: primary cinematic wall wash
 - real-world output: medium
-- notes:
-  - Strong visual wall wash
-  - Good for color-driven scenes
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Breathe, Flow, Gradient, Forest, Ocean, Aurora, Fire, Sunrise, Sunset, Meteor, Firefly, Moonlight, Rainbow, Wave, Romantic, Dreamlike, Tunnel
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+Nature
+
+- Forest
+- Ocean
+- Aurora
+- Firefly
+
+Fire
+
+- Fire
+- Candlelight
+
+Sky
+
+- Sunrise
+- Sunset
+- Meteor
+
+Ambient
+
+- Gradient
+- Breathe
+- Dreamlike
+
+Notes
+
+- Positioned left of the TV
+- Strong indirect wall illumination
 
 ---
 
-### Shelf Case Lights
+## Floor Lamp 2 Right
+
+- entity_id: `light.floor_lamp_2_r`
+
+(same capabilities and effects as left)
+
+Notes
+
+- Positioned right of the TV
+- Mirrors the left floor lamp
+
+---
+
+## Smart AI Sync Box
+
+- entity_id: `light.smart_ai_sync_box`
+- category: bias light
+- role: immersive TV backlight
+- real-world output: low-medium
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Fire
+
+- Fire
+- Candlelight
+
+Sky
+
+- Meteor
+- Moonlight
+
+Ambient
+
+- Dreamlike
+- Flow
+- Ripple
+
+Notes
+
+- Behind the TV
+- Primary immersion light
+
+---
+
+## Case Lights
 
 - entity_id: `light.case_lights`
-- name: Case Lights
-- wall: wall_1_tv
-- type: decorative shelf lighting
-- role: small localized accent
+- category: decorative
+- role: shelf accent
 - real-world output: very low
-- capabilities:
-  - on/off
-  - brightness
+
+Capabilities
+
+- on/off
+- brightness
+
+Notes
+
+- Small decorative light
+- Never intended as primary lighting
 
 ---
 
-### TV Backlight
+# Wall 2 — Window Wall
 
-- entity_id: `light.rgbic_tv_backlight`
-- name: TV Backlight
-- wall: wall_1_tv
-- type: bias light
-- role: TV immersion and glow
-- real-world output: low-to-medium
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects
-
----
-
-## Wall 2 — Window Wall
-
-### Window LED Strip
+## Window LED Strip
 
 - entity_id: `light.nedis_window_strip`
-- name: Window LED Strip
-- wall: wall_2_window
-- type: ambient strip light
-- role: soft background glow
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
+
+category: strip
+
+role: ambient fill
+
+real-world output: low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
 
 ---
 
-## Wall 3 — Sofa + Desk Wall
+## Window Top Light
 
-### Sofa Floor Lamp (2 bulbs)
+- entity_id: `light.window_top_light`
+
+category: ceiling strip
+
+role: indirect wall wash
+
+real-world output: medium
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Sky
+
+- Sunrise
+- Sunset
+- Meteor
+- Moonlight
+
+Ambient
+
+- Breathe
+- Dreamlike
+- Flow
+
+Notes
+
+- Mounted above the window
+- Casts light downward
+
+---
+
+# Wall 3 — Sofa + Desk
+
+## Sofa Floor Lamp
 
 - entity_id: `light.wiz_couch_floor_lamp_1`
-- name: Sofa Floor Lamp (Main)
-- wall: wall_3_sofa_desk
-- type: uplight / ambient
-- role: main ambient support for seating area
-- real-world output: medium
-- notes:
-  - Stronger in white than color
-  - Provides ceiling bounce light
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
+
+category: uplight
+
+role: ambient ceiling bounce
+
+real-world output: medium
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+- Candlelight
+- Cozy
+- Fireplace
+- Forest
+- Jungle
+- Ocean
+- Romance
+- Relax
+- Sunset
+- Deep dive
+- Pastel colors
+- Steampunk
 
 ---
 
-### Sofa Accent Bulb
+## Sofa Accent Lamp
 
 - entity_id: `light.wiz_couch_floor_lamp_2`
-- name: Sofa Accent Light
-- wall: wall_3_sofa_desk
-- type: directional accent
-- role: highlights wall art
-- real-world output: low-to-medium
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
+
+category: uplight
+
+role: wall accent
+
+real-world output: low-to-medium
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+- Candlelight
+- Cozy
+- Fireplace
+- Forest
+- Jungle
+- Ocean
+- Romance
+- Relax
+- Sunset
+- Deep dive
+- Pastel colors
+- Steampunk
 
 ---
 
-### Desk Hue Lights
+## Sofa Strip
+
+- entity_id: `light.sofa_strip_light`
+
+category: LED strip
+
+role: indirect sofa accent
+
+real-world output: low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Fire
+
+- Fire
+- Candlelight
+
+Ambient
+
+- Dreamlike
+- Ripple
+- Flow
+
+Notes
+
+- Mounted under the picture shelf
+- Shines downward onto the sofa wall
+
+---
+
+## Hue Play 2
 
 - entity_id: `light.hue_play_2`
-- name: Desk Hue Light 1
-- wall: wall_3_sofa_desk
-- type: bias light
-- role: monitor backlight
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - color temperature
-  - effects (use exact names): candle, fire, prism, sparkle, opal, glisten, underwater, cosmos, sunbeam, enchant, sunrise, sunset
+
+category: bias light
+
+role: monitor backlight
+
+real-world output: low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+- candle
+- fire
+- prism
+- underwater
+- cosmos
+- sparkle
+- sunrise
+- sunset
 
 ---
+
+## Hue Play 3
 
 - entity_id: `light.hue_play_3`
-- name: Desk Hue Light 2
-- wall: wall_3_sofa_desk
-- type: bias light
-- role: monitor backlight
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - color temperature
-  - effects (use exact names): candle, fire, prism, sparkle, opal, glisten, underwater, cosmos, sunbeam, enchant, sunrise, sunset
+
+category: bias light
+
+role: monitor backlight
+
+real-world output: low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+- color temperature
+
+Recommended effects
+
+- candle
+- fire
+- prism
+- underwater
+- cosmos
+- sparkle
+- sunrise
+- sunset
 
 ---
 
-### Desk LED Strip
+## Desk LED Strip
 
 - entity_id: `light.led_strip_light_m1`
-- name: Desk LED Strip
-- wall: wall_3_sofa_desk
-- type: under-desk accent strip
-- role: local desk underglow and low-level ambient support
-- real-world output: low
-- notes:
-  - Mounted under the desk
-  - Best used as a subtle desk-zone accent, not as a main light
-  - Helps separate the desk area from the sofa area
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Breathe, Candlelight, Aurora-A, Aurora-B, Forest, Sunset, Sunrise, Fire-A, Fire-B, Ripple, Wave-A, Moonlight-A, Meteor, Starry Sky, Rainbow-A, Dreamlike-A, Meditation-A, Romantic, Flow-A, Flash, Twinkle-A
 
-### Govee Uplighter
+category: LED strip
+
+role: under-desk accent
+
+real-world output: low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+Nature
+
+- Forest
+
+Fire
+
+- Fire
+- Candlelight
+
+Sky
+
+- Meteor
+- Moonlight
+
+Ambient
+
+- Dreamlike
+- Flow
+- Meditation
+
+---
+
+## Desk Govee
+
+- entity_id: `light.desk_govee`
+
+category: floor lamp
+
+role: desk ambient
+
+real-world output: medium
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Fire
+
+- Fire
+
+Sky
+
+- Sunrise
+- Sunset
+- Meteor
+
+Ambient
+
+- Dreamlike
+- Movie
+- Cyberpunk
+- Thunderstorm
+
+---
+
+## Govee Uplighter
 
 - entity_id: `light.uplighter_floor_lamp`
-- name: Govee Uplighter
-- wall: wall_3_sofa_desk
-- type: dynamic uplight
-- role: strong vertical ambient and ceiling wash
-- real-world output: medium
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Breathe, Twinkle, Flow, Gradient, Gleam, Forest, Ocean, Aurora, Firefly, Moonlight, Candlelight, Sunrise, Sunset, Bonfire, Stream
+
+category: floor uplight
+
+role: vertical ambient lighting
+
+Recommended effects
+
+Nature
+
+- Forest
+- Ocean
+- Aurora
+
+Fire
+
+- Bonfire
+- Candlelight
+
+Sky
+
+- Sunrise
+- Sunset
+- Moonlight
+
+Ambient
+
+- Breathe
+- Flow
+- Twinkle
+- Gradient
+- Dreamlike
 
 ---
 
-## Wall 4 — Cabinet Wall
+# Wall 4 — Cabinet Wall
 
-### Cone Floor Lamp (3 heads)
+## Cone Lamp 1
 
 - entity_id: `light.wiz_cone_floor_lamp_1`
-- name: Cone Lamp 1
-- wall: wall_4_cabinet
-- type: directional accent
-- role: object highlighting
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
+
+Recommended effects
+
+- Candlelight
+- Cozy
+- Fireplace
+- Forest
+- Jungle
+- Ocean
+- Romance
+- Relax
+- Sunset
+- Deep dive
+- Pastel colors
+- Steampunk
 
 ---
+
+## Cone Lamp 2
 
 - entity_id: `light.wiz_cone_floor_lamp_2`
-- name: Cone Lamp 2
-- wall: wall_4_cabinet
-- type: directional accent
-- role: object highlighting
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
+
+Recommended effects
+
+- Candlelight
+- Cozy
+- Fireplace
+- Forest
+- Jungle
+- Ocean
+- Romance
+- Relax
+- Sunset
+- Deep dive
+- Pastel colors
+- Steampunk
 
 ---
+
+## Cone Lamp 3
 
 - entity_id: `light.wiz_cone_floor_lamp_3`
-- name: Cone Lamp 3
-- wall: wall_4_cabinet
-- type: directional accent
-- role: object highlighting
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
-  - RGB color
-  - effects (use exact names): Candlelight, Cozy, Fireplace, Forest, Jungle, Ocean, Romance, Relax, Sunset, Pulse, Party, Rhythm, Deep dive, Pastel colors, Steampunk
+
+Recommended effects
+
+- Candlelight
+- Cozy
+- Fireplace
+- Forest
+- Jungle
+- Ocean
+- Romance
+- Relax
+- Sunset
+- Deep dive
+- Pastel colors
+- Steampunk
 
 ---
 
-### Cabinet Shelf Lights
+## Table Lamp
+
+- entity_id: `light.table_lamp`
+
+category: decorative
+
+role: cabinet accent
+
+real-world output: very low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Fire
+
+- Fire
+- Candlelight
+
+Sky
+
+- Meteor
+- Moonlight
+
+Ambient
+
+- Dreamland
+- Romantic
+- Meditation
+
+Notes
+
+- Small decorative lamp
+- Placed on top of the display cabinet
+
+---
+
+## Shelf Lights
 
 - entity_id: `light.shelf_light`
-- name: Cabinet Shelf Lights
-- wall: wall_4_cabinet
-- type: decorative lighting
-- role: depth and subtle structure
-- real-world output: low
-- capabilities:
-  - on/off
-  - brightness
+
+category: decorative
+
+role: cabinet depth
+
+real-world output: very low
+
+Capabilities
+
+- on/off
+- brightness
 
 ---
 
-## Practical Notes
+# Practical Notes
 
-- White light is significantly brighter than RGB
-- Ceiling light is the only true full-room illumination source
-- Floor lamps provide usable ambient lighting
-- TV and bias lights are not sufficient for visibility
-- Decorative lights should never be used as primary lighting
-- Wall-based lighting creates direction and depth in the room
-- Under-desk lighting is a local accent, not a room-lighting source
+- White light is significantly brighter than RGB.
+- Brightness values are relative to each fixture.
+- Decorative lights should never be treated as primary illumination.
+- Strong uplights influence multiple walls through indirect reflection.
+- Layer lighting using primary, ambient, accent and decorative light.
+- Prefer effects only when they meaningfully reinforce the requested atmosphere.
