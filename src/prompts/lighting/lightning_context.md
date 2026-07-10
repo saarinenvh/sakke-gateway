@@ -556,6 +556,52 @@ Ambient
 
 ---
 
+## Table Lamp
+
+- entity_id: `light.table_lamp`
+
+category: decorative
+
+role: cabinet accent
+
+real-world output: very low
+
+Capabilities
+
+- on/off
+- brightness
+- RGB color
+
+Recommended effects
+
+Nature
+
+- Forest
+- Aurora
+
+Fire
+
+- Fire
+- Candlelight
+
+Sky
+
+- Meteor
+- Moonlight
+
+Ambient
+
+- Dreamland
+- Romantic
+- Meditation
+
+Notes
+
+- Placed on top of the display cabinet (vitriini) in the center of wall 3
+- Small decorative lamp
+
+---
+
 # Wall 4 — Cabinet Wall
 
 ## Cone Lamp 1
@@ -618,52 +664,6 @@ Recommended effects
 - Deep dive
 - Pastel colors
 - Steampunk
-
----
-
-## Table Lamp
-
-- entity_id: `light.table_lamp`
-
-category: decorative
-
-role: cabinet accent
-
-real-world output: very low
-
-Capabilities
-
-- on/off
-- brightness
-- RGB color
-
-Recommended effects
-
-Nature
-
-- Forest
-- Aurora
-
-Fire
-
-- Fire
-- Candlelight
-
-Sky
-
-- Meteor
-- Moonlight
-
-Ambient
-
-- Dreamland
-- Romantic
-- Meditation
-
-Notes
-
-- Small decorative lamp
-- Placed on top of the display cabinet
 
 ---
 
