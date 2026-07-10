@@ -66,42 +66,36 @@ export async function designScene(description: string): Promise<ScenePlan> {
 }
 
 export async function applyScene(plan: ScenePlan): Promise<void> {
-  const plannedIds = new Set(plan.lights.map(l => l.entity_id));
-  const unplanned = getLights()
-    .map(l => l.entity_id)
-    .filter(id => !plannedIds.has(id));
+  // Step 1: turn off all known lights first, then apply scene — avoids race conditions with group entities
+  await Promise.all(getLights().map(async (light) => {
+    try {
+      await callHA("light", "turn_off", { entity_id: light.entity_id });
+    } catch (err: any) {
+      console.error(`Failed to turn off ${light.entity_id}: ${err.message}`);
+    }
+  }));
 
-  await Promise.all([
-    ...plan.lights.map(async (light) => {
-      try {
-        if (light.value !== undefined) {
-          await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
-          return;
-        }
-
-        if (light.state === "off") {
-          return;
-        }
-
-        const body: Record<string, unknown> = { entity_id: light.entity_id };
-        if (light.brightness !== undefined) body.brightness = light.brightness;
-        const isWhite = light.color?.[0] === 255 && light.color?.[1] === 255 && light.color?.[2] === 255;
-        if (light.color && !isWhite) body.rgb_color = light.color;
-        if (light.effect) body.effect = light.effect;
-
-        await callHA("light", "turn_on", body);
-      } catch (err: any) {
-        console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
+  // Step 2: apply planned lights
+  await Promise.all(plan.lights.map(async (light) => {
+    try {
+      if (light.value !== undefined) {
+        await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
+        return;
       }
-    }),
-    ...unplanned.map(async (id) => {
-      try {
-        await callHA("light", "turn_off", { entity_id: id });
-      } catch (err: any) {
-        console.error(`Failed to turn off unplanned light ${id}: ${err.message}`);
-      }
-    }),
-  ]);
+
+      if (light.state === "off") return;
+
+      const body: Record<string, unknown> = { entity_id: light.entity_id };
+      if (light.brightness !== undefined) body.brightness = light.brightness;
+      const isWhite = light.color?.[0] === 255 && light.color?.[1] === 255 && light.color?.[2] === 255;
+      if (light.color && !isWhite) body.rgb_color = light.color;
+      if (light.effect) body.effect = light.effect;
+
+      await callHA("light", "turn_on", body);
+    } catch (err: any) {
+      console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
+    }
+  }));
 }
 
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
