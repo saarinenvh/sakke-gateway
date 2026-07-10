@@ -171,18 +171,17 @@ Good:
 
 ## Composition Rules
 
-- Always have a dominant wall
-- Always create direction across the room
-- Never treat all walls equally
-- Simply omit lights that don't serve the scene
+- Always have a dominant wall for cinematic scenes
+- For immersive/nature/fantasy scenes, use ALL lights across all walls
+- Always create direction or atmosphere across the room
+- Use as many lights as needed to fill the atmosphere — more lights = richer scene
 
 ---
 
 ## Common Mistakes (AVOID)
 
-- Lighting every wall equally
-- No clear focal direction
-- Too many lights active
+- No clear focal direction or atmosphere
+- Using too FEW lights — a rich scene uses most or all available lights
 - Scene too dark to function
 - All lights same color and brightness
 
