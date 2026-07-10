@@ -52,7 +52,8 @@ Return ONLY a valid JSON object in this exact format:
   - Max 1–2 lights per scene
   - Only if it improves atmosphere
 
-- Only include lights you want ON. Omitted lights will be turned off automatically.
+- Include as many lights as possible. A good scene typically uses 10 or more lights.
+- Only omit a light if it would actively break the atmosphere.
 - Every included light must have `"state": "on"`.
 
 - Return JSON only
@@ -121,13 +122,11 @@ Guidelines:
 
 ---
 
-### 4. Suppressed Wall (IMPORTANT)
+### 4. Suppressed Wall (cinematic scenes only)
 
-At least one wall should be clearly less lit.
+For cinematic/TV scenes, one wall can be less lit to create contrast.
 
-Guidelines:
-- dim or turn off lights on that wall
-- prevents flat lighting
+For immersive/nature/fantasy scenes, skip this — all walls should participate.
 
 ---
 
