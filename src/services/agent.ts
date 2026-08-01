@@ -3,6 +3,7 @@ import { tools } from "../tools/definitions.js";
 import { executeTool } from "../tools/executor.js";
 import { buildSystemPrompt } from "../prompts/systemPrompt.js";
 import { broadcastState } from "./displayState.js";
+import { isRelevantContinuation } from "./continuationCheck.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
@@ -27,7 +28,12 @@ interface OllamaToolCall {
   };
 }
 
-const conversations = new Map<string, { messages: Message[]; lastActive: number; chatMode: boolean }>();
+const conversations = new Map<string, {
+  messages: Message[];
+  lastActive: number;
+  chatMode: boolean;
+  awaitingContinuation: boolean;
+}>();
 
 function pruneStale(): void {
   const now = Date.now();
@@ -78,6 +84,19 @@ export async function runAgent(
   }
 
   const existing = conversations.get(conversationId);
+
+  if (existing?.awaitingContinuation && !existing.chatMode) {
+    const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
+    const isContinuation = await isRelevantContinuation(lastAssistantMessage, userMessage, log);
+
+    if (!isContinuation) {
+      log.info({ conversationId, userMessage }, "🤫 Utterance deemed unrelated, staying silent");
+      conversations.set(conversationId, { ...existing, awaitingContinuation: false });
+      broadcastState("idle");
+      return { content: "", continueConversation: false };
+    }
+  }
+
   const messages: Message[] = existing?.messages ?? [
     { role: "system", content: await buildSystemPrompt() },
   ];
@@ -142,13 +161,13 @@ export async function runAgent(
       .trim() || "I got nothing.";
 
     messages.push({ role: "assistant", content });
-    conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode });
+    conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode, awaitingContinuation: true });
 
     const asksQuestion = content.trimEnd().endsWith("?");
     log.info({ conversationId, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "💬 Agent response");
     const speakingMs = Math.max(2000, content.length * 70);
     broadcastState("speaking", speakingMs);
-    return { content, continueConversation: chatMode || asksQuestion };
+    return { content, continueConversation: true };
   }
 
   return { content: "I got confused trying to answer that.", continueConversation: chatMode };
