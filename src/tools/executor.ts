@@ -7,6 +7,7 @@ import { readList, addToList, completeInList, removeFromList, sortList } from ".
 import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "../services/integrations/spotify.js";
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
 import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
+import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
 import type { Intent } from "../types/intent.js";
 
 const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -249,6 +250,24 @@ export async function executeTool(
     }
 
     return `Unknown timer action: ${action}`;
+  }
+
+  if (name === "refresh_home_data") {
+    log.info({ tool: "refresh_home_data" }, "🔄 Tool call: refresh home data");
+    try {
+      await loadEntities();
+      const areas = getAreas().map(a => a.name).join(", ") || "none";
+      const scenes = getScenes().map(s => s.name).join(", ") || "none";
+      const scripts = getScripts().map(s => s.name).join(", ") || "none";
+      log.info(
+        { areas: getAreas().length, scenes: getScenes().length, scripts: getScripts().length },
+        "✅ Home data refreshed",
+      );
+      return `Reloaded home data.\nAreas: ${areas}\nScenes: ${scenes}\nRoutines: ${scripts}`;
+    } catch (err: any) {
+      log.error({ err: err.message }, "❌ Refresh home data error");
+      return `Failed to refresh home data: ${err.message}`;
+    }
   }
 
   if (name === "web_search") {

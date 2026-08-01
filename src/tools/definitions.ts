@@ -222,6 +222,18 @@ export const tools = [
   {
     type: "function",
     function: {
+      name: "refresh_home_data",
+      description: "Reload the list of areas, lights, switches, scenes, and routines from Home Assistant. Call this when a scene, light, area, or routine the user mentions isn't in your known lists, or when explicitly asked to refresh, update, or reload your knowledge of the smart home (e.g. 'refresh your scenes', 'do you know about the new scene I made', 'update your info'). This data is only loaded at startup otherwise, so it can go stale when things change in Home Assistant.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_calendar",
       description: "Get events from Google Calendar. Use ONLY for calendar events, appointments, meetings, or scheduled events — things happening at a specific time. NOT for tasks or to-dos.",
       parameters: {
