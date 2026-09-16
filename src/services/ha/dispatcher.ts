@@ -53,9 +53,11 @@ export async function dispatch(intent: Intent): Promise<string> {
         s.name.toLowerCase() === intent.scene?.toLowerCase() ||
         s.entity_id === intent.scene
       );
-      const sceneEntityId = match ? match.entity_id : `scene.${intent.scene}`;
-      await callService("scene", "turn_on", { entity_id: sceneEntityId });
-      if (match?.scene_id === "tv_time" || intent.scene === "tv_time") {
+      if (!match) {
+        return `No scene named "${intent.scene}" exists. If this is a routine (HA script), use run_routine instead of scene_activate.`;
+      }
+      await callService("scene", "turn_on", { entity_id: match.entity_id });
+      if (match.scene_id === "tv_time" || intent.scene === "tv_time") {
         await callService("remote", "turn_on", { entity_id: "remote.living_room_tv" });
         await callService("switch", "turn_on", { entity_id: "switch.rgbic_tv_backlight_dreamview" });
       }
