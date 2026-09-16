@@ -14,17 +14,26 @@ export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 // staying quiet is recoverable (just repeat yourself), responding to speech
 // never meant for Sakke is not.
 export async function classifyFollowUp(
+  lastUserMessage: string,
   lastAssistantMessage: string,
   newUtterance: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
+  // Passing only the assistant's last line let a generic, open-ended reply
+  // (e.g. "What can I do for you?") trivially "continue" into literally
+  // anything - a genuine topic switch (Spotify chat -> "light the campfire")
+  // got classified continuation just because it technically answered an
+  // open question, dragging irrelevant history into an unrelated request.
+  // Including the user's last message gives the classifier the actual topic
+  // to compare against, not just whatever the assistant happened to ask.
   const prompt = `Here is the most recent exchange between a voice assistant and a user:
-Assistant said: "${lastAssistantMessage}"
+User said: "${lastUserMessage}"
+Assistant replied: "${lastAssistantMessage}"
 New speech picked up by the microphone: "${newUtterance}"
 
 Classify the new speech into exactly one of these three categories:
-- continuation: directly continues, answers, corrects, or responds to what the assistant just said (e.g. picking an option, confirming, correcting a detail).
-- new_request: a clear, coherent new request or comment, clearly directed at the assistant, just unrelated to the previous topic.
+- continuation: about the SAME specific topic or task as the exchange above (e.g. picking an option, confirming, correcting a detail, directly answering a specific question the assistant asked).
+- new_request: a clear, coherent request or comment on a DIFFERENT topic than the exchange above. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does NOT make the next thing continuation by default - if it's a different topic, it's new_request even though it technically answers that open question.
 - noise: not actually directed at the assistant at all - talking to someone else, background chatter, an incomplete fragment, or anything ambiguous.
 
 Answer with exactly one word: continuation, new_request, or noise.`;
@@ -62,7 +71,7 @@ Answer with exactly one word: continuation, new_request, or noise.`;
       : "noise";
 
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ model, lastAssistantMessage, newUtterance, raw, verdict }, "Follow-up classification");
+    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict }, "Follow-up classification");
 
     return verdict;
   } catch (err: any) {

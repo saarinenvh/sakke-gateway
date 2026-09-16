@@ -138,7 +138,8 @@ export async function runAgent(
 
   if (existing?.awaitingContinuation && !existing.chatMode) {
     const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
-    const verdict = await classifyFollowUp(lastAssistantMessage, userMessage, log);
+    const lastUserMessage = [...existing.messages].reverse().find(m => m.role === "user")?.content ?? "";
+    const verdict = await classifyFollowUp(lastUserMessage, lastAssistantMessage, userMessage, log);
 
     if (verdict === "noise") {
       log.info({ conversationId, userMessage }, "Utterance deemed noise, staying silent");
