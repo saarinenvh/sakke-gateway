@@ -174,6 +174,7 @@ const lastSuggestion = new Map<string, { query: string; type: "track" | "artist"
 
 // Presents 3 numbered results without playing anything.
 export async function spotifySuggest(conversationId: string, query: string, type: "track" | "artist" | "playlist" | "album" = "track", offset: number = 0): Promise<string> {
+  if (!query.trim()) return "No search term given - what would you like me to look for?";
   const results = await spotifySearchMultiple(query, type, 3, offset);
   if (results.length === 0) {
     return offset === 0 ? `Couldn't find any ${type}s for "${query}".` : `No more ${type}s for "${query}".`;
