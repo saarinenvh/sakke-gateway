@@ -4,7 +4,7 @@ import { dispatch } from "../services/ha/dispatcher.js";
 import { webSearch } from "../services/integrations/webSearch.js";
 import { getWeather } from "../services/integrations/weather.js";
 import { readList, addToList, completeInList, removeFromList, sortList } from "../services/ha/lists.js";
-import { spotifySearchAndPlay, spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume } from "../services/integrations/spotify.js";
+import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayFromSuggestions, spotifyPlayPersonal } from "../services/integrations/spotify.js";
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
 import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
@@ -63,17 +63,24 @@ export async function executeTool(
   }
 
   if (name === "spotify") {
-    const { action, query, type, volume } = args as { action: string; query?: string; type?: "track" | "artist" | "playlist" | "album"; volume?: number };
-    log.info({ tool: "spotify", action, query }, "🎵 Tool call: Spotify");
+    const { action, query, type, volume, offset, index } = args as { action: string; query?: string; type?: "track" | "artist" | "playlist" | "album"; volume?: number; offset?: number; index?: number };
+    log.info({ tool: "spotify", action, query, offset, index }, "🎵 Tool call: Spotify");
     try {
       let result: string;
-      if (action === "search_and_play" || (action === "play" && query)) result = await spotifySearchAndPlay(query ?? "", type ?? "track");
+      if (action === "suggest") result = await spotifySuggest(query ?? "", type ?? "track", offset ?? 0);
+      else if (index && (action === "play" || action === "search_and_play")) result = await spotifyPlayFromSuggestions(query ?? "", type ?? "track", offset ?? 0, index);
+      else if (action === "play" && query) {
+        // No direct search-and-blind-play anymore - STT makes exact-name matches
+        // too unreliable. A known personal playlist plays instantly (unambiguous);
+        // anything else falls back to search results instead of guessing.
+        result = (await spotifyPlayPersonal(query)) ?? await spotifySuggest(query, type ?? "track", 0);
+      }
       else if (action === "play") result = await spotifyPlay();
       else if (action === "pause" || action === "stop" || action === "media_stop") result = await spotifyPause();
       else if (action === "next") result = await spotifyNext();
       else if (action === "previous") result = await spotifyPrevious();
       else if (action === "volume") result = await spotifyVolume(volume ?? 50);
-      else result = `Unknown spotify action: ${action}. Valid actions: play, pause, next, previous, volume, search_and_play.`;
+      else result = `Unknown spotify action: ${action}. Valid actions: play, pause, next, previous, volume, suggest.`;
       log.info({ result }, "✅ Spotify result");
       return result;
     } catch (err: any) {

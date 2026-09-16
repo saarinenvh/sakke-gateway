@@ -144,11 +144,9 @@ async function haService(service: string, data: Record<string, unknown>): Promis
   console.log(`[spotify] haService ${service} OK`);
 }
 
-export async function spotifySearch(query: string, type: "track" | "artist" | "playlist" | "album" = "track"): Promise<{ uri: string; name: string; artist?: string; id?: string } | null> {
+async function spotifySearchMultiple(query: string, type: "track" | "artist" | "playlist" | "album", limit: number, offset: number): Promise<{ uri: string; name: string; artist?: string; id?: string }[]> {
   const token = await getAccessToken();
-  // market is required for Client Credentials flow - without it, Spotify treats
-  // all content as unavailable and returns empty results.
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=1&market=FI`;
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}&market=FI`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
@@ -156,27 +154,49 @@ export async function spotifySearch(query: string, type: "track" | "artist" | "p
   if (!res.ok) throw new Error(`Spotify search failed: ${res.status}`);
   const data = await res.json() as any;
 
-  if (type === "track") {
-    const track = data.tracks?.items?.[0];
-    if (!track) return null;
-    return { uri: track.uri, name: track.name, artist: track.artists?.[0]?.name };
+  const key = type === "playlist" ? "playlists" : type === "artist" ? "artists" : type === "album" ? "albums" : "tracks";
+  const items = data[key]?.items ?? [];
+  return items.map((item: any) => ({
+    uri: item.uri,
+    name: item.name,
+    artist: item.artists?.[0]?.name,
+    id: item.id,
+  }));
+}
+
+// Presents 3 numbered results without playing anything - the model re-sends the
+// same query/type/offset when the user picks one (playFromSuggestions) or asks
+// for more (offset += 3), so no server-side session state is needed.
+export async function spotifySuggest(query: string, type: "track" | "artist" | "playlist" | "album" = "track", offset: number = 0): Promise<string> {
+  const results = await spotifySearchMultiple(query, type, 3, offset);
+  if (results.length === 0) {
+    return offset === 0 ? `Couldn't find any ${type}s for "${query}".` : `No more ${type}s for "${query}".`;
   }
+  const list = results.map((r, i) => `${i + 1}. ${r.name}${r.artist ? ` by ${r.artist}` : ""}`).join(", ");
+  return `Found: ${list}.`;
+}
+
+// Re-runs the exact same search (same query/type/offset the suggestions came
+// from) and plays whichever numbered item was picked - avoids needing to store
+// the previous results anywhere.
+export async function spotifyPlayFromSuggestions(query: string, type: "track" | "artist" | "playlist" | "album", offset: number, index: number): Promise<string> {
+  const results = await spotifySearchMultiple(query, type, 3, offset);
+  const choice = results[index - 1];
+  if (!choice) return `Couldn't find option ${index} for "${query}".`;
+
+  // media_content_type "artist" isn't supported by HA's Spotify integration -
+  // resolve to one of the artist's albums instead, same as before.
   if (type === "artist") {
-    const artist = data.artists?.items?.[0];
-    if (!artist) return null;
-    return { uri: artist.uri, name: artist.name, id: artist.id };
+    if (!choice.id) return `Couldn't resolve "${choice.name}" to play.`;
+    const album = await spotifyArtistAlbum(choice.id);
+    if (!album) return `Found ${choice.name} but couldn't find an album to play.`;
+    await spotifyPlay(album.uri, "album");
+    return `Playing ${album.name} by ${choice.name}.`;
   }
-  if (type === "playlist") {
-    const playlist = data.playlists?.items?.[0];
-    if (!playlist) return null;
-    return { uri: playlist.uri, name: playlist.name };
-  }
-  if (type === "album") {
-    const album = data.albums?.items?.[0];
-    if (!album) return null;
-    return { uri: album.uri, name: album.name, artist: album.artists?.[0]?.name };
-  }
-  return null;
+
+  await spotifyPlay(choice.uri, type);
+  const label = choice.artist ? `${choice.name} by ${choice.artist}` : choice.name;
+  return `Playing ${label}.`;
 }
 
 // /artists/{id}/top-tracks is deprecated, and editorial/algorithmic playlists
@@ -232,31 +252,13 @@ export async function spotifyVolume(pct: number): Promise<string> {
   return `Volume set to ${pct}%.`;
 }
 
-export async function spotifySearchAndPlay(query: string, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
-  const personalUri = findPersonalPlaylist(query);
-  if (personalUri) {
-    await spotifyPlay(personalUri, "playlist");
-    return `Playing ${query}.`;
-  }
-
-  // HA's Spotify integration doesn't support media_content_type "artist" for
-  // play_media (errors with a generic 500), and editorial/algorithmic playlists
-  // (e.g. official "This Is ..." playlists) are no longer accessible via
-  // Client Credentials flow as of Spotify's Feb 2026 API changes. For an artist
-  // request, resolve them to an artist ID then play one of their albums
-  // instead - proper catalog content, doesn't need an exact song name.
-  if (type === "artist") {
-    const artist = await spotifySearch(query, "artist");
-    if (!artist?.id) return `Couldn't find artist "${query}" on Spotify.`;
-    const album = await spotifyArtistAlbum(artist.id);
-    if (!album) return `Found ${artist.name} but couldn't find an album to play.`;
-    await spotifyPlay(album.uri, "album");
-    return `Playing ${album.name} by ${artist.name}.`;
-  }
-
-  const result = await spotifySearch(query, type);
-  if (!result) return `Couldn't find ${type} "${query}" on Spotify.`;
-  await spotifyPlay(result.uri, type);
-  const label = result.artist ? `${result.name} by ${result.artist}` : result.name;
-  return `Playing ${label}.`;
+// STT makes exact-name matches unreliable, so there's no direct "search and
+// blind-play the top result" path anymore - only a known personal playlist
+// (instant, unambiguous) or the search -> suggest -> pick-by-index flow.
+// Returns null if query doesn't match a known personal playlist.
+export async function spotifyPlayPersonal(query: string): Promise<string | null> {
+  const uri = findPersonalPlaylist(query);
+  if (!uri) return null;
+  await spotifyPlay(uri, "playlist");
+  return `Playing ${query}.`;
 }
