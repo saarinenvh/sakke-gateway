@@ -88,6 +88,14 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("media_player", "media_stop", target);
       return reply("Stopped.");
 
+    case "media_on":
+      await callService("media_player", "turn_on", target);
+      return reply("Turned on.");
+
+    case "media_off":
+      await callService("media_player", "turn_off", target);
+      return reply("Turned off.");
+
     case "media_volume":
       await callService("media_player", "volume_set", { ...target, volume_level: (intent.volume ?? 50) / 100 });
       return reply(`Volume set to ${intent.volume}%.`);
