@@ -51,8 +51,12 @@ async function getState(entityId: string): Promise<string> {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
   });
-  if (!res.ok) throw new Error(`HA API ${res.status}`);
+  if (!res.ok) {
+    console.error(`[spotify] getState ${entityId} FAILED: ${res.status}`);
+    throw new Error(`HA API ${res.status}`);
+  }
   const data = await res.json() as { state: string };
+  console.log(`[spotify] getState ${entityId} = ${data.state}`);
   return data.state;
 }
 
@@ -63,22 +67,31 @@ async function getState(entityId: string): Promise<string> {
 // Spotify on it when nothing is actively playing anywhere.
 async function ensureActiveDevice(): Promise<void> {
   const spotifyState = await getState(SPOTIFY_ENTITY);
-  if (spotifyState === "playing") return;
+  if (spotifyState === "playing") {
+    console.log("[spotify] ensureActiveDevice: already playing, skipping TV wake");
+    return;
+  }
 
   const tvState = await getState(TV_REMOTE_ENTITY);
   if (tvState !== "on") {
+    console.log("[spotify] ensureActiveDevice: TV not on, turning on and waiting 5s");
     await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY });
     await new Promise(r => setTimeout(r, 5000));
   }
 
+  console.log("[spotify] ensureActiveDevice: opening Spotify on TV");
   await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY, activity: "spotify://" });
 
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 1500));
     const state = await getState(SPOTIFY_ENTITY);
-    if (state === "playing" || state === "paused" || state === "idle") return;
+    if (state === "playing" || state === "paused" || state === "idle") {
+      console.log(`[spotify] ensureActiveDevice: ready (state=${state})`);
+      return;
+    }
   }
+  console.warn("[spotify] ensureActiveDevice: timed out waiting for device to become ready");
 }
 
 async function getAccessToken(): Promise<string> {
@@ -103,13 +116,19 @@ async function getAccessToken(): Promise<string> {
 
 async function haService(service: string, data: Record<string, unknown>): Promise<void> {
   const [domain, action] = service.split(".");
+  console.log(`[spotify] haService ${service}`, JSON.stringify(data));
   const res = await fetch(`${baseUrl}/api/services/${domain}/${action}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(data),
     signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[spotify] haService ${service} FAILED: ${res.status} ${body}`);
+    throw new Error(`HA ${res.status}: ${body}`);
+  }
+  console.log(`[spotify] haService ${service} OK`);
 }
 
 export async function spotifySearch(query: string, type: "track" | "artist" | "playlist" | "album" = "track"): Promise<{ uri: string; name: string; artist?: string; id?: string } | null> {
@@ -166,6 +185,7 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
 }
 
 export async function spotifyPlay(uri?: string, type?: "track" | "artist" | "playlist" | "album"): Promise<string> {
+  console.log(`[spotify] spotifyPlay uri=${uri ?? "(none)"} type=${type ?? "(none)"}`);
   await ensureActiveDevice();
   const data: Record<string, unknown> = { entity_id: SPOTIFY_ENTITY };
   if (uri) {
