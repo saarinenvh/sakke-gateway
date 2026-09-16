@@ -108,12 +108,15 @@ export async function spotifySearch(query: string, type: "track" | "artist" | "p
   return null;
 }
 
-export async function spotifyPlay(uri?: string): Promise<string> {
+export async function spotifyPlay(uri?: string, type?: "track" | "artist" | "playlist" | "album"): Promise<string> {
   await ensureActiveDevice();
   const data: Record<string, unknown> = { entity_id: SPOTIFY_ENTITY };
   if (uri) {
     data.media_content_id = uri;
-    data.media_content_type = "music";
+    // Must match the URI's actual type (spotify:track:.../spotify:playlist:...) -
+    // a mismatched type (e.g. always "music") causes HA's Spotify integration to
+    // open the app without loading the content, silently.
+    data.media_content_type = type ?? "track";
   }
   await haService(uri ? "media_player.play_media" : "media_player.media_play", data);
   return "Playing.";
@@ -142,7 +145,7 @@ export async function spotifyVolume(pct: number): Promise<string> {
 export async function spotifySearchAndPlay(query: string, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
   const result = await spotifySearch(query, type);
   if (!result) return `Couldn't find ${type} "${query}" on Spotify.`;
-  await spotifyPlay(result.uri);
+  await spotifyPlay(result.uri, type);
   const label = result.artist ? `${result.name} by ${result.artist}` : result.name;
   return `Playing ${label}.`;
 }
