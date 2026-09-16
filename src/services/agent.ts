@@ -128,7 +128,7 @@ export async function runAgent(
   if (isResetRequest(userMessage)) {
     conversations.delete(conversationId);
     clearSpotifySuggestion(conversationId);
-    log.info({ conversationId }, "🔄 Conversation reset");
+    log.info({ conversationId, userMessage }, "Conversation reset");
     const reply = "Fine. Wiped. We never spoke.";
     broadcastState("speaking", Math.max(2000, reply.length * 70));
     return { content: reply, continueConversation: false };
@@ -141,7 +141,7 @@ export async function runAgent(
     const verdict = await classifyFollowUp(lastAssistantMessage, userMessage, log);
 
     if (verdict === "noise") {
-      log.info({ conversationId, userMessage }, "🤫 Utterance deemed noise, staying silent");
+      log.info({ conversationId, userMessage }, "Utterance deemed noise, staying silent");
       conversations.set(conversationId, { ...existing, awaitingContinuation: false });
       broadcastState("idle");
       return { content: "", continueConversation: false };
@@ -151,7 +151,7 @@ export async function runAgent(
       // A real request, just off-topic vs. the last exchange - respond to it
       // fresh instead of dragging in irrelevant prior context (or, worse,
       // silencing it the way "noise" does).
-      log.info({ conversationId, userMessage }, "🔄 New unrelated request detected, starting fresh conversation");
+      log.info({ conversationId, userMessage }, "New unrelated request detected, starting fresh conversation");
       conversations.delete(conversationId);
       clearSpotifySuggestion(conversationId);
       existing = undefined;
@@ -169,16 +169,16 @@ export async function runAgent(
   const beforeTrim = messages.length;
   trimConversationHistory(messages);
   if (messages.length < beforeTrim) {
-    log.info({ conversationId, droppedMessages: beforeTrim - messages.length }, "✂️  Trimmed old conversation history to fit num_ctx");
+    log.info({ conversationId, droppedMessages: beforeTrim - messages.length }, "Trimmed old conversation history to fit num_ctx");
   }
 
-  log.info({ conversationId, turns: messages.length - 1, chatMode }, "🤖 Agent started");
+  log.info({ conversationId, userMessage, model, turns: messages.length - 1, chatMode }, "Agent started");
   broadcastState("thinking");
 
   const completedToolCalls = new Set<string>();
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    log.info({ iteration: i + 1 }, "📡 Calling Ollama");
+    log.info({ conversationId, iteration: i + 1 }, "Calling Ollama");
 
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
@@ -203,14 +203,14 @@ export async function runAgent(
       const callKeys = message.tool_calls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
       const alreadyDone = callKeys.every(k => completedToolCalls.has(k));
       if (alreadyDone) {
-        log.warn({ tools: callKeys }, "⚠️  Duplicate tool calls detected, forcing response");
+        log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, forcing response");
         break;
       }
       callKeys.forEach(k => completedToolCalls.add(k));
 
       log.info(
-        { tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
-        "🛠️  Tool calls requested",
+        { conversationId, tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
+        "Tool calls requested",
       );
 
       messages.push(message);
@@ -247,11 +247,12 @@ export async function runAgent(
     conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode, awaitingContinuation: true });
 
     const asksQuestion = content.trimEnd().endsWith("?");
-    log.info({ conversationId, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "💬 Agent response");
+    log.info({ conversationId, model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
     const speakingMs = Math.max(2000, content.length * 70);
     broadcastState("speaking", speakingMs);
     return { content, continueConversation: true };
   }
 
+  log.warn({ conversationId, userMessage, model, maxIterations: MAX_ITERATIONS }, "Max tool-call iterations exhausted without a final response");
   return { content: "I got confused trying to answer that.", continueConversation: chatMode };
 }

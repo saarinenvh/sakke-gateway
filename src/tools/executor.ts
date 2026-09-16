@@ -39,33 +39,33 @@ export async function executeTool(
   conversationId: string,
 ): Promise<string> {
   if (name === "control_home_assistant") {
-    log.info({ tool: "control_home_assistant", args }, "🔧 Tool call: HA");
+    log.info({ conversationId, tool: "control_home_assistant", args }, "Tool call: HA");
     try {
       const intent = { ...args, raw: JSON.stringify(args) } as Intent;
       const result = await dispatch(intent);
-      log.info({ result }, "✅ HA tool result");
+      log.info({ conversationId, tool: "control_home_assistant", result }, "HA tool result");
       return result;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ HA tool error");
+      log.error({ conversationId, tool: "control_home_assistant", err: err.message }, "HA tool error");
       return `Error: ${err.message}`;
     }
   }
 
   if (name === "get_weather") {
-    log.info({ tool: "get_weather" }, "🌤️  Tool call: weather");
+    log.info({ conversationId, tool: "get_weather" }, "Tool call: weather");
     try {
       const result = await getWeather();
-      log.info({ result }, "✅ Weather result");
+      log.info({ conversationId, tool: "get_weather", result }, "Weather result");
       return result;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Weather error");
+      log.error({ conversationId, tool: "get_weather", err: err.message }, "Weather error");
       return `Weather fetch failed: ${err.message}`;
     }
   }
 
   if (name === "spotify") {
     const { action, query, type, volume, offset, index } = args as { action: string; query?: string; type?: "track" | "artist" | "playlist" | "album"; volume?: number; offset?: number; index?: number };
-    log.info({ tool: "spotify", action, query, offset, index }, "🎵 Tool call: Spotify");
+    log.info({ conversationId, tool: "spotify", action, query, type, offset, index }, "Tool call: Spotify");
     try {
       let result: string;
       if (action === "suggest" && query) {
@@ -89,17 +89,17 @@ export async function executeTool(
       else if (action === "previous") result = await spotifyPrevious();
       else if (action === "volume") result = await spotifyVolume(volume ?? 50);
       else result = `Unknown spotify action: ${action}. Valid actions: play, pause, next, previous, volume, suggest.`;
-      log.info({ result }, "✅ Spotify result");
+      log.info({ conversationId, tool: "spotify", result }, "Spotify result");
       return result;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Spotify error");
+      log.error({ conversationId, tool: "spotify", err: err.message }, "Spotify error");
       return `Spotify failed: ${err.message}`;
     }
   }
 
   if (name === "manage_list") {
     const { action, list, items, item } = args as { action: string; list: string; items?: string[]; item?: string };
-    log.info({ tool: "manage_list", action, list }, "📋 Tool call: list");
+    log.info({ conversationId, tool: "manage_list", action, list }, "Tool call: list");
     try {
       let result: string;
       if (action === "list_read") result = await readList(list);
@@ -112,32 +112,32 @@ export async function executeTool(
       else if (action === "list_remove") result = await removeFromList(list, item ?? "");
       else if (action === "list_sort") result = await sortList(list);
       else result = `Unknown list action: ${action}`;
-      log.info({ result }, "✅ List result");
+      log.info({ conversationId, tool: "manage_list", result }, "List result");
       return result;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ List error");
+      log.error({ conversationId, tool: "manage_list", err: err.message }, "List error");
       return `List operation failed: ${err.message}`;
     }
   }
 
   if (name === "get_tasks") {
     const period = (args.period as string) ?? "today";
-    log.info({ tool: "get_tasks", period }, "✅ Tool call: tasks");
+    log.info({ conversationId, tool: "get_tasks", period }, "Tool call: tasks");
     try {
       return await getTasksText(period);
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Tasks error");
+      log.error({ conversationId, tool: "get_tasks", err: err.message }, "Tasks error");
       return `Tasks fetch failed: ${err.message}`;
     }
   }
 
   if (name === "get_calendar") {
     const period = (args.period as string) ?? "today";
-    log.info({ tool: "get_calendar", period }, "📅 Tool call: calendar");
+    log.info({ conversationId, tool: "get_calendar", period }, "Tool call: calendar");
     try {
       return await getCalendarText(period);
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Calendar error");
+      log.error({ conversationId, tool: "get_calendar", err: err.message }, "Calendar error");
       return `Calendar fetch failed: ${err.message}`;
     }
   }
@@ -146,7 +146,7 @@ export async function executeTool(
     const app = args.app as string;
     const pkg = APP_PACKAGES[app];
     if (!pkg) return `Unknown app: ${app}`;
-    log.info({ tool: "open_tv_app", app, pkg }, "📺 Tool call: open TV app");
+    log.info({ conversationId, tool: "open_tv_app", app, pkg }, "Tool call: open TV app");
     try {
       const stateRes = await fetch(`${haBase}/api/states/remote.living_room_tv`, {
         headers: { Authorization: `Bearer ${haToken}` },
@@ -169,8 +169,10 @@ export async function executeTool(
         body: JSON.stringify({ entity_id: "remote.living_room_tv", activity: pkg }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
+      log.info({ conversationId, tool: "open_tv_app", app }, "Open TV app result");
       return `Opened ${app} on the TV.`;
     } catch (err: any) {
+      log.error({ conversationId, tool: "open_tv_app", app, err: err.message }, "Open TV app error");
       return `Failed to open ${app}: ${err.message}`;
     }
   }
@@ -179,7 +181,7 @@ export async function executeTool(
     const command = args.command as string;
     const keycode = REMOTE_COMMANDS[command];
     if (!keycode) return `Unknown remote command: ${command}`;
-    log.info({ tool: "tv_remote_command", command, keycode }, "📺 Tool call: TV remote command");
+    log.info({ conversationId, tool: "tv_remote_command", command, keycode }, "Tool call: TV remote command");
     try {
       const res = await fetch(`${haBase}/api/services/remote/send_command`, {
         method: "POST",
@@ -197,16 +199,17 @@ export async function executeTool(
         search: "Opened search on the TV.",
       };
       const result = confirmations[command] ?? `TV remote command "${command}" sent.`;
-      log.info({ tool: "tv_remote_command", result }, "✅ TV remote command result");
+      log.info({ conversationId, tool: "tv_remote_command", result }, "TV remote command result");
       return result;
     } catch (err: any) {
+      log.error({ conversationId, tool: "tv_remote_command", command, err: err.message }, "TV remote command error");
       return `Failed to send ${command}: ${err.message}`;
     }
   }
 
   if (name === "tv_send_text") {
     const text = args.text as string;
-    log.info({ tool: "tv_send_text", text }, "⌨️  Tool call: TV text input");
+    log.info({ conversationId, tool: "tv_send_text", text }, "Tool call: TV text input");
     try {
       const res = await fetch(`${haBase}/api/services/remote/send_command`, {
         method: "POST",
@@ -214,15 +217,17 @@ export async function executeTool(
         body: JSON.stringify({ entity_id: "remote.living_room_tv", command: `text:${text}` }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
+      log.info({ conversationId, tool: "tv_send_text" }, "TV text input result");
       return `Typed "${text}" on the TV.`;
     } catch (err: any) {
+      log.error({ conversationId, tool: "tv_send_text", err: err.message }, "TV text input error");
       return `Failed to type text: ${err.message}`;
     }
   }
 
   if (name === "get_device_state") {
     const entityId = args.entity_id as string;
-    log.info({ tool: "get_device_state", entityId }, "📡 Tool call: device state");
+    log.info({ conversationId, tool: "get_device_state", entityId }, "Tool call: device state");
     try {
       const res = await fetch(`${haBase}/api/states/${entityId}`, {
         headers: { Authorization: `Bearer ${haToken}` },
@@ -231,13 +236,14 @@ export async function executeTool(
       const state = await res.json() as { state: string; attributes: Record<string, unknown> };
       return JSON.stringify({ state: state.state, attributes: state.attributes });
     } catch (err: any) {
+      log.error({ conversationId, tool: "get_device_state", entityId, err: err.message }, "Device state error");
       return `Error fetching state: ${err.message}`;
     }
   }
 
   if (name === "run_routine") {
     const scriptId = args.script_id as string;
-    log.info({ tool: "run_routine", scriptId }, "🔁 Tool call: routine");
+    log.info({ conversationId, tool: "run_routine", scriptId }, "Tool call: routine");
     try {
       const res = await fetch(`${haBase}/api/services/script/turn_on`, {
         method: "POST",
@@ -245,21 +251,22 @@ export async function executeTool(
         body: JSON.stringify({ entity_id: `script.${scriptId}` }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}: ${await res.text()}`);
-      log.info({ scriptId }, "✅ Routine triggered");
+      log.info({ conversationId, tool: "run_routine", scriptId }, "Routine triggered");
       return `Routine "${scriptId}" started.`;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Routine error");
+      log.error({ conversationId, tool: "run_routine", scriptId, err: err.message }, "Routine error");
       return `Routine failed: ${err.message}`;
     }
   }
 
   if (name === "get_context") {
     const page = args.page as string;
-    log.info({ page }, "📖 Tool call: get_context");
+    log.info({ conversationId, tool: "get_context", page }, "Tool call: get_context");
     try {
       const content = await fs.readFile(`/wiki/${page}.md`, "utf-8");
       return content;
-    } catch {
+    } catch (err: any) {
+      log.warn({ conversationId, tool: "get_context", page, err: err.message }, "get_context page not found");
       return `No knowledge base page found for "${page}". Available pages are listed in the system prompt.`;
     }
   }
@@ -270,14 +277,16 @@ export async function executeTool(
     const docsDir = "/wiki/sakke-knowledge";
     const filePath = `${docsDir}/${filename}.md`;
     const indexPath = "/wiki/sakke-knowledge/sakke-index.md";
-    log.info({ filename }, "📝 Tool call: create_knowledge");
+    log.info({ conversationId, tool: "create_knowledge", filename }, "Tool call: create_knowledge");
     try {
       await fs.mkdir(docsDir, { recursive: true });
       const isNew = !await fs.access(filePath).then(() => true).catch(() => false);
       await fs.writeFile(filePath, content);
       if (isNew) await fs.appendFile(indexPath, `- [[sakke-knowledge/${filename}]]\n`);
+      log.info({ conversationId, tool: "create_knowledge", filename, isNew }, "Knowledge note saved");
       return `Saved note "${filename}".`;
     } catch (err: any) {
+      log.error({ conversationId, tool: "create_knowledge", filename, err: err.message }, "create_knowledge error");
       return `Failed to save note: ${err.message}`;
     }
   }
@@ -289,7 +298,7 @@ export async function executeTool(
       label?: string;
       timer_id?: string;
     };
-    log.info({ tool: "timer", action }, "⏱️  Tool call: timer");
+    log.info({ conversationId, tool: "timer", action }, "Tool call: timer");
 
     if (action === "set") {
       if (!duration_minutes || duration_minutes <= 0) return "Duration is required to set a timer.";
@@ -324,35 +333,36 @@ export async function executeTool(
   }
 
   if (name === "refresh_home_data") {
-    log.info({ tool: "refresh_home_data" }, "🔄 Tool call: refresh home data");
+    log.info({ conversationId, tool: "refresh_home_data" }, "Tool call: refresh home data");
     try {
       await loadEntities();
       const areas = getAreas().map(a => a.name).join(", ") || "none";
       const scenes = getScenes().map(s => s.name).join(", ") || "none";
       const scripts = getScripts().map(s => s.name).join(", ") || "none";
       log.info(
-        { areas: getAreas().length, scenes: getScenes().length, scripts: getScripts().length },
-        "✅ Home data refreshed",
+        { conversationId, tool: "refresh_home_data", areas: getAreas().length, scenes: getScenes().length, scripts: getScripts().length },
+        "Home data refreshed",
       );
       return `Reloaded home data.\nAreas: ${areas}\nScenes: ${scenes}\nRoutines: ${scripts}`;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Refresh home data error");
+      log.error({ conversationId, tool: "refresh_home_data", err: err.message }, "Refresh home data error");
       return `Failed to refresh home data: ${err.message}`;
     }
   }
 
   if (name === "web_search") {
     const query = args.query as string;
-    log.info({ tool: "web_search", query }, "🔍 Tool call: web search");
+    log.info({ conversationId, tool: "web_search", query }, "Tool call: web search");
     try {
       const result = await webSearch(query);
-      log.info({ preview: result.slice(0, 200) }, "✅ Web search result");
+      log.info({ conversationId, tool: "web_search", preview: result.slice(0, 200) }, "Web search result");
       return result;
     } catch (err: any) {
-      log.error({ err: err.message }, "❌ Web search error");
+      log.error({ conversationId, tool: "web_search", err: err.message }, "Web search error");
       return `Search failed: ${err.message}`;
     }
   }
 
+  log.warn({ conversationId, tool: name }, "Unknown tool requested");
   return `Unknown tool: ${name}`;
 }

@@ -43,7 +43,7 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     });
 
     if (!res.ok) {
-      log.warn({ status: res.status }, "⚠️  Continuation check HTTP error, defaulting to noise");
+      log.warn({ model, status: res.status }, "Continuation check HTTP error, defaulting to noise");
       return "noise";
     }
 
@@ -62,11 +62,11 @@ Answer with exactly one word: continuation, new_request, or noise.`;
       : "noise";
 
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ lastAssistantMessage, newUtterance, raw, verdict }, "🧭 Follow-up classification");
+    log.info({ model, lastAssistantMessage, newUtterance, raw, verdict }, "Follow-up classification");
 
     return verdict;
   } catch (err: any) {
-    log.warn({ err: err.message }, "⚠️  Continuation check failed, defaulting to noise");
+    log.warn({ model, err: err.message }, "Continuation check failed, defaulting to noise");
     return "noise";
   }
 }
