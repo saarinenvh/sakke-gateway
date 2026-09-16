@@ -93,12 +93,12 @@ export async function dispatch(intent: Intent): Promise<string> {
       return reply(`Volume set to ${intent.volume}%.`);
 
     case "switch_on":
-      await callService("switch", "turn_on", { entity_id: intent.device });
-      return reply("Switch turned on.");
+      await callService("homeassistant", "turn_on", { entity_id: intent.device });
+      return reply("Turned on.");
 
     case "switch_off":
-      await callService("switch", "turn_off", { entity_id: intent.device });
-      return reply("Switch turned off.");
+      await callService("homeassistant", "turn_off", { entity_id: intent.device });
+      return reply("Turned off.");
 
     case "bedtime_routine":
       await callService("light", "turn_off", { entity_id: getLights().map(l => l.entity_id) });
