@@ -3,7 +3,7 @@ import { tools } from "../tools/definitions.js";
 import { executeTool } from "../tools/executor.js";
 import { buildSystemPrompt } from "../prompts/systemPrompt.js";
 import { broadcastState } from "./displayState.js";
-import { isRelevantContinuation } from "./continuationCheck.js";
+import { classifyFollowUp } from "./continuationCheck.js";
 import { clearSpotifySuggestion } from "./integrations/spotify.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
@@ -134,17 +134,27 @@ export async function runAgent(
     return { content: reply, continueConversation: false };
   }
 
-  const existing = conversations.get(conversationId);
+  let existing = conversations.get(conversationId);
 
   if (existing?.awaitingContinuation && !existing.chatMode) {
     const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
-    const isContinuation = await isRelevantContinuation(lastAssistantMessage, userMessage, log);
+    const verdict = await classifyFollowUp(lastAssistantMessage, userMessage, log);
 
-    if (!isContinuation) {
-      log.info({ conversationId, userMessage }, "🤫 Utterance deemed unrelated, staying silent");
+    if (verdict === "noise") {
+      log.info({ conversationId, userMessage }, "🤫 Utterance deemed noise, staying silent");
       conversations.set(conversationId, { ...existing, awaitingContinuation: false });
       broadcastState("idle");
       return { content: "", continueConversation: false };
+    }
+
+    if (verdict === "new_request") {
+      // A real request, just off-topic vs. the last exchange - respond to it
+      // fresh instead of dragging in irrelevant prior context (or, worse,
+      // silencing it the way "noise" does).
+      log.info({ conversationId, userMessage }, "🔄 New unrelated request detected, starting fresh conversation");
+      conversations.delete(conversationId);
+      clearSpotifySuggestion(conversationId);
+      existing = undefined;
     }
   }
 
