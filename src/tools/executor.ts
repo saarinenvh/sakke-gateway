@@ -25,6 +25,13 @@ const APP_PACKAGES: Record<string, string> = {
   dgn: "com.discgolfprotour",
 };
 
+const REMOTE_COMMANDS: Record<string, string> = {
+  home: "HOME",
+  back: "BACK",
+  mute: "MUTE",
+  search: "SEARCH",
+};
+
 export async function executeTool(
   name: string,
   args: Record<string, unknown>,
@@ -62,11 +69,11 @@ export async function executeTool(
       let result: string;
       if (action === "search_and_play") result = await spotifySearchAndPlay(query ?? "", type ?? "track");
       else if (action === "play") result = await spotifyPlay();
-      else if (action === "pause") result = await spotifyPause();
+      else if (action === "pause" || action === "stop" || action === "media_stop") result = await spotifyPause();
       else if (action === "next") result = await spotifyNext();
       else if (action === "previous") result = await spotifyPrevious();
       else if (action === "volume") result = await spotifyVolume(volume ?? 50);
-      else result = `Unknown spotify action: ${action}`;
+      else result = `Unknown spotify action: ${action}. Valid actions: play, pause, next, previous, volume, search_and_play.`;
       log.info({ result }, "✅ Spotify result");
       return result;
     } catch (err: any) {
@@ -150,6 +157,40 @@ export async function executeTool(
       return `Opened ${app} on the TV.`;
     } catch (err: any) {
       return `Failed to open ${app}: ${err.message}`;
+    }
+  }
+
+  if (name === "tv_remote_command") {
+    const command = args.command as string;
+    const keycode = REMOTE_COMMANDS[command];
+    if (!keycode) return `Unknown remote command: ${command}`;
+    log.info({ tool: "tv_remote_command", command, keycode }, "📺 Tool call: TV remote command");
+    try {
+      const res = await fetch(`${haBase}/api/services/remote/send_command`, {
+        method: "POST",
+        headers: haHeaders,
+        body: JSON.stringify({ entity_id: "remote.living_room_tv", command: keycode }),
+      });
+      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      return `Sent ${command} to the TV.`;
+    } catch (err: any) {
+      return `Failed to send ${command}: ${err.message}`;
+    }
+  }
+
+  if (name === "tv_send_text") {
+    const text = args.text as string;
+    log.info({ tool: "tv_send_text", text }, "⌨️  Tool call: TV text input");
+    try {
+      const res = await fetch(`${haBase}/api/services/remote/send_command`, {
+        method: "POST",
+        headers: haHeaders,
+        body: JSON.stringify({ entity_id: "remote.living_room_tv", command: `text:${text}` }),
+      });
+      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      return `Typed "${text}" on the TV.`;
+    } catch (err: any) {
+      return `Failed to type text: ${err.message}`;
     }
   }
 

@@ -43,6 +43,9 @@ Device rules:
 - "TV" or "the TV" without a room specified always means the living room TV. Never ask which TV.
 - Living room TV power: use device "remote.living_room_tv" with action switch_on/switch_off. Never use media_stop to turn the TV off — that only stops/pauses whatever's playing, it doesn't power off the TV.
 - Living room TV media: use device "media_player.living_room_tv" for media_play/media_pause/media_stop/media_volume.
+- To close/exit the current app on the living room TV, use tv_remote_command with command "home" — not media_stop or switch_off, those don't exit an app.
+- To go back a screen on the living room TV, use tv_remote_command with command "back".
+- To search within an app on the living room TV (e.g. "search YouTube for X"): open the app if not already open, call tv_remote_command with command "search" to focus the search field, then call tv_send_text with the query. Do this as two separate tool calls in sequence, never combine them into one.
 - Bedroom TV power: use device "remote.bedroom_tv" with action switch_on/switch_off.
 - Bedroom TV media: use device "media_player.bedroom_tv" for media_play/media_pause/media_stop/media_volume.
 - Coffee maker: use device "switch.coffee_maker".

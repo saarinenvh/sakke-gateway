@@ -118,6 +118,34 @@ export const tools = [
   {
     type: "function",
     function: {
+      name: "tv_remote_command",
+      description: "Send a remote-control button press to the living room TV. home = close/exit the current app and return to the home screen. back = go back one screen. mute = toggle mute. search = focus the search field in the current app (use tv_send_text right after to type the search query).",
+      parameters: {
+        type: "object",
+        properties: {
+          command: { type: "string", enum: ["home", "back", "mute", "search"], description: "The remote command to send" },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "tv_send_text",
+      description: "Type text into whatever input field is currently focused on the living room TV. Typically used right after tv_remote_command with command=search, to type a search query.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "The text to type" },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_device_state",
       description: "Get the current state and attributes of a Home Assistant entity. Call this BEFORE acting on a device if you are unsure of its current state. Also use when asked about what is on, what is playing, is something on/off, or any question about current device status.",
       parameters: {
