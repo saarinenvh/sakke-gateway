@@ -172,7 +172,18 @@ export async function executeTool(
         body: JSON.stringify({ entity_id: "remote.living_room_tv", command: keycode }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
-      return `Sent ${command} to the TV.`;
+      // Ambiguous phrasing here (e.g. "Sent home to the TV") reads as a normal
+      // English sentence and has confused the model into asking the user to
+      // clarify their own tool result - use unambiguous, command-specific text.
+      const confirmations: Record<string, string> = {
+        home: "Exited to the TV home screen.",
+        back: "Went back on the TV.",
+        mute: "Toggled TV mute.",
+        search: "Opened search on the TV.",
+      };
+      const result = confirmations[command] ?? `TV remote command "${command}" sent.`;
+      log.info({ tool: "tv_remote_command", result }, "✅ TV remote command result");
+      return result;
     } catch (err: any) {
       return `Failed to send ${command}: ${err.message}`;
     }
