@@ -6,6 +6,16 @@ const token = process.env.HA_TOKEN ?? "";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 
+// Personal/private playlists can never be found via search (Client Credentials
+// flow has no user context, so it only sees public content) - and Spotify-owned
+// editorial/algorithmic playlists (Discover Weekly, This Is..., etc.) lost
+// search access entirely in Spotify's Feb 2026 API changes. For any playlist
+// you already know the ID of, skip search and play it directly instead.
+const PERSONAL_PLAYLISTS: Record<string, string> = {
+  "discover weekly": "spotify:playlist:37i9dQZEVXcRBTpgpeHTpf",
+  "metal": "spotify:playlist:6r8VigRsBUdBocm2aXxuGZ",
+};
+
 let accessToken: string | null = null;
 let tokenExpiry = 0;
 
@@ -75,9 +85,11 @@ async function haService(service: string, data: Record<string, unknown>): Promis
   if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
 }
 
-export async function spotifySearch(query: string, type: "track" | "artist" | "playlist" | "album" = "track"): Promise<{ uri: string; name: string; artist?: string } | null> {
+export async function spotifySearch(query: string, type: "track" | "artist" | "playlist" | "album" = "track"): Promise<{ uri: string; name: string; artist?: string; id?: string } | null> {
   const token = await getAccessToken();
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=1`;
+  // market is required for Client Credentials flow - without it, Spotify treats
+  // all content as unavailable and returns empty results.
+  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=1&market=FI`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
@@ -93,7 +105,7 @@ export async function spotifySearch(query: string, type: "track" | "artist" | "p
   if (type === "artist") {
     const artist = data.artists?.items?.[0];
     if (!artist) return null;
-    return { uri: artist.uri, name: artist.name };
+    return { uri: artist.uri, name: artist.name, id: artist.id };
   }
   if (type === "playlist") {
     const playlist = data.playlists?.items?.[0];
@@ -106,6 +118,24 @@ export async function spotifySearch(query: string, type: "track" | "artist" | "p
     return { uri: album.uri, name: album.name, artist: album.artists?.[0]?.name };
   }
   return null;
+}
+
+// /artists/{id}/top-tracks is deprecated, and editorial/algorithmic playlists
+// (e.g. official "This Is ..." playlists) are no longer accessible via
+// Client Credentials flow as of Spotify's Feb 2026 API changes. Get Artist's
+// Albums remains a proper, active endpoint - use it instead.
+async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name: string } | null> {
+  const token = await getAccessToken();
+  const url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album&limit=1&market=FI`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`Spotify albums fetch failed: ${res.status}`);
+  const data = await res.json() as any;
+  const album = data.items?.[0];
+  if (!album) return null;
+  return { uri: album.uri, name: album.name };
 }
 
 export async function spotifyPlay(uri?: string, type?: "track" | "artist" | "playlist" | "album"): Promise<string> {
@@ -143,16 +173,30 @@ export async function spotifyVolume(pct: number): Promise<string> {
 }
 
 export async function spotifySearchAndPlay(query: string, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
-  // HA's Spotify integration doesn't support media_content_type "artist" for
-  // play_media (errors with a generic 500) - redirect to that artist's official
-  // "This Is ..." playlist instead, which Spotify publishes for most artists and
-  // uses the "playlist" content type we know actually works.
-  const searchQuery = type === "artist" ? `This Is ${query}` : query;
-  const searchType = type === "artist" ? "playlist" : type;
+  const personalUri = PERSONAL_PLAYLISTS[query.trim().toLowerCase()];
+  if (personalUri) {
+    await spotifyPlay(personalUri, "playlist");
+    return `Playing ${query}.`;
+  }
 
-  const result = await spotifySearch(searchQuery, searchType);
+  // HA's Spotify integration doesn't support media_content_type "artist" for
+  // play_media (errors with a generic 500), and editorial/algorithmic playlists
+  // (e.g. official "This Is ..." playlists) are no longer accessible via
+  // Client Credentials flow as of Spotify's Feb 2026 API changes. For an artist
+  // request, resolve them to an artist ID then play one of their albums
+  // instead - proper catalog content, doesn't need an exact song name.
+  if (type === "artist") {
+    const artist = await spotifySearch(query, "artist");
+    if (!artist?.id) return `Couldn't find artist "${query}" on Spotify.`;
+    const album = await spotifyArtistAlbum(artist.id);
+    if (!album) return `Found ${artist.name} but couldn't find an album to play.`;
+    await spotifyPlay(album.uri, "album");
+    return `Playing ${album.name} by ${artist.name}.`;
+  }
+
+  const result = await spotifySearch(query, type);
   if (!result) return `Couldn't find ${type} "${query}" on Spotify.`;
-  await spotifyPlay(result.uri, searchType);
+  await spotifyPlay(result.uri, type);
   const label = result.artist ? `${result.name} by ${result.artist}` : result.name;
   return `Playing ${label}.`;
 }
