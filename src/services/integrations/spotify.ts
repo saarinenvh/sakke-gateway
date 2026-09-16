@@ -4,9 +4,43 @@ const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const token = process.env.HA_TOKEN ?? "";
 
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
+const TV_REMOTE_ENTITY = "remote.living_room_tv";
 
 let accessToken: string | null = null;
 let tokenExpiry = 0;
+
+async function getState(entityId: string): Promise<string> {
+  const res = await fetch(`${baseUrl}/api/states/${entityId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`HA API ${res.status}`);
+  const data = await res.json() as { state: string };
+  return data.state;
+}
+
+// HA's Spotify integration is Connect-based - it can only send playback to an
+// already-active device, it can't activate one on its own. If nothing's active
+// (the common case when asking Sakke to *start* something), open Spotify on the
+// living room TV and wait for it to register before attempting to play anything.
+async function ensureActiveDevice(): Promise<void> {
+  const spotifyState = await getState(SPOTIFY_ENTITY);
+  if (spotifyState !== "unavailable") return;
+
+  const tvState = await getState(TV_REMOTE_ENTITY);
+  if (tvState !== "on") {
+    await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY });
+    await new Promise(r => setTimeout(r, 5000));
+  }
+
+  await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY, activity: "spotify://" });
+
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1500));
+    if (await getState(SPOTIFY_ENTITY) !== "unavailable") return;
+  }
+}
 
 async function getAccessToken(): Promise<string> {
   if (accessToken && Date.now() < tokenExpiry) return accessToken;
@@ -73,6 +107,7 @@ export async function spotifySearch(query: string, type: "track" | "artist" | "p
 }
 
 export async function spotifyPlay(uri?: string): Promise<string> {
+  await ensureActiveDevice();
   const data: Record<string, unknown> = { entity_id: SPOTIFY_ENTITY };
   if (uri) {
     data.media_content_id = uri;
