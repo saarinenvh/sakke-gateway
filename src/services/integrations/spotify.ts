@@ -16,6 +16,33 @@ const PERSONAL_PLAYLISTS: Record<string, string> = {
   "metal": "spotify:playlist:6r8VigRsBUdBocm2aXxuGZ",
 };
 
+function levenshtein(a: string, b: string): number {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+// Tolerates small STT mishearings (e.g. "Discovery Weekly" for "Discover Weekly")
+// by allowing a short edit-distance, scaled down for short names to avoid
+// false-positive matches on short/generic words.
+function findPersonalPlaylist(query: string): string | null {
+  const normalized = query.trim().toLowerCase();
+  if (PERSONAL_PLAYLISTS[normalized]) return PERSONAL_PLAYLISTS[normalized];
+  for (const [name, uri] of Object.entries(PERSONAL_PLAYLISTS)) {
+    const threshold = name.length <= 6 ? 1 : 2;
+    if (levenshtein(normalized, name) <= threshold) return uri;
+  }
+  return null;
+}
+
 let accessToken: string | null = null;
 let tokenExpiry = 0;
 
@@ -173,7 +200,7 @@ export async function spotifyVolume(pct: number): Promise<string> {
 }
 
 export async function spotifySearchAndPlay(query: string, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
-  const personalUri = PERSONAL_PLAYLISTS[query.trim().toLowerCase()];
+  const personalUri = findPersonalPlaylist(query);
   if (personalUri) {
     await spotifyPlay(personalUri, "playlist");
     return `Playing ${query}.`;

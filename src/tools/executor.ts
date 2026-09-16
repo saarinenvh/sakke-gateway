@@ -67,7 +67,7 @@ export async function executeTool(
     log.info({ tool: "spotify", action, query }, "🎵 Tool call: Spotify");
     try {
       let result: string;
-      if (action === "search_and_play") result = await spotifySearchAndPlay(query ?? "", type ?? "track");
+      if (action === "search_and_play" || (action === "play" && query)) result = await spotifySearchAndPlay(query ?? "", type ?? "track");
       else if (action === "play") result = await spotifyPlay();
       else if (action === "pause" || action === "stop" || action === "media_stop") result = await spotifyPause();
       else if (action === "next") result = await spotifyNext();
