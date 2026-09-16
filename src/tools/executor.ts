@@ -68,7 +68,14 @@ export async function executeTool(
     log.info({ tool: "spotify", action, query, offset, index }, "🎵 Tool call: Spotify");
     try {
       let result: string;
-      if (action === "suggest") result = await spotifySuggest(conversationId, query ?? "", type ?? "track", offset ?? 0);
+      if (action === "suggest" && query) {
+        // A known personal playlist should play instantly regardless of which
+        // action the model picked - the model is told to always call "suggest"
+        // first for named requests, so the personal-playlist shortcut can't
+        // depend on it choosing "play" instead.
+        result = (await spotifyPlayPersonal(query)) ?? await spotifySuggest(conversationId, query, type ?? "track", offset ?? 0);
+      }
+      else if (action === "suggest") result = await spotifySuggest(conversationId, query ?? "", type ?? "track", offset ?? 0);
       else if (index && action === "play") result = await spotifyPlayIndexed(conversationId, index);
       else if (action === "play" && query) {
         // No direct search-and-blind-play anymore - STT makes exact-name matches
