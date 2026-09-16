@@ -155,7 +155,9 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
   const data = await res.json() as any;
 
   const key = type === "playlist" ? "playlists" : type === "artist" ? "artists" : type === "album" ? "albums" : "tracks";
-  const items = data[key]?.items ?? [];
+  // Spotify's playlist search sometimes mixes in null entries (deleted/made-private
+  // playlists that still match the query) - filter them out before mapping.
+  const items = (data[key]?.items ?? []).filter((item: any) => item != null);
   return items.map((item: any) => ({
     uri: item.uri,
     name: item.name,
