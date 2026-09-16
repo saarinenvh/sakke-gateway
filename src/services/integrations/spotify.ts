@@ -143,9 +143,16 @@ export async function spotifyVolume(pct: number): Promise<string> {
 }
 
 export async function spotifySearchAndPlay(query: string, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
-  const result = await spotifySearch(query, type);
+  // HA's Spotify integration doesn't support media_content_type "artist" for
+  // play_media (errors with a generic 500) - redirect to that artist's official
+  // "This Is ..." playlist instead, which Spotify publishes for most artists and
+  // uses the "playlist" content type we know actually works.
+  const searchQuery = type === "artist" ? `This Is ${query}` : query;
+  const searchType = type === "artist" ? "playlist" : type;
+
+  const result = await spotifySearch(searchQuery, searchType);
   if (!result) return `Couldn't find ${type} "${query}" on Spotify.`;
-  await spotifyPlay(result.uri, type);
+  await spotifyPlay(result.uri, searchType);
   const label = result.artist ? `${result.name} by ${result.artist}` : result.name;
   return `Playing ${label}.`;
 }
