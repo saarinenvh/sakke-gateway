@@ -160,6 +160,21 @@ export async function runAgent(
     const content = (message.content ?? "I got nothing.")
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .replace(/<channel\|>[\s\S]*/gi, "")
+      // The model doesn't reliably follow the "no markdown" voice rule on its
+      // own (confirmed even after reinforcing it) - strip it deterministically
+      // instead of continuing to depend on prompt compliance for something a
+      // TTS voice would otherwise read literally (asterisks, list numbers, etc).
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/__(.+?)__/g, "$1")
+      .replace(/^\s*#{1,6}\s+/gm, "")
+      .replace(/^\s*[-*]\s+/gm, "")
+      .replace(/^\s*\d+\.\s+/gm, "")
+      // Turn line breaks into sentence breaks (not spaces) so former list items
+      // get spoken with natural pauses instead of running together.
+      .replace(/\s*\n+\s*/g, ". ")
+      .replace(/[:.]\s*\./g, m => m.trimEnd().slice(0, 1))
+      .replace(/ {2,}/g, " ")
       .trim() || "I got nothing.";
 
     messages.push({ role: "assistant", content });
