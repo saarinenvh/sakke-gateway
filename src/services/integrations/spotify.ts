@@ -5,6 +5,8 @@ const token = process.env.HA_TOKEN ?? "";
 
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
+// Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
+const SPOTIFY_TV_SOURCE = "Tv";
 
 // Personal/private playlists can never be found via search (Client Credentials
 // flow has no user context, so it only sees public content) - and Spotify-owned
@@ -30,11 +32,14 @@ function levenshtein(a: string, b: string): number {
   return dp[a.length][b.length];
 }
 
+const FILLER_WORDS = /\b(playlist|song|track|please|the)\b/g;
+
 // Tolerates small STT mishearings (e.g. "Discovery Weekly" for "Discover Weekly")
-// by allowing a short edit-distance, scaled down for short names to avoid
-// false-positive matches on short/generic words.
+// and filler words the model tacks on (e.g. "metal playlist" for "metal") by
+// stripping them before comparing, with a short edit-distance allowed on top,
+// scaled down for short names to avoid false-positive matches on short/generic words.
 function findPersonalPlaylist(query: string): string | null {
-  const normalized = query.trim().toLowerCase();
+  const normalized = query.trim().toLowerCase().replace(FILLER_WORDS, "").replace(/\s+/g, " ").trim();
   if (PERSONAL_PLAYLISTS[normalized]) return PERSONAL_PLAYLISTS[normalized];
   for (const [name, uri] of Object.entries(PERSONAL_PLAYLISTS)) {
     const threshold = name.length <= 6 ? 1 : 2;
@@ -46,18 +51,22 @@ function findPersonalPlaylist(query: string): string | null {
 let accessToken: string | null = null;
 let tokenExpiry = 0;
 
-async function getState(entityId: string): Promise<string> {
+async function getEntity(entityId: string): Promise<{ state: string; attributes: Record<string, unknown> }> {
   const res = await fetch(`${baseUrl}/api/states/${entityId}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
-    console.error(`[spotify] getState ${entityId} FAILED: ${res.status}`);
+    console.error(`[spotify] getEntity ${entityId} FAILED: ${res.status}`);
     throw new Error(`HA API ${res.status}`);
   }
-  const data = await res.json() as { state: string };
-  console.log(`[spotify] getState ${entityId} = ${data.state}`);
-  return data.state;
+  const data = await res.json() as { state: string; attributes: Record<string, unknown> };
+  console.log(`[spotify] getEntity ${entityId} state=${data.state} source_list=${JSON.stringify(data.attributes.source_list ?? [])}`);
+  return data;
+}
+
+async function getState(entityId: string): Promise<string> {
+  return (await getEntity(entityId)).state;
 }
 
 // HA's Spotify integration is Connect-based - it can only send playback to an
@@ -82,16 +91,20 @@ async function ensureActiveDevice(): Promise<void> {
   console.log("[spotify] ensureActiveDevice: opening Spotify on TV");
   await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY, activity: "spotify://" });
 
-  const deadline = Date.now() + 15000;
+  // The app being open isn't enough - Spotify needs to register the TV as a
+  // known Connect device before it can be selected as the playback target.
+  const deadline = Date.now() + 20000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 1500));
-    const state = await getState(SPOTIFY_ENTITY);
-    if (state === "playing" || state === "paused" || state === "idle") {
-      console.log(`[spotify] ensureActiveDevice: ready (state=${state})`);
+    const { attributes } = await getEntity(SPOTIFY_ENTITY);
+    const sourceList = (attributes.source_list as string[] | undefined) ?? [];
+    if (sourceList.includes(SPOTIFY_TV_SOURCE)) {
+      console.log(`[spotify] ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" available, selecting it`);
+      await haService("media_player.select_source", { entity_id: SPOTIFY_ENTITY, source: SPOTIFY_TV_SOURCE });
       return;
     }
   }
-  console.warn("[spotify] ensureActiveDevice: timed out waiting for device to become ready");
+  console.warn(`[spotify] ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" never appeared in source_list, proceeding anyway`);
 }
 
 async function getAccessToken(): Promise<string> {
