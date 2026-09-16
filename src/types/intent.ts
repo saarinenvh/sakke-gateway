@@ -1,5 +1,5 @@
 export type LightAction = "light_on" | "light_off" | "light_dim" | "light_color";
-export type MediaAction = "media_play" | "media_pause" | "media_stop" | "media_volume" | "media_on" | "media_off";
+export type MediaAction = "media_play" | "media_pause" | "media_stop" | "media_volume";
 export type SceneAction = "scene_activate" | "scene_create" | "scene_design";
 export type SwitchAction = "switch_on" | "switch_off";
 export type RoutineAction = "morning_routine" | "bedtime_routine";

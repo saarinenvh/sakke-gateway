@@ -14,10 +14,14 @@ const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const haToken = process.env.HA_TOKEN ?? "";
 const haHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${haToken}` };
 
+// Prefer deep links over bare package names - HA's androidtv_remote docs warn that
+// launching by application ID "doesn't work for many apps due to a Google Play Store
+// change." No verified deep link is known for dgn, so it's left as a package name and
+// may still fail to launch - test and swap in a working deep link if found.
 const APP_PACKAGES: Record<string, string> = {
-  netflix: "com.netflix.ninja",
-  youtube: "com.google.android.youtube.tv",
-  spotify: "com.spotify.tv.android",
+  netflix: "https://www.netflix.com/title",
+  youtube: "https://www.youtube.com",
+  spotify: "spotify://",
   dgn: "com.discgolfprotour",
 };
 
