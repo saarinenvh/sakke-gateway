@@ -20,12 +20,13 @@ async function getState(entityId: string): Promise<string> {
 }
 
 // HA's Spotify integration is Connect-based - it can only send playback to an
-// already-active device, it can't activate one on its own. If nothing's active
-// (the common case when asking Sakke to *start* something), open Spotify on the
-// living room TV and wait for it to register before attempting to play anything.
+// already-active device, it can't activate one on its own. If something is
+// already actively playing (phone/desktop/TV), leave it alone - play_media will
+// just switch what's playing there. Only wake the living room TV and open
+// Spotify on it when nothing is actively playing anywhere.
 async function ensureActiveDevice(): Promise<void> {
   const spotifyState = await getState(SPOTIFY_ENTITY);
-  if (spotifyState !== "unavailable") return;
+  if (spotifyState === "playing") return;
 
   const tvState = await getState(TV_REMOTE_ENTITY);
   if (tvState !== "on") {
@@ -38,7 +39,8 @@ async function ensureActiveDevice(): Promise<void> {
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 1500));
-    if (await getState(SPOTIFY_ENTITY) !== "unavailable") return;
+    const state = await getState(SPOTIFY_ENTITY);
+    if (state === "playing" || state === "paused" || state === "idle") return;
   }
 }
 
