@@ -9,9 +9,32 @@ import { clearSpotifySuggestion } from "./integrations/spotify.js";
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
 const think = process.env.OLLAMA_THINK === "true" ? true : process.env.OLLAMA_THINK === "false" ? false : undefined;
+// Without this, Ollama's default context window is small enough that the
+// system prompt + full tool schema (+ accumulated tool results in longer
+// tool-calling turns) can get silently truncated - confirmed directly against
+// gpt-oss:20b: the same real prompt/tools evaluated only ~2050 tokens and
+// produced a hallucinated, tool-call-free response, vs. the correct tool call
+// once num_ctx was set large enough to actually fit the prompt (~8800 tokens).
+// The models themselves support far more (qwen3 up to 256K, gpt-oss up to
+// 128K) - the real ceiling is VRAM for the KV cache, which differs a lot per
+// GPU/model (gpt-oss:20b has only ~1GB headroom on the 5080; the small
+// always-on model on the 3070 has more slack but shares the card with
+// Whisper) - so this stays env-overridable per deployment rather than fixed.
+const numCtx = Number(process.env.OLLAMA_NUM_CTX ?? "32768");
 
 const CONVERSATION_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_ITERATIONS = 6;
+
+// A fixed num_ctx alone only raises the ceiling - a conversation left running
+// (chat mode, or just repeated follow-ups inside the 10-minute idle window)
+// grows without bound otherwise and will eventually hit it anyway. No real
+// tokenizer here, so this uses a ~4-chars-per-token heuristic with a safety
+// margin - approximate on purpose, trimming a turn earlier than strictly
+// necessary is harmless, but truncating mid-request (the original bug) isn't.
+const CHARS_PER_TOKEN = 4;
+const TOOLS_JSON_CHARS = JSON.stringify(tools).length;
+const RESPONSE_RESERVE_TOKENS = 2000; // matches num_predict
+const SAFETY_MARGIN_TOKENS = 300; // chat template / role overhead, not reflected in raw content length
 
 interface Message {
   role: "system" | "user" | "assistant" | "tool";
@@ -42,6 +65,32 @@ function pruneStale(): void {
     if (now - conv.lastActive > CONVERSATION_TIMEOUT_MS) {
       conversations.delete(id);
     }
+  }
+}
+
+function messageChars(m: Message): number {
+  return (m.content?.length ?? 0) + (m.tool_calls ? JSON.stringify(m.tool_calls).length : 0);
+}
+
+// Drops the oldest whole turns (a user message through everything before the
+// next user message - keeps assistant/tool_call pairs intact so no tool
+// message is ever left dangling without its originating assistant message)
+// once accumulated history threatens to overflow num_ctx. Always keeps the
+// system prompt and the in-progress turn, even if that alone is oversized -
+// there's nothing sensible left to trim in that case.
+function trimConversationHistory(messages: Message[]): void {
+  const budgetChars = (numCtx - RESPONSE_RESERVE_TOKENS - SAFETY_MARGIN_TOKENS) * CHARS_PER_TOKEN - TOOLS_JSON_CHARS;
+  if (budgetChars <= 0) return;
+
+  let total = messages.slice(1).reduce((sum, m) => sum + messageChars(m), 0);
+
+  while (total > budgetChars) {
+    const turnStart = messages.findIndex((m, i) => i > 0 && m.role === "user");
+    if (turnStart === -1) break;
+    const turnEnd = messages.findIndex((m, i) => i > turnStart && m.role === "user");
+    if (turnEnd === -1) break; // only the in-progress turn remains - stop
+    const removed = messages.splice(turnStart, turnEnd - turnStart);
+    total -= removed.reduce((sum, m) => sum + messageChars(m), 0);
   }
 }
 
@@ -106,6 +155,13 @@ export async function runAgent(
   const chatMode = existing?.chatMode ?? isChatModeRequest(userMessage);
 
   messages.push({ role: "user", content: userMessage });
+
+  const beforeTrim = messages.length;
+  trimConversationHistory(messages);
+  if (messages.length < beforeTrim) {
+    log.info({ conversationId, droppedMessages: beforeTrim - messages.length }, "✂️  Trimmed old conversation history to fit num_ctx");
+  }
+
   log.info({ conversationId, turns: messages.length - 1, chatMode }, "🤖 Agent started");
   broadcastState("thinking");
 
@@ -123,7 +179,7 @@ export async function runAgent(
         tools,
         stream: false,
         ...(think !== undefined && { think }),
-        options: { temperature: 0.7, num_predict: 2000 },
+        options: { temperature: 0.7, num_predict: 2000, num_ctx: numCtx },
       }),
     });
 
