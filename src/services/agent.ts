@@ -4,6 +4,7 @@ import { executeTool } from "../tools/executor.js";
 import { buildSystemPrompt } from "../prompts/systemPrompt.js";
 import { broadcastState } from "./displayState.js";
 import { isRelevantContinuation } from "./continuationCheck.js";
+import { clearSpotifySuggestion } from "./integrations/spotify.js";
 
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
@@ -77,6 +78,7 @@ export async function runAgent(
 
   if (isResetRequest(userMessage)) {
     conversations.delete(conversationId);
+    clearSpotifySuggestion(conversationId);
     log.info({ conversationId }, "🔄 Conversation reset");
     const reply = "Fine. Wiped. We never spoke.";
     broadcastState("speaking", Math.max(2000, reply.length * 70));
@@ -148,7 +150,7 @@ export async function runAgent(
       messages.push(message);
 
       for (const call of message.tool_calls) {
-        const result = await executeTool(call.function.name, call.function.arguments, log);
+        const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
         messages.push({ role: "tool", content: result, tool_call_id: call.id });
       }
 

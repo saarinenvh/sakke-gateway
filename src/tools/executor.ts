@@ -4,7 +4,7 @@ import { dispatch } from "../services/ha/dispatcher.js";
 import { webSearch } from "../services/integrations/webSearch.js";
 import { getWeather } from "../services/integrations/weather.js";
 import { readList, addToList, completeInList, removeFromList, sortList } from "../services/ha/lists.js";
-import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayFromSuggestions, spotifyPlayPersonal } from "../services/integrations/spotify.js";
+import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayIndexed, spotifyPlayPersonal } from "../services/integrations/spotify.js";
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
 import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
@@ -36,6 +36,7 @@ export async function executeTool(
   name: string,
   args: Record<string, unknown>,
   log: FastifyBaseLogger,
+  conversationId: string,
 ): Promise<string> {
   if (name === "control_home_assistant") {
     log.info({ tool: "control_home_assistant", args }, "🔧 Tool call: HA");
@@ -67,13 +68,13 @@ export async function executeTool(
     log.info({ tool: "spotify", action, query, offset, index }, "🎵 Tool call: Spotify");
     try {
       let result: string;
-      if (action === "suggest") result = await spotifySuggest(query ?? "", type ?? "track", offset ?? 0);
-      else if (index && (action === "play" || action === "search_and_play")) result = await spotifyPlayFromSuggestions(query ?? "", type ?? "track", offset ?? 0, index);
+      if (action === "suggest") result = await spotifySuggest(conversationId, query ?? "", type ?? "track", offset ?? 0);
+      else if (index && action === "play") result = await spotifyPlayIndexed(conversationId, index);
       else if (action === "play" && query) {
         // No direct search-and-blind-play anymore - STT makes exact-name matches
         // too unreliable. A known personal playlist plays instantly (unambiguous);
         // anything else falls back to search results instead of guessing.
-        result = (await spotifyPlayPersonal(query)) ?? await spotifySuggest(query, type ?? "track", 0);
+        result = (await spotifyPlayPersonal(query)) ?? await spotifySuggest(conversationId, query, type ?? "track", 0);
       }
       else if (action === "play") result = await spotifyPlay();
       else if (action === "pause" || action === "stop" || action === "media_stop") result = await spotifyPause();

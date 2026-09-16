@@ -61,7 +61,7 @@ export const tools = [
     type: "function",
     function: {
       name: "spotify",
-      description: "Control Spotify playback, or find and play a track/artist/album/playlist by name. Voice input is unreliable for exact names, so there is no direct search-and-blind-play - always use action 'suggest' first for ANY named request (a song, artist, album, or playlist) to present 3 numbered options by voice, e.g. 'Found: 1. X, 2. Y, 3. Z'. When the user picks one (e.g. 'play the second one'), use action 'play' with index (1, 2, or 3) plus the SAME query/type/offset from that suggest call. To hear more options, call suggest again with offset increased by 3. Exception: 'play' with a query but no prior suggest call still works directly IF it exactly matches a known personal playlist name - otherwise it falls back to suggesting options instead of guessing.",
+      description: "Control Spotify playback, or find and play a track/artist/album/playlist by name. Voice input is unreliable for exact names, so there is no direct search-and-blind-play - always use action 'suggest' first for ANY named request (a song, artist, album, or playlist) to present 3 numbered options by voice, e.g. 'Found: 1. X, 2. Y, 3. Z'. When the user picks one (e.g. 'play the second one', 'take the first option', 'the last one'), use action 'play' with ONLY index (1, 2, or 3) - do not repeat the query/type, the server remembers the last suggestions in this conversation. To hear more options, call suggest again with the SAME query/type and offset increased by 3. Exception: 'play' with a query but no prior suggest call still works directly IF it exactly matches a known personal playlist name - otherwise it falls back to suggesting options instead of guessing.",
       parameters: {
         type: "object",
         properties: {
@@ -69,15 +69,15 @@ export const tools = [
             type: "string",
             enum: ["play", "pause", "next", "previous", "volume", "suggest"],
           },
-          query: { type: "string", description: "Search query for suggest/play" },
+          query: { type: "string", description: "Search query for suggest, or for play when directly naming a known personal playlist. Omit when picking a previously suggested option by index." },
           type: {
             type: "string",
             enum: ["track", "artist", "playlist", "album"],
-            description: "Type of content to search for (defaults to track)",
+            description: "Type of content to search for (defaults to track). Only used with suggest.",
           },
           volume: { type: "number", description: "0-100 for volume action" },
-          offset: { type: "number", description: "Pagination offset for suggest/play - 0 for first 3 results, 3 for the next 3, etc. Must match the offset from the suggest call being followed up on." },
-          index: { type: "number", description: "For 'play' only: which of the 3 previously suggested options to play (1, 2, or 3). Requires the same query/type/offset as the suggest call that produced them." },
+          offset: { type: "number", description: "Pagination offset for suggest only - 0 for first 3 results, 3 for the next 3, etc." },
+          index: { type: "number", description: "For 'play' only: which of the 3 most recently suggested options to play (1, 2, or 3). No other parameters needed - the server already knows what was suggested." },
         },
         required: ["action"],
       },

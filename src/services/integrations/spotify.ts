@@ -164,22 +164,39 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
   }));
 }
 
-// Presents 3 numbered results without playing anything - the model re-sends the
-// same query/type/offset when the user picks one (playFromSuggestions) or asks
-// for more (offset += 3), so no server-side session state is needed.
-export async function spotifySuggest(query: string, type: "track" | "artist" | "playlist" | "album" = "track", offset: number = 0): Promise<string> {
+// Relying on the model to correctly re-send the same query/type/offset when
+// picking an option proved unreliable in practice - indirect pick phrasing
+// ("take the first option" instead of "play the second one") made it lose
+// track of the original search entirely and call no tool at all. Storing the
+// last suggestion per-conversation means picking only needs an index, which
+// is a much simpler thing for the model to get right.
+const lastSuggestion = new Map<string, { query: string; type: "track" | "artist" | "playlist" | "album"; offset: number }>();
+
+// Presents 3 numbered results without playing anything.
+export async function spotifySuggest(conversationId: string, query: string, type: "track" | "artist" | "playlist" | "album" = "track", offset: number = 0): Promise<string> {
   const results = await spotifySearchMultiple(query, type, 3, offset);
   if (results.length === 0) {
     return offset === 0 ? `Couldn't find any ${type}s for "${query}".` : `No more ${type}s for "${query}".`;
   }
+  lastSuggestion.set(conversationId, { query, type, offset });
   const list = results.map((r, i) => `${i + 1}. ${r.name}${r.artist ? ` by ${r.artist}` : ""}`).join(", ");
   return `Found: ${list}.`;
 }
 
-// Re-runs the exact same search (same query/type/offset the suggestions came
-// from) and plays whichever numbered item was picked - avoids needing to store
-// the previous results anywhere.
-export async function spotifyPlayFromSuggestions(query: string, type: "track" | "artist" | "playlist" | "album", offset: number, index: number): Promise<string> {
+// Plays whichever numbered item (1-3) was picked from this conversation's most
+// recent suggestion - the model only needs to supply the index, not recall the
+// original query/type/offset itself.
+export async function spotifyPlayIndexed(conversationId: string, index: number): Promise<string> {
+  const last = lastSuggestion.get(conversationId);
+  if (!last) return "I don't have a recent set of suggestions to pick from - ask me to search for something first.";
+  return spotifyPlayFromSuggestions(last.query, last.type, last.offset, index);
+}
+
+export function clearSpotifySuggestion(conversationId: string): void {
+  lastSuggestion.delete(conversationId);
+}
+
+async function spotifyPlayFromSuggestions(query: string, type: "track" | "artist" | "playlist" | "album", offset: number, index: number): Promise<string> {
   const results = await spotifySearchMultiple(query, type, 3, offset);
   const choice = results[index - 1];
   if (!choice) return `Couldn't find option ${index} for "${query}".`;
