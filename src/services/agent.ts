@@ -5,22 +5,66 @@ import { buildSystemPrompt } from "../prompts/systemPrompt.js";
 import { broadcastState } from "./displayState.js";
 import { classifyFollowUp } from "./continuationCheck.js";
 import { clearSpotifySuggestion } from "./integrations/spotify.js";
+import { getGpuStatus } from "./gpuStatus.js";
 
-const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
-const think = process.env.OLLAMA_THINK === "true" ? true : process.env.OLLAMA_THINK === "false" ? false : undefined;
-// Without this, Ollama's default context window is small enough that the
-// system prompt + full tool schema (+ accumulated tool results in longer
-// tool-calling turns) can get silently truncated - confirmed directly against
-// gpt-oss:20b: the same real prompt/tools evaluated only ~2050 tokens and
-// produced a hallucinated, tool-call-free response, vs. the correct tool call
-// once num_ctx was set large enough to actually fit the prompt (~8800 tokens).
-// The models themselves support far more (qwen3 up to 256K, gpt-oss up to
-// 128K) - the real ceiling is VRAM for the KV cache, which differs a lot per
-// GPU/model (gpt-oss:20b has only ~1GB headroom on the 5080; the small
-// always-on model on the 3070 has more slack but shares the card with
-// Whisper) - so this stays env-overridable per deployment rather than fixed.
-const numCtx = Number(process.env.OLLAMA_NUM_CTX ?? "32768");
+interface OllamaTarget {
+  baseUrl: string;
+  model: string;
+  numCtx: number;
+  think: boolean | undefined;
+}
+
+function parseThink(value: string | undefined): boolean | undefined {
+  return value === "true" ? true : value === "false" ? false : undefined;
+}
+
+// Without an explicit num_ctx, Ollama's default context window is small
+// enough that the system prompt + full tool schema (+ accumulated tool
+// results in longer tool-calling turns) can get silently truncated -
+// confirmed directly against gpt-oss:20b: the same real prompt/tools
+// evaluated only ~2050 tokens and produced a hallucinated, tool-call-free
+// response, vs. the correct tool call once num_ctx was set large enough to
+// actually fit the prompt (~8800 tokens). The models themselves support far
+// more (qwen3 up to 256K, gpt-oss up to 128K) - the real ceiling is VRAM for
+// the KV cache, which differs a lot per GPU/model, so this stays
+// env-overridable per deployment rather than fixed.
+const serverTarget: OllamaTarget = {
+  baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
+  model: process.env.OLLAMA_MODEL ?? "qwen3:8b",
+  numCtx: Number(process.env.OLLAMA_NUM_CTX ?? "32768"),
+  think: parseThink(process.env.OLLAMA_THINK),
+};
+
+// Only defined if PC_OLLAMA_BASE_URL is actually set - otherwise routing
+// always falls back to the server, same as before Phase 3 existed.
+const pcTarget: OllamaTarget | null = process.env.PC_OLLAMA_BASE_URL
+  ? {
+      baseUrl: process.env.PC_OLLAMA_BASE_URL,
+      model: process.env.PC_OLLAMA_MODEL ?? serverTarget.model,
+      numCtx: Number(process.env.PC_OLLAMA_NUM_CTX ?? "32768"),
+      think: parseThink(process.env.PC_OLLAMA_THINK),
+    }
+  : null;
+
+// Per gpu_routing_design.md: the routing check happens once per conversation
+// turn, not continuously mid-generation or per tool-call iteration within a
+// turn - a game starting mid-response is an accepted small risk, not
+// engineered around. "busy" and "unknown" (stale/no heartbeat yet, or no PC
+// configured at all) both fail closed to the always-on server model -
+// preferring the recoverable outcome over guessing wrong about whether the
+// PC is actually reachable.
+function getOllamaTarget(log: FastifyBaseLogger): OllamaTarget {
+  if (!pcTarget) return serverTarget;
+
+  const gpu = getGpuStatus();
+  if (gpu.state === "available") {
+    log.info({ gpuSource: gpu.source, gpuLastSeen: gpu.lastSeen }, "Routing to PC");
+    return pcTarget;
+  }
+
+  log.info({ gpuState: gpu.state, gpuStaleMs: gpu.staleMs }, "Routing to server");
+  return serverTarget;
+}
 
 const CONVERSATION_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_ITERATIONS = 6;
@@ -78,7 +122,7 @@ function messageChars(m: Message): number {
 // once accumulated history threatens to overflow num_ctx. Always keeps the
 // system prompt and the in-progress turn, even if that alone is oversized -
 // there's nothing sensible left to trim in that case.
-function trimConversationHistory(messages: Message[]): void {
+function trimConversationHistory(messages: Message[], numCtx: number): void {
   const budgetChars = (numCtx - RESPONSE_RESERVE_TOKENS - SAFETY_MARGIN_TOKENS) * CHARS_PER_TOKEN - TOOLS_JSON_CHARS;
   if (budgetChars <= 0) return;
 
@@ -167,13 +211,17 @@ export async function runAgent(
 
   messages.push({ role: "user", content: userMessage });
 
+  // Decided once per turn, not per tool-call iteration within it - see
+  // getOllamaTarget's own comment for why.
+  const target = getOllamaTarget(log);
+
   const beforeTrim = messages.length;
-  trimConversationHistory(messages);
+  trimConversationHistory(messages, target.numCtx);
   if (messages.length < beforeTrim) {
     log.info({ conversationId, droppedMessages: beforeTrim - messages.length }, "Trimmed old conversation history to fit num_ctx");
   }
 
-  log.info({ conversationId, userMessage, model, turns: messages.length - 1, chatMode }, "Agent started");
+  log.info({ conversationId, userMessage, model: target.model, baseUrl: target.baseUrl, turns: messages.length - 1, chatMode }, "Agent started");
   broadcastState("thinking");
 
   const completedToolCalls = new Set<string>();
@@ -181,16 +229,16 @@ export async function runAgent(
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     log.info({ conversationId, iteration: i + 1 }, "Calling Ollama");
 
-    const res = await fetch(`${baseUrl}/api/chat`, {
+    const res = await fetch(`${target.baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model,
+        model: target.model,
         messages,
         tools,
         stream: false,
-        ...(think !== undefined && { think }),
-        options: { temperature: 0.7, num_predict: 2000, num_ctx: numCtx },
+        ...(target.think !== undefined && { think: target.think }),
+        options: { temperature: 0.7, num_predict: 2000, num_ctx: target.numCtx },
       }),
     });
 
@@ -248,12 +296,12 @@ export async function runAgent(
     conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode, awaitingContinuation: true });
 
     const asksQuestion = content.trimEnd().endsWith("?");
-    log.info({ conversationId, model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
+    log.info({ conversationId, model: target.model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
     const speakingMs = Math.max(2000, content.length * 70);
     broadcastState("speaking", speakingMs);
     return { content, continueConversation: true };
   }
 
-  log.warn({ conversationId, userMessage, model, maxIterations: MAX_ITERATIONS }, "Max tool-call iterations exhausted without a final response");
+  log.warn({ conversationId, userMessage, model: target.model, maxIterations: MAX_ITERATIONS }, "Max tool-call iterations exhausted without a final response");
   return { content: "I got confused trying to answer that.", continueConversation: chatMode };
 }
