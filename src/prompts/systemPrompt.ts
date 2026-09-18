@@ -6,7 +6,16 @@ export async function buildSystemPrompt(): Promise<string> {
   const areas = getAreas().map(a => `  - ${a.name} (${a.area_id})`).join("\n");
   const scenes = getScenes().map(s => `  - ${s.name} (${s.scene_id})`).join("\n");
   const scripts = getScripts().map(s => `  - ${s.name} (${s.script_id})`).join("\n") || "  (none defined)";
-  const lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
+
+  // getAreas/getScenes/getScripts read from an in-memory cache populated at
+  // startup, so a dead HA connection doesn't affect them - but getTodoLists()
+  // makes a live HA call on every single turn. Unlike the wiki-index read
+  // below, this had no fallback: a momentary HA outage would throw here and
+  // break every conversation turn, not just the list-related ones.
+  let lists = "  (unable to load lists right now)";
+  try {
+    lists = (await getTodoLists()).map(l => `  - ${l.name} (${l.entity_id})`).join("\n");
+  } catch { /* HA unreachable - degrade gracefully instead of failing the whole turn */ }
 
   let wikiIndex = "";
   try {
