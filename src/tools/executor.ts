@@ -8,6 +8,7 @@ import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume,
 import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
 import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
+import { setManualOverride, clearManualOverride } from "../services/gpuStatus.js";
 import type { Intent } from "../types/intent.js";
 
 const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -31,6 +32,26 @@ const REMOTE_COMMANDS: Record<string, string> = {
   mute: "MUTE",
   search: "SEARCH",
 };
+
+// Same trick status-service.ps1 used on the PC side before it was simplified
+// to pure telemetry: Ollama has no direct "unload" call, but keep_alive: 0
+// with no prompt evicts a loaded model immediately. Queried per-model from
+// /api/ps rather than assuming a name, same as before.
+async function unloadPcOllamaModels(pcOllamaUrl: string, log: FastifyBaseLogger): Promise<void> {
+  const timeout = AbortSignal.timeout(5000);
+  const psRes = await fetch(`${pcOllamaUrl}/api/ps`, { signal: timeout });
+  if (!psRes.ok) throw new Error(`PC Ollama /api/ps ${psRes.status}`);
+  const { models } = (await psRes.json()) as { models?: { name: string }[] };
+  for (const m of models ?? []) {
+    log.info({ tool: "set_gaming_mode", model: m.name }, "Unloading PC Ollama model");
+    await fetch(`${pcOllamaUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: m.name, keep_alive: 0 }),
+      signal: AbortSignal.timeout(5000),
+    });
+  }
+}
 
 export async function executeTool(
   name: string,
@@ -348,6 +369,31 @@ export async function executeTool(
       log.error({ conversationId, tool: "refresh_home_data", err: err.message }, "Refresh home data error");
       return `Failed to refresh home data: ${err.message}`;
     }
+  }
+
+  if (name === "set_gaming_mode") {
+    const mode = args.mode as string;
+    const pcOllamaUrl = process.env.PC_OLLAMA_BASE_URL;
+    log.info({ conversationId, tool: "set_gaming_mode", mode }, "Tool call: set gaming mode");
+    if (!pcOllamaUrl) return "GPU routing to your PC isn't configured, so there's nothing to override.";
+
+    if (mode === "gaming") {
+      // The override itself is purely local state - it can't fail. Freeing
+      // VRAM on the PC is best-effort on top of it: if the PC is asleep/
+      // unreachable, that's fine, there's nothing loaded there to free.
+      setManualOverride("busy");
+      try {
+        await unloadPcOllamaModels(pcOllamaUrl, log);
+      } catch (err: any) {
+        log.warn({ conversationId, tool: "set_gaming_mode", err: err.message }, "Couldn't reach PC to unload VRAM");
+      }
+      return "Got it, I'll leave your PC's GPU alone.";
+    }
+    if (mode === "free") {
+      clearManualOverride();
+      return "Okay, I'll go back to automatically checking if your PC's GPU is free.";
+    }
+    return `Unknown gaming mode: ${mode}`;
   }
 
   if (name === "web_search") {
