@@ -37,9 +37,21 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     if (!text) {
       responseText = "Didn't catch that.";
     } else {
-      const result = await runAgent(text, conversationId, request.log);
-      responseText = result.content;
-      continueConversation = result.continueConversation;
+      try {
+        const result = await runAgent(text, conversationId, request.log);
+        responseText = result.content;
+        continueConversation = result.continueConversation;
+      } catch (err: any) {
+        // Neither the Ollama fetch nor its !res.ok check in agent.ts are
+        // wrapped in try/catch, so without this the real cause (a bad HTTP
+        // status from Ollama, a network failure, anything) never got logged
+        // anywhere - only a bare 500 reached the caller, spoken aloud
+        // verbatim by the voice pipeline as "Gateway error 500". Log it for
+        // real, and degrade to a spoken response instead of a raw HTTP error.
+        request.log.error({ conversationId, err: err.message, stack: err.stack }, "runAgent failed");
+        responseText = "Something broke on my end. Try that again.";
+        continueConversation = false;
+      }
     }
 
     return reply.send({
