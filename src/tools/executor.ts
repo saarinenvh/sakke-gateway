@@ -33,24 +33,21 @@ const REMOTE_COMMANDS: Record<string, string> = {
   search: "SEARCH",
 };
 
-// Same trick status-service.ps1 used on the PC side before it was simplified
-// to pure telemetry: Ollama has no direct "unload" call, but keep_alive: 0
-// with no prompt evicts a loaded model immediately. Queried per-model from
-// /api/ps rather than assuming a name, same as before.
+// status-service.ps1's default port - see scripts/gpu-router/ in sakke-workspace.
+const PC_STATUS_SERVICE_PORT = 5055;
+
+// Asks the PC's own status-service.ps1 to free Ollama's VRAM (its POST
+// /unload, stateless, just runs the same local unload it already does for
+// auto-detected busy) rather than duplicating that trick here - the actual
+// "how" of unloading Ollama should live in exactly one place. Same host as
+// PC_OLLAMA_BASE_URL, different port - the status service and Ollama are
+// separate processes on the PC.
 async function unloadPcOllamaModels(pcOllamaUrl: string, log: FastifyBaseLogger): Promise<void> {
-  const timeout = AbortSignal.timeout(5000);
-  const psRes = await fetch(`${pcOllamaUrl}/api/ps`, { signal: timeout });
-  if (!psRes.ok) throw new Error(`PC Ollama /api/ps ${psRes.status}`);
-  const { models } = (await psRes.json()) as { models?: { name: string }[] };
-  for (const m of models ?? []) {
-    log.info({ tool: "set_gaming_mode", model: m.name }, "Unloading PC Ollama model");
-    await fetch(`${pcOllamaUrl}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: m.name, keep_alive: 0 }),
-      signal: AbortSignal.timeout(5000),
-    });
-  }
+  const host = new URL(pcOllamaUrl).hostname;
+  const url = `http://${host}:${PC_STATUS_SERVICE_PORT}/unload`;
+  const res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(5000) });
+  if (!res.ok) throw new Error(`PC status service /unload ${res.status}`);
+  log.info({ tool: "set_gaming_mode", url }, "Requested PC to unload Ollama VRAM");
 }
 
 export async function executeTool(
