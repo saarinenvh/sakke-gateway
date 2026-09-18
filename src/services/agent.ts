@@ -12,6 +12,7 @@ interface OllamaTarget {
   model: string;
   numCtx: number;
   think: boolean | undefined;
+  keepAlive: string | undefined;
 }
 
 function parseThink(value: string | undefined): boolean | undefined {
@@ -33,6 +34,10 @@ const serverTarget: OllamaTarget = {
   model: process.env.OLLAMA_MODEL ?? "qwen3:8b",
   numCtx: Number(process.env.OLLAMA_NUM_CTX ?? "32768"),
   think: parseThink(process.env.OLLAMA_THINK),
+  // Left unset (Ollama's own default keep-alive, normally 5min) unless
+  // explicitly configured - the server is dedicated to Sakke, so there's no
+  // reason to be eager about freeing its VRAM the way the PC target is.
+  keepAlive: process.env.OLLAMA_KEEP_ALIVE,
 };
 
 // Only defined if PC_OLLAMA_BASE_URL is actually set - otherwise routing
@@ -43,6 +48,14 @@ const pcTarget: OllamaTarget | null = process.env.PC_OLLAMA_BASE_URL
       model: process.env.PC_OLLAMA_MODEL ?? serverTarget.model,
       numCtx: Number(process.env.PC_OLLAMA_NUM_CTX ?? "32768"),
       think: parseThink(process.env.PC_OLLAMA_THINK),
+      // Left unset by default, same as the server target - a short default
+      // here would force a cold reload on every single PC-routed request,
+      // including consecutive ones seconds apart within the same
+      // conversation. Freeing VRAM when something else needs it (a game
+      // starting) is instead handled proactively by status-service.ps1 on
+      // the PC itself, right at the moment it detects the GPU going busy -
+      // see that script's Unload-OllamaModels function.
+      keepAlive: process.env.PC_OLLAMA_KEEP_ALIVE,
     }
   : null;
 
@@ -238,6 +251,7 @@ export async function runAgent(
         tools,
         stream: false,
         ...(target.think !== undefined && { think: target.think }),
+        ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
         options: { temperature: 0.7, num_predict: 2000, num_ctx: target.numCtx },
       }),
     });
