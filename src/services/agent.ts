@@ -256,7 +256,7 @@ export async function runAgent(
       }),
     });
 
-    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
 
     const json = await res.json() as { message: Message & { tool_calls?: OllamaToolCall[] } };
     const message = json.message;
