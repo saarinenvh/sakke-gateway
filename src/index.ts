@@ -4,11 +4,12 @@ import { sceneRoutes } from "./routes/scene.js";
 import { conversationRoutes } from "./routes/conversation.js";
 import { reminderRoutes } from "./routes/reminders.js";
 import { displayRoutes } from "./routes/display.js";
+import { gpuStatusRoutes } from "./routes/gpuStatus.js";
 import { loadEntities } from "./services/ha/registry.js";
 
 const port = parseInt(process.env.PORT ?? "3100", 10);
 
-const SILENT_ROUTES = new Set(["/health", "/reminders/check", "/display/events"]);
+const SILENT_ROUTES = new Set(["/health", "/reminders/check", "/display/events", "/internal/gpu-status"]);
 
 const app = Fastify({
   logger: {
@@ -34,6 +35,7 @@ app.register(sceneRoutes);
 app.register(conversationRoutes);
 app.register(reminderRoutes);
 app.register(displayRoutes);
+app.register(gpuStatusRoutes);
 
 app.get("/health", async () => ({ ok: true }));
 
