@@ -1,7 +1,15 @@
 import type { FastifyBaseLogger } from "fastify";
 
-const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const model = process.env.OLLAMA_MODEL ?? "qwen3:8b";
+// Deliberately independent of OLLAMA_BASE_URL/OLLAMA_MODEL (the main agent's
+// config) rather than falling back to them - once GPU routing sends the main
+// agent to the PC's bigger model, this classification step (continuation vs
+// new_request vs noise) still runs on every single follow-up utterance and
+// doesn't need that model's reasoning power. Sharing the main model's config
+// would mean paying its full latency just to classify, on every turn.
+// Always local, always the fast model, independent of whatever the main
+// agent routes to.
+const baseUrl = process.env.OLLAMA_CLASSIFIER_BASE_URL ?? "http://localhost:11434";
+const model = process.env.OLLAMA_CLASSIFIER_MODEL ?? "qwen3:8b";
 
 export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 
