@@ -1,5 +1,5 @@
 import type { Intent } from "../../types/intent.js";
-import { getLights, getScenes } from "./registry.js";
+import { getLights, getScenes, getAreas, resolveArea } from "./registry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
 
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -23,7 +23,18 @@ async function callService(domain: string, service: string, data: Record<string,
 
 export async function dispatch(intent: Intent): Promise<string> {
   const target: Record<string, unknown> = {};
-  if (intent.area) target["area_id"] = intent.area.toLowerCase().replace(/\s+/g, "_");
+  if (intent.area) {
+    // Verified against the real registry rather than slugified and hoped for.
+    // An unknown area_id is not an error to HA - it answers 200 having done
+    // nothing - so an unmatched area has to be caught here or it surfaces as a
+    // confident confirmation of something that never happened.
+    const area = resolveArea(intent.area);
+    if (!area) {
+      const known = getAreas().map(a => a.name).join(", ") || "none loaded";
+      return `No area named "${intent.area}" exists. Known areas: ${known}.`;
+    }
+    target["area_id"] = area.area_id;
+  }
   else if (intent.device) target["entity_id"] = intent.device;
   else target["entity_id"] = getLights().map(l => l.entity_id);
 
@@ -101,17 +112,6 @@ export async function dispatch(intent: Intent): Promise<string> {
     case "switch_off":
       await callService("homeassistant", "turn_off", { entity_id: intent.device });
       return reply("Turned off.");
-
-    case "bedtime_routine":
-      await callService("light", "turn_off", { entity_id: getLights().map(l => l.entity_id) });
-      await callService("remote", "turn_off", { entity_id: "remote.living_room_tv" });
-      await callService("remote", "turn_on", { entity_id: "remote.bedroom_tv" });
-      return reply("Lights off, TV off, bedroom Chromecast on. Don't forget to brush your teeth. I won't remind you again. Tonight.");
-
-    case "morning_routine":
-      await callService("scene", "turn_on", { entity_id: "scene.default" });
-      await callService("light", "turn_on", { area_id: "bedroom" });
-      return "Lights on, default scene active.";
 
     case "unknown":
     default:

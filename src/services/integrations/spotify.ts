@@ -172,7 +172,15 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
 // track of the original search entirely and call no tool at all. Storing the
 // last suggestion per-conversation means picking only needs an index, which
 // is a much simpler thing for the model to get right.
-const lastSuggestion = new Map<string, { query: string; type: "track" | "artist" | "playlist" | "album"; offset: number }>();
+// Stores the RESOLVED items, not the search that produced them. Re-running the
+// search to resolve an index (what this did before) assumes Spotify returns the
+// same three results in the same order a few seconds later, which it does not
+// guarantee - popularity shifts, new releases and regional caching all reorder
+// it. Between hearing "Found: 1. X, 2. Y, 3. Z" and saying "the second one",
+// position 2 could be a different track: the model does everything right and
+// the wrong song plays. Also saves a second API round-trip on the pick.
+interface SuggestionItem { uri: string; name: string; artist?: string; id?: string }
+const lastSuggestion = new Map<string, { items: SuggestionItem[]; type: "track" | "artist" | "playlist" | "album"; query: string }>();
 
 // Presents 3 numbered results without playing anything.
 export async function spotifySuggest(conversationId: string, query: string, type: "track" | "artist" | "playlist" | "album" = "track", offset: number = 0): Promise<string> {
@@ -181,7 +189,7 @@ export async function spotifySuggest(conversationId: string, query: string, type
   if (results.length === 0) {
     return offset === 0 ? `Couldn't find any ${type}s for "${query}".` : `No more ${type}s for "${query}".`;
   }
-  lastSuggestion.set(conversationId, { query, type, offset });
+  lastSuggestion.set(conversationId, { items: results, type, query });
   const list = results.map((r, i) => `${i + 1}. ${r.name}${r.artist ? ` by ${r.artist}` : ""}`).join(", ");
   return `Found: ${list}.`;
 }
@@ -192,18 +200,16 @@ export async function spotifySuggest(conversationId: string, query: string, type
 export async function spotifyPlayIndexed(conversationId: string, index: number): Promise<string> {
   const last = lastSuggestion.get(conversationId);
   if (!last) return "I don't have a recent set of suggestions to pick from - ask me to search for something first.";
-  return spotifyPlayFromSuggestions(last.query, last.type, last.offset, index);
+  const choice = last.items[index - 1];
+  if (!choice) return `I only offered ${last.items.length} option${last.items.length === 1 ? "" : "s"} for "${last.query}".`;
+  return playResolved(choice, last.type);
 }
 
 export function clearSpotifySuggestion(conversationId: string): void {
   lastSuggestion.delete(conversationId);
 }
 
-async function spotifyPlayFromSuggestions(query: string, type: "track" | "artist" | "playlist" | "album", offset: number, index: number): Promise<string> {
-  const results = await spotifySearchMultiple(query, type, 3, offset);
-  const choice = results[index - 1];
-  if (!choice) return `Couldn't find option ${index} for "${query}".`;
-
+async function playResolved(choice: SuggestionItem, type: "track" | "artist" | "playlist" | "album"): Promise<string> {
   // media_content_type "artist" isn't supported by HA's Spotify integration -
   // resolve to one of the artist's albums instead, same as before.
   if (type === "artist") {

@@ -121,6 +121,11 @@ function pruneStale(): void {
   for (const [id, conv] of conversations) {
     if (now - conv.lastActive > CONVERSATION_TIMEOUT_MS) {
       conversations.delete(id);
+      // The Spotify suggestion map is keyed by the same conversation id but
+      // was only ever cleared on an explicit reset or a new_request verdict,
+      // so timed-out conversations left entries behind for the lifetime of the
+      // process - and timers.ts mints a fresh conversation id per timer.
+      clearSpotifySuggestion(id);
     }
   }
 }
@@ -139,7 +144,13 @@ function trimConversationHistory(messages: Message[], numCtx: number): void {
   const budgetChars = (numCtx - RESPONSE_RESERVE_TOKENS - SAFETY_MARGIN_TOKENS) * CHARS_PER_TOKEN - TOOLS_JSON_CHARS;
   if (budgetChars <= 0) return;
 
-  let total = messages.slice(1).reduce((sum, m) => sum + messageChars(m), 0);
+  // Counts the system prompt too. It used to be excluded (slice(1)), which
+  // meant the budget ignored the single largest block in the conversation -
+  // it carries every area, scene, script and list plus the whole wiki index,
+  // and grows every time one of those is added. Undercounting it is exactly
+  // how a context overflow sneaks back in, which is the thing this function
+  // exists to prevent.
+  let total = messages.reduce((sum, m) => sum + messageChars(m), 0);
 
   while (total > budgetChars) {
     const turnStart = messages.findIndex((m, i) => i > 0 && m.role === "user");

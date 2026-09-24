@@ -2,10 +2,13 @@ export type LightAction = "light_on" | "light_off" | "light_dim" | "light_color"
 export type MediaAction = "media_play" | "media_pause" | "media_stop" | "media_volume";
 export type SceneAction = "scene_activate" | "scene_create" | "scene_design";
 export type SwitchAction = "switch_on" | "switch_off";
-export type RoutineAction = "morning_routine" | "bedtime_routine";
 export type UnknownAction = "unknown";
 
-export type IntentAction = LightAction | MediaAction | SceneAction | SwitchAction | RoutineAction | UnknownAction;
+// Routines are HA scripts, run through the run_routine tool - deliberately
+// not actions here. There used to be hardcoded morning_routine/bedtime_routine
+// actions doing something different from the scripts of the same name that the
+// system prompt points at, for the same spoken phrase.
+export type IntentAction = LightAction | MediaAction | SceneAction | SwitchAction | UnknownAction;
 
 export interface Intent {
   action: IntentAction;

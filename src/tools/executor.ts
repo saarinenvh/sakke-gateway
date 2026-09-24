@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import { resolve } from "path";
 import type { FastifyBaseLogger } from "fastify";
 import { dispatch } from "../services/ha/dispatcher.js";
 import { webSearch } from "../services/integrations/webSearch.js";
@@ -10,6 +11,8 @@ import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
 import { setManualOverride, clearManualOverride } from "../services/gpuStatus.js";
 import type { Intent } from "../types/intent.js";
+
+const WIKI_ROOT = "/wiki";
 
 const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const haToken = process.env.HA_TOKEN ?? "";
@@ -280,8 +283,18 @@ export async function executeTool(
   if (name === "get_context") {
     const page = args.page as string;
     log.info({ conversationId, tool: "get_context", page }, "Tool call: get_context");
+    // The page name comes from the model, so it can't be trusted to stay
+    // inside the wiki - "../../etc/passwd" would have been read straight out
+    // of the mount. Resolve it and check where it actually landed rather than
+    // trying to spot bad input, which is the same reason create_knowledge
+    // below sanitises its filename.
+    const filePath = resolve(WIKI_ROOT, `${page}.md`);
+    if (filePath !== WIKI_ROOT && !filePath.startsWith(`${WIKI_ROOT}/`)) {
+      log.warn({ conversationId, tool: "get_context", page, filePath }, "get_context path escapes the wiki root");
+      return `No knowledge base page found for "${page}". Available pages are listed in the system prompt.`;
+    }
     try {
-      const content = await fs.readFile(`/wiki/${page}.md`, "utf-8");
+      const content = await fs.readFile(filePath, "utf-8");
       return content;
     } catch (err: any) {
       log.warn({ conversationId, tool: "get_context", page, err: err.message }, "get_context page not found");
@@ -292,9 +305,9 @@ export async function executeTool(
   if (name === "create_knowledge") {
     const filename = (args.filename as string).replace(/[^a-z0-9_-]/gi, "_");
     const content = args.content as string;
-    const docsDir = "/wiki/sakke-knowledge";
+    const docsDir = `${WIKI_ROOT}/sakke-knowledge`;
     const filePath = `${docsDir}/${filename}.md`;
-    const indexPath = "/wiki/sakke-knowledge/sakke-index.md";
+    const indexPath = `${docsDir}/sakke-index.md`;
     log.info({ conversationId, tool: "create_knowledge", filename }, "Tool call: create_knowledge");
     try {
       await fs.mkdir(docsDir, { recursive: true });

@@ -66,34 +66,78 @@ export async function loadEntities(): Promise<void> {
     !s.attributes?.entity_ids
   );
 
-  const areaMap = new Map<string, string>();
-  const areaTemplate = lightStates
-    .map(s => `${s.entity_id}:{{ area_name('${s.entity_id}') or '' }}`)
-    .join("\n");
+  // Asks HA for the REAL area_id alongside the friendly name. These are not
+  // interchangeable: HA assigns area_id when the area is created and keeps it
+  // when the area is renamed, so deriving it by slugifying the current name
+  // (what this did before) is only correct until someone renames something.
+  // When they disagree, the service call targets an area that doesn't exist -
+  // and HA answers 200 with an empty result, so the failure arrives as Sakke
+  // cheerfully confirming an action that never happened.
+  // Pipe-separated because an area name may contain a colon; entity ids cannot
+  // contain either.
+  // One template call returns the whole area registry plus each area's
+  // entities, which replaces two separate guesses that were both wrong:
+  //
+  //   - area_id was derived by slugifying the friendly name. HA assigns
+  //     area_id at creation and keeps it across renames, so that only held
+  //     until someone renamed an area - and a wrong area_id isn't an error to
+  //     HA, it answers 200 having done nothing, surfacing as Sakke confirming
+  //     an action that never happened.
+  //   - the list of areas was inferred from whichever entities were lights, so
+  //     an area containing only a switch or a media player didn't exist as far
+  //     as Sakke was concerned.
+  const areaMap = new Map<string, { id: string; name: string }>();
+  const areaTemplate = `{% for a in areas() %}{{ a }}|{{ area_name(a) }}|{{ area_entities(a) | join(',') }}
+{% endfor %}`;
 
+  const byId = new Map<string, AreaInfo>();
   try {
     const areaResult = await haTemplate(areaTemplate);
     for (const line of areaResult.split("\n")) {
-      const [entityId, areaName] = line.split(":");
-      if (entityId && areaName) areaMap.set(entityId.trim(), areaName.trim());
+      const [areaId, areaName, entityIds] = line.split("|");
+      if (!areaId?.trim() || !areaName?.trim()) continue;
+      const id = areaId.trim();
+      const name = areaName.trim();
+      byId.set(id, { area_id: id, name });
+      for (const entityId of (entityIds ?? "").split(",")) {
+        if (entityId.trim()) areaMap.set(entityId.trim(), { id, name });
+      }
     }
   } catch {
-    // area info is optional, continue without it
+    // handled by the fallback below
   }
 
-  const areaSet = new Set<string>();
-  for (const area of areaMap.values()) {
-    if (area) areaSet.add(area);
+  // Per-entity fallback, using only area_name/area_id - the functions this code
+  // already relied on before. areas()/area_entities() are the better source but
+  // are newer, and since resolveArea now REFUSES areas it doesn't recognise, an
+  // empty registry would turn every area-scoped command into a hard failure.
+  // Worth the few extra lines not to make that depend on one template call.
+  if (byId.size === 0 && lightStates.length > 0) {
+    const perEntityTemplate = lightStates
+      .map(s => `${s.entity_id}|{{ area_name('${s.entity_id}') or '' }}|{{ area_id('${s.entity_id}') or '' }}`)
+      .join("\n");
+    try {
+      const result = await haTemplate(perEntityTemplate);
+      for (const line of result.split("\n")) {
+        const [entityId, areaName, areaId] = line.split("|");
+        if (!entityId?.trim() || !areaName?.trim()) continue;
+        const name = areaName.trim();
+        const id = areaId?.trim() || name.toLowerCase().replace(/\s+/g, "_");
+        byId.set(id, { area_id: id, name });
+        areaMap.set(entityId.trim(), { id, name });
+      }
+    } catch {
+      // Neither worked - area-scoped commands will say the area is unknown
+      // rather than acting on the wrong one.
+    }
   }
-  areasCache = [...areaSet].map(name => ({
-    area_id: name.toLowerCase().replace(/\s+/g, "_"),
-    name,
-  }));
+
+  areasCache = [...byId.values()];
 
   lightsCache = lightStates.map((s: any) => ({
     entity_id: s.entity_id,
     name: s.attributes?.friendly_name ?? s.entity_id,
-    area: areaMap.get(s.entity_id) || undefined,
+    area: areaMap.get(s.entity_id)?.name || undefined,
   }));
 
   const allSwitches = states
@@ -149,4 +193,19 @@ export function getScenes(): SceneEntity[] {
 
 export function getScripts(): ScriptEntity[] {
   return scriptsCache;
+}
+
+// Matches whatever the model supplied against the real area registry - it is
+// told the area_id in the system prompt but will sometimes send the friendly
+// name, or a name with spaces where the id has underscores. Returns undefined
+// rather than guessing, so callers can fail loudly instead of sending HA an
+// area that doesn't exist.
+export function resolveArea(query: string): AreaInfo | undefined {
+  const q = query.trim().toLowerCase();
+  const slug = q.replace(/\s+/g, "_");
+  return areasCache.find(a =>
+    a.area_id.toLowerCase() === q ||
+    a.area_id.toLowerCase() === slug ||
+    a.name.toLowerCase() === q
+  );
 }

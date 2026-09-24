@@ -8,8 +8,13 @@ import type { FastifyBaseLogger } from "fastify";
 // would mean paying its full latency just to classify, on every turn.
 // Always local, always the fast model, independent of whatever the main
 // agent routes to.
-const baseUrl = process.env.OLLAMA_CLASSIFIER_BASE_URL ?? "http://localhost:11434";
-const model = process.env.OLLAMA_CLASSIFIER_MODEL ?? "qwen3:8b";
+// Defaults assume the container, not a laptop: this service runs in Docker
+// without network_mode host, so "localhost" here is the container itself and
+// nothing is listening on it. The previous localhost default could not work in
+// any real deployment, and its failure mode is invisible (see below), so a
+// missing OLLAMA_CLASSIFIER_BASE_URL silently muted every follow-up.
+const baseUrl = process.env.OLLAMA_CLASSIFIER_BASE_URL ?? "http://host.docker.internal:11434";
+const model = process.env.OLLAMA_CLASSIFIER_MODEL ?? "qwen3:4b-instruct-2507-q8_0";
 
 export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 
@@ -60,7 +65,7 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     });
 
     if (!res.ok) {
-      log.warn({ model, status: res.status }, "Continuation check HTTP error, defaulting to noise");
+      log.error({ model, baseUrl, status: res.status }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
       return "noise";
     }
 
@@ -83,7 +88,13 @@ Answer with exactly one word: continuation, new_request, or noise.`;
 
     return verdict;
   } catch (err: any) {
-    log.warn({ model, err: err.message }, "Continuation check failed, defaulting to noise");
+    // Deliberately still "noise" rather than "new_request": responding to
+    // speech that was never aimed at Sakke is the worse failure, and staying
+    // quiet is recoverable by repeating the wake word. But an unreachable
+    // classifier is an outage, not an ambiguous utterance - it silences every
+    // follow-up for as long as it lasts, so it gets logged as an error rather
+    // than a warning that blends into the noise.
+    log.error({ model, baseUrl, err: err.message }, "Continuation check unreachable - follow-ups will be ignored until this is fixed");
     return "noise";
   }
 }

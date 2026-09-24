@@ -96,8 +96,13 @@ async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
   const root = data?.service_response ?? data;
   const items = (root[TASKS_TODO_ENTITY]?.items ?? []) as TodoItem[];
   const { start, end } = getDateRange(period);
+  // Compare the date portion only. start/end are date-only ("2026-09-24"), but
+  // a due value carrying a time ("2026-09-24T10:00:00") is a longer string that
+  // sorts AFTER the plain date, so `due <= end` was false for anything due at a
+  // specific time today - silently dropped from the briefing rather than
+  // reported late.
   return items.filter(i =>
-    i.status !== "completed" && (!i.due || (i.due >= start && i.due <= end))
+    i.status !== "completed" && (!i.due || (i.due.slice(0, 10) >= start && i.due.slice(0, 10) <= end))
   );
 }
 

@@ -29,8 +29,11 @@ export async function getWeather(): Promise<string> {
   const hourly = data.hourly;
 
   const condition = WMO_CODES[c.weather_code] ?? `code ${c.weather_code}`;
+  // Math.max() with no arguments is -Infinity, so an absent
+  // precipitation_probability had Sakke reading out "max rain chance minus
+  // Infinity percent". Same guard the wind line below already uses.
   const next6 = hourly.precipitation_probability?.slice(0, 6) ?? [];
-  const maxRainChance = Math.max(...next6);
+  const maxRainChance = next6.length > 0 ? Math.max(...next6) : 0;
   const maxWindNext6 = Math.max(...(hourly.wind_speed_10m?.slice(0, 6) ?? [0]));
 
   return [

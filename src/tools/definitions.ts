@@ -15,7 +15,6 @@ export const tools = [
               "scene_activate", "scene_create", "scene_design",
               "switch_on", "switch_off",
               "media_play", "media_pause", "media_stop", "media_volume",
-              "morning_routine", "bedtime_routine",
             ],
           },
           area: { type: "string", description: "Room area id e.g. living_room" },
