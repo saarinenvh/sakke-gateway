@@ -216,9 +216,21 @@ export async function runAgent(
     }
   }
 
-  const messages: Message[] = existing?.messages ?? [
-    { role: "system", content: await buildSystemPrompt() },
-  ];
+  // Built on a COPY of the stored history, and only committed back to the map
+  // once a response has actually been produced. This used to be
+  // `existing?.messages ?? [...]` - i.e. the very same array object held in the
+  // map - so every push below mutated stored history immediately, before
+  // anything had succeeded. A thrown Ollama call then left a dangling user
+  // message (plus any completed assistant/tool pairs) permanently in the
+  // conversation, and the next turn resumed from that corrupt state, feeding
+  // the model a history of consecutive unanswered user messages. The
+  // MAX_ITERATIONS path had the mirror problem: it never called
+  // conversations.set at all, so a brand-new conversation's turn was dropped.
+  // Copying the array is enough - the message objects themselves are never
+  // mutated in place, only appended.
+  const messages: Message[] = existing
+    ? [...existing.messages]
+    : [{ role: "system", content: await buildSystemPrompt() }];
 
   const chatMode = existing?.chatMode ?? isChatModeRequest(userMessage);
 
@@ -238,84 +250,110 @@ export async function runAgent(
   broadcastState("thinking");
 
   const completedToolCalls = new Set<string>();
+  // Set when the model starts repeating itself - the next pass withholds the
+  // tool schema entirely so it has to answer from the results already in
+  // context. See the duplicate-detection branch below.
+  let forceFinalResponse = false;
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    log.info({ conversationId, iteration: i + 1 }, "Calling Ollama");
+  // MAX_ITERATIONS tool-calling passes, plus one reserved slot that is only
+  // ever used for the forced tools-withheld pass - that one isn't the model
+  // looping, it's us telling it to stop, so it shouldn't consume the budget.
+  try {
+    for (let i = 0; i < MAX_ITERATIONS + 1; i++) {
+      if (i === MAX_ITERATIONS && !forceFinalResponse) break;
 
-    const res = await fetch(`${target.baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: target.model,
-        messages,
-        tools,
-        stream: false,
-        ...(target.think !== undefined && { think: target.think }),
-        ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
-        options: { temperature: 0.7, num_predict: 2000, num_ctx: target.numCtx },
-      }),
-    });
+      log.info({ conversationId, iteration: i + 1, toolsWithheld: forceFinalResponse }, "Calling Ollama");
 
-    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
+      const res = await fetch(`${target.baseUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: target.model,
+          messages,
+          ...(forceFinalResponse ? {} : { tools }),
+          stream: false,
+          ...(target.think !== undefined && { think: target.think }),
+          ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
+          options: { temperature: 0.7, num_predict: 2000, num_ctx: target.numCtx },
+        }),
+      });
 
-    const json = await res.json() as { message: Message & { tool_calls?: OllamaToolCall[] } };
-    const message = json.message;
+      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
 
-    if (message.tool_calls?.length) {
-      // Detect repeated identical tool calls — model is stuck in a loop
-      const callKeys = message.tool_calls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
-      const alreadyDone = callKeys.every(k => completedToolCalls.has(k));
-      if (alreadyDone) {
-        log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, forcing response");
-        break;
+      const json = await res.json() as { message: Message & { tool_calls?: OllamaToolCall[] } };
+      const message = json.message;
+
+      if (message.tool_calls?.length && !forceFinalResponse) {
+        // Detect repeated identical tool calls — model is stuck in a loop
+        const callKeys = message.tool_calls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
+        const alreadyDone = callKeys.every(k => completedToolCalls.has(k));
+        if (alreadyDone) {
+          // This used to `break`, which fell straight through into the
+          // max-iterations path below - so the user heard "I got confused trying
+          // to answer that." even though the tool had already run successfully,
+          // and the log claimed a response was being forced when nothing forced
+          // one. Withhold the tool schema for one more pass instead, so the model
+          // has no option but to answer from the tool results already in context.
+          log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
+          forceFinalResponse = true;
+          continue;
+        }
+        callKeys.forEach(k => completedToolCalls.add(k));
+
+        log.info(
+          { conversationId, tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
+          "Tool calls requested",
+        );
+
+        messages.push(message);
+
+        for (const call of message.tool_calls) {
+          const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
+          messages.push({ role: "tool", content: result, tool_call_id: call.id });
+        }
+
+        continue;
       }
-      callKeys.forEach(k => completedToolCalls.add(k));
 
-      log.info(
-        { conversationId, tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
-        "Tool calls requested",
-      );
+      const content = (message.content ?? "I got nothing.")
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/<channel\|>[\s\S]*/gi, "")
+        // The model doesn't reliably follow the "no markdown" voice rule on its
+        // own (confirmed even after reinforcing it) - strip it deterministically
+        // instead of continuing to depend on prompt compliance for something a
+        // TTS voice would otherwise read literally (asterisks, list numbers, etc).
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\*(.+?)\*/g, "$1")
+        .replace(/__(.+?)__/g, "$1")
+        .replace(/^\s*#{1,6}\s+/gm, "")
+        .replace(/^\s*[-*]\s+/gm, "")
+        .replace(/^\s*\d+\.\s+/gm, "")
+        // Turn line breaks into sentence breaks (not spaces) so former list items
+        // get spoken with natural pauses instead of running together.
+        .replace(/\s*\n+\s*/g, ". ")
+        .replace(/[:.]\s*\./g, m => m.trimEnd().slice(0, 1))
+        .replace(/ {2,}/g, " ")
+        .trim() || "I got nothing.";
 
-      messages.push(message);
+      messages.push({ role: "assistant", content });
+      conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode, awaitingContinuation: true });
 
-      for (const call of message.tool_calls) {
-        const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
-        messages.push({ role: "tool", content: result, tool_call_id: call.id });
-      }
-
-      continue;
+      const asksQuestion = content.trimEnd().endsWith("?");
+      log.info({ conversationId, model: target.model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
+      const speakingMs = Math.max(2000, content.length * 70);
+      broadcastState("speaking", speakingMs);
+      return { content, continueConversation: true };
     }
-
-    const content = (message.content ?? "I got nothing.")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .replace(/<channel\|>[\s\S]*/gi, "")
-      // The model doesn't reliably follow the "no markdown" voice rule on its
-      // own (confirmed even after reinforcing it) - strip it deterministically
-      // instead of continuing to depend on prompt compliance for something a
-      // TTS voice would otherwise read literally (asterisks, list numbers, etc).
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/__(.+?)__/g, "$1")
-      .replace(/^\s*#{1,6}\s+/gm, "")
-      .replace(/^\s*[-*]\s+/gm, "")
-      .replace(/^\s*\d+\.\s+/gm, "")
-      // Turn line breaks into sentence breaks (not spaces) so former list items
-      // get spoken with natural pauses instead of running together.
-      .replace(/\s*\n+\s*/g, ". ")
-      .replace(/[:.]\s*\./g, m => m.trimEnd().slice(0, 1))
-      .replace(/ {2,}/g, " ")
-      .trim() || "I got nothing.";
-
-    messages.push({ role: "assistant", content });
-    conversations.set(conversationId, { messages, lastActive: Date.now(), chatMode, awaitingContinuation: true });
-
-    const asksQuestion = content.trimEnd().endsWith("?");
-    log.info({ conversationId, model: target.model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
-    const speakingMs = Math.max(2000, content.length * 70);
-    broadcastState("speaking", speakingMs);
-    return { content, continueConversation: true };
+  } catch (err) {
+    // "thinking" was broadcast before the loop, and only the speaking/idle
+    // calls ever clear it (the speaking one schedules the auto-idle timer). A
+    // throw from here used to leave the tablet display spinning on "thinking"
+    // indefinitely, with nothing to reset it until the next successful turn.
+    broadcastState("idle");
+    throw err;
   }
 
   log.warn({ conversationId, userMessage, model: target.model, maxIterations: MAX_ITERATIONS }, "Max tool-call iterations exhausted without a final response");
+  broadcastState("idle");
   return { content: "I got confused trying to answer that.", continueConversation: chatMode };
 }

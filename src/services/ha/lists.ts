@@ -31,6 +31,8 @@ interface TodoItem {
   uid?: string;
   summary: string;
   status: "needs_action" | "completed";
+  due?: string;
+  description?: string;
 }
 
 async function haPost(path: string, body: object): Promise<any> {
@@ -62,6 +64,66 @@ function findItem(items: TodoItem[], query: string): TodoItem | undefined {
   );
 }
 
+// HA's REST service API has no "reorder item" call, so putting a list into a
+// given order means removing items and re-adding them (which appends). The
+// previous implementation did that for EVERY item on every single add: it
+// removed the whole list, then re-added it sorted. Any failure between those
+// two loops - an HA restart, the 10s timeout above, a network blip - destroyed
+// the entire list permanently.
+//
+// Instead, only the items that genuinely have to move are touched, and each is
+// removed and immediately re-added on its own, so at most one item is ever in
+// flight. The items that can stay put are the longest prefix of the target
+// order that already appears as a subsequence of the current order; everything
+// from there on gets re-appended in target order.
+//
+// Common cases cost nothing at all: a list that's already sorted, or a new item
+// whose section sorts last, produce zero moves.
+function itemsToMove(current: string[], target: string[]): string[] {
+  let kept = 0;
+  for (const summary of current) {
+    if (kept < target.length && target[kept] === summary) kept++;
+  }
+  return target.slice(kept);
+}
+
+// remove_item/add_item only carry the summary, so a reorder would otherwise
+// silently drop anything else set on the item - a due date added in the HA UI,
+// a description synced from Google Tasks. Restored best-effort: the item itself
+// already exists again by this point, so a failure here costs a field, never
+// the item. A completed item also has to be re-marked completed, since it comes
+// back as needs_action.
+async function restoreItemFields(entityId: string, item: TodoItem | undefined): Promise<void> {
+  if (!item) return;
+
+  const fields: Record<string, unknown> = {};
+  if (item.status === "completed") fields.status = "completed";
+  if (item.due) fields[item.due.includes("T") ? "due_datetime" : "due_date"] = item.due;
+  if (item.description) fields.description = item.description;
+  if (Object.keys(fields).length === 0) return;
+
+  try {
+    await haPost("/api/services/todo/update_item", { entity_id: entityId, item: item.summary, ...fields });
+  } catch {
+    // Not every todo integration supports every field (Google Tasks and
+    // local_todo differ), and a rejected optional field must not take the
+    // whole list operation down with it.
+  }
+}
+
+async function reorderList(entityId: string, items: TodoItem[], current: string[], target: string[]): Promise<number> {
+  const moves = itemsToMove(current, target);
+  if (moves.length === 0) return 0;
+
+  const bySummary = new Map(items.map(i => [i.summary, i]));
+  for (const summary of moves) {
+    await haPost("/api/services/todo/remove_item", { entity_id: entityId, item: summary });
+    await haPost("/api/services/todo/add_item", { entity_id: entityId, item: summary });
+    await restoreItemFields(entityId, bySummary.get(summary));
+  }
+  return moves.length;
+}
+
 export async function getTodoLists(): Promise<{ entity_id: string; name: string }[]> {
   const res = await fetch(`${baseUrl}/api/states`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -76,26 +138,20 @@ export async function getTodoLists(): Promise<{ entity_id: string; name: string 
 
 export async function sortList(entityId: string): Promise<string> {
   const items = await getItems(entityId);
-  const pending = items.filter(i => i.status === "needs_action").map(i => i.summary);
-  const completed = items.filter(i => i.status === "completed").map(i => i.summary);
+  const pending = items.filter(i => i.status === "needs_action");
+  const completed = items.filter(i => i.status === "completed");
 
   if (pending.length === 0 && completed.length === 0) return "List is empty.";
 
-  const sortedPending = [...pending].sort((a, b) => categorizeItem(a) - categorizeItem(b));
-  const sortedCompleted = [...completed].sort((a, b) => a.localeCompare(b));
+  const currentPending = pending.map(i => i.summary);
+  const targetPending = [...currentPending].sort((a, b) => categorizeItem(a) - categorizeItem(b));
+  await reorderList(entityId, pending, currentPending, targetPending);
 
-  for (const item of [...pending, ...completed]) {
-    await haPost("/api/services/todo/remove_item", { entity_id: entityId, item });
-  }
-  for (const item of sortedPending) {
-    await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
-  }
-  for (const item of sortedCompleted) {
-    await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
-    await haPost("/api/services/todo/update_item", { entity_id: entityId, item, status: "completed" });
-  }
+  const currentCompleted = completed.map(i => i.summary);
+  const targetCompleted = [...currentCompleted].sort((a, b) => a.localeCompare(b));
+  await reorderList(entityId, completed, currentCompleted, targetCompleted);
 
-  return `Sorted ${sortedPending.length} items by store layout, ${sortedCompleted.length} completed items alphabetically.`;
+  return `Sorted ${targetPending.length} items by store layout, ${targetCompleted.length} completed items alphabetically.`;
 }
 
 export async function readList(entityId: string): Promise<string> {
@@ -107,25 +163,30 @@ export async function readList(entityId: string): Promise<string> {
 
 export async function addToList(entityId: string, newItems: string[]): Promise<string> {
   const existing = await getItems(entityId);
-  const incomplete = existing.filter(i => i.status === "needs_action").map(i => i.summary);
+  const pending = existing.filter(i => i.status === "needs_action");
+  const currentSummaries = pending.map(i => i.summary);
 
-  const merged = [...incomplete];
-  for (const item of newItems) {
-    if (!merged.some(e => e.toLowerCase() === item.toLowerCase())) {
-      merged.push(item);
-    }
-  }
+  const toAdd = newItems.filter(
+    item => !currentSummaries.some(e => e.toLowerCase() === item.toLowerCase()),
+  );
 
-  merged.sort((a, b) => categorizeItem(a) - categorizeItem(b));
-
-  for (const item of incomplete) {
-    await haPost("/api/services/todo/remove_item", { entity_id: entityId, item });
-  }
-  for (const item of merged) {
+  // Add first, so the new items exist even if the reorder below fails partway.
+  for (const item of toAdd) {
     await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
   }
 
-  return `Added ${newItems.join(", ")}. List has ${merged.length} items sorted by store layout.`;
+  // New items land at the end of the list; only re-sort if that isn't already
+  // where they belong. Array.sort is stable, so items in the same section keep
+  // their existing relative order and don't get moved for nothing.
+  const current = [...currentSummaries, ...toAdd];
+  const target = [...current].sort((a, b) => categorizeItem(a) - categorizeItem(b));
+  const added = toAdd.map(item => ({ summary: item, status: "needs_action" as const }));
+  await reorderList(entityId, [...pending, ...added], current, target);
+
+  const lead = toAdd.length > 0
+    ? `Added ${toAdd.join(", ")}.`
+    : `${newItems.join(", ")} already on the list.`;
+  return `${lead} List has ${current.length} items sorted by store layout.`;
 }
 
 export async function completeInList(entityId: string, itemQuery: string): Promise<string> {
