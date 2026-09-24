@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { getMorningGreeting, getPendingReminder } from "../services/ha/reminders.js";
+import { getMorningGreeting, getPendingReminder } from "./reminders.js";
 
 export async function reminderRoutes(app: FastifyInstance): Promise<void> {
   app.get("/reminders/morning", async (_request, reply) => {

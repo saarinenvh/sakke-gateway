@@ -1,11 +1,11 @@
 import type { FastifyBaseLogger } from "fastify";
 import { tools } from "../tools/definitions.js";
 import { executeTool } from "../tools/executor.js";
-import { buildSystemPrompt } from "../prompts/systemPrompt.js";
-import { broadcastState } from "./displayState.js";
+import { buildSystemPrompt } from "./systemPrompt.js";
+import { broadcastState } from "../display/displayState.js";
 import { classifyFollowUp } from "./continuationCheck.js";
-import { clearSpotifySuggestion } from "./integrations/spotify.js";
-import { getGpuStatus } from "./gpuStatus.js";
+import { clearSpotifySuggestion } from "../spotify/spotify.js";
+import { getGpuStatus } from "../gpu/gpuStatus.js";
 import { config, type OllamaTargetConfig } from "../config.js";
 
 // Per gpu_routing_design.md: the routing check happens once per conversation

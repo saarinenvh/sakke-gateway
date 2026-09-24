@@ -1,7 +1,7 @@
-import type { Intent } from "../../types/intent.js";
-import { getLights, getScenes, getAreas, resolveArea } from "./registry.js";
-import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
-import { config } from "../../config.js";
+import type { Intent } from "./intent.js";
+import { getLights, getScenes, getAreas, resolveArea } from "../integrations/homeAssistant/registry.js";
+import { designScene, applyScene, saveCurrentStateAsScene } from "../scenes/scenes.js";
+import { config } from "../config.js";
 
 async function callService(domain: string, service: string, data: Record<string, unknown> = {}): Promise<void> {
   const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${service}`, {

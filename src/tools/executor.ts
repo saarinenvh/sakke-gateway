@@ -1,16 +1,16 @@
 import { promises as fs } from "fs";
 import { resolve } from "path";
 import type { FastifyBaseLogger } from "fastify";
-import { dispatch } from "../services/ha/dispatcher.js";
-import { webSearch } from "../services/integrations/webSearch.js";
-import { getWeather } from "../services/integrations/weather.js";
-import { readList, addToList, completeInList, removeFromList, sortList } from "../services/ha/lists.js";
-import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayIndexed, spotifyPlayPersonal } from "../services/integrations/spotify.js";
-import { getTasksText, getCalendarText } from "../services/ha/reminders.js";
-import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
-import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
-import { setManualOverride, clearManualOverride } from "../services/gpuStatus.js";
-import type { Intent } from "../types/intent.js";
+import { dispatch } from "../homeControl/dispatcher.js";
+import { webSearch } from "../search/webSearch.js";
+import { getWeather } from "../weather/weather.js";
+import { readList, addToList, completeInList, removeFromList, sortList } from "../lists/lists.js";
+import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayIndexed, spotifyPlayPersonal } from "../spotify/spotify.js";
+import { getTasksText, getCalendarText } from "../reminders/reminders.js";
+import { setTimer, cancelTimer, listTimers } from "../timers/timers.js";
+import { loadEntities, getAreas, getScenes, getScripts } from "../integrations/homeAssistant/registry.js";
+import { setManualOverride, clearManualOverride } from "../gpu/gpuStatus.js";
+import type { Intent } from "../homeControl/intent.js";
 import { config } from "../config.js";
 
 function haHeadersNow(): Record<string, string> {

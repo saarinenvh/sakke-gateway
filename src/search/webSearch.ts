@@ -1,4 +1,4 @@
-import { config } from "../../config.js";
+import { config } from "../config.js";
 
 export async function webSearch(query: string): Promise<string> {
   const url = `${config.search.searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&language=en`;

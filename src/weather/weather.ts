@@ -1,4 +1,4 @@
-import { config } from "../../config.js";
+import { config } from "../config.js";
 
 const WMO_CODES: Record<number, string> = {
   0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",

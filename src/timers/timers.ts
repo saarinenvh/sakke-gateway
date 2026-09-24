@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import { moduleLog } from "./logger.js";
+import { moduleLog } from "../logger.js";
 import { config } from "../config.js";
 
 // What happens when a timer finishes is injected, not imported. This module

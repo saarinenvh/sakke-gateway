@@ -1,4 +1,4 @@
-import { config } from "../../config.js";
+import { config } from "../config.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },

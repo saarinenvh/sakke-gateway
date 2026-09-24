@@ -1,14 +1,14 @@
 import "dotenv/config";
 import Fastify from "fastify";
-import { sceneRoutes } from "./routes/scene.js";
-import { conversationRoutes } from "./routes/conversation.js";
-import { reminderRoutes } from "./routes/reminders.js";
-import { displayRoutes } from "./routes/display.js";
-import { gpuStatusRoutes } from "./routes/gpuStatus.js";
-import { loadEntities } from "./services/ha/registry.js";
-import { setModuleLogger } from "./services/logger.js";
-import { restoreTimers, setTimerHandler } from "./services/timers.js";
-import { announceFinishedTimer } from "./services/timerAnnouncer.js";
+import { sceneRoutes } from "./scenes/route.js";
+import { conversationRoutes } from "./agent/route.js";
+import { reminderRoutes } from "./reminders/route.js";
+import { displayRoutes } from "./display/route.js";
+import { gpuStatusRoutes } from "./gpu/route.js";
+import { loadEntities } from "./integrations/homeAssistant/registry.js";
+import { setModuleLogger } from "./logger.js";
+import { restoreTimers, setTimerHandler } from "./timers/timers.js";
+import { announceFinishedTimer } from "./timers/timerAnnouncer.js";
 import { config } from "./config.js";
 
 

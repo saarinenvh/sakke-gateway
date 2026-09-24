@@ -1,5 +1,5 @@
 import { moduleLog } from "../logger.js";
-import { config } from "../../config.js";
+import { config } from "../config.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).

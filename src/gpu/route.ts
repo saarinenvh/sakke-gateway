@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { recordGpuStatus, getGpuStatus } from "../services/gpuStatus.js";
+import { recordGpuStatus, getGpuStatus } from "./gpuStatus.js";
 
 export async function gpuStatusRoutes(app: FastifyInstance): Promise<void> {
   // Called by the dev PC's status-push service (scripts/gpu-router/status-service.ps1

@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
-import { getAreas, getScenes, getScripts } from "../services/ha/registry.js";
-import { getTodoLists, STORE_LAYOUT_SECTIONS } from "../services/ha/lists.js";
+import { getAreas, getScenes, getScripts } from "../integrations/homeAssistant/registry.js";
+import { getTodoLists, STORE_LAYOUT_SECTIONS } from "../lists/lists.js";
 
 export async function buildSystemPrompt(): Promise<string> {
   const areas = getAreas().map(a => `  - ${a.name} (${a.area_id})`).join("\n");

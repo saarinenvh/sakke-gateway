@@ -1,6 +1,6 @@
-import { runAgent } from "./agent.js";
+import { runAgent } from "../agent/agent.js";
 import { config } from "../config.js";
-import { moduleLog } from "./logger.js";
+import { moduleLog } from "../logger.js";
 
 // The "what to say when a timer finishes" half of the timer feature, kept out
 // of timers.ts so the scheduler doesn't have to know about the agent - see the

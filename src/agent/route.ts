@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { runAgent } from "../services/agent.js";
+import { runAgent } from "./agent.js";
 
 interface ChatMessage {
   role: string;

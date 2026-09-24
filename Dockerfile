@@ -8,7 +8,6 @@ RUN npm install
 COPY . .
 RUN npm run build
 RUN npm prune --omit=dev
-RUN cp -r src/prompts/. dist/prompts/
 
 EXPOSE 3100
 

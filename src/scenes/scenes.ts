@@ -1,8 +1,8 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import { getLights } from "./registry.js";
+import { getLights } from "../integrations/homeAssistant/registry.js";
 import { moduleLog } from "../logger.js";
-import { config } from "../../config.js";
+import { config } from "../config.js";
 
 // Scene design is a big single completion, so more generous than the 5-8s used
 // for the quick HA/Spotify calls.
@@ -24,9 +24,9 @@ export interface ScenePlan {
 }
 
 function loadPrompt(): string {
-  const context = readFileSync(join(__dirname, "../../prompts/lighting/lightning_context.md"), "utf-8");
-  const layout = readFileSync(join(__dirname, "../../prompts/lighting/lightning_layout.md"), "utf-8");
-  const template = readFileSync(join(__dirname, "../../prompts/lighting/lightning_designer_prompt.md"), "utf-8");
+  const context = readFileSync(join(__dirname, "prompts/lightning_context.md"), "utf-8");
+  const layout = readFileSync(join(__dirname, "prompts/lightning_layout.md"), "utf-8");
+  const template = readFileSync(join(__dirname, "prompts/lightning_designer_prompt.md"), "utf-8");
   return template.replace("{{lighting_context}}", `${context}\n\n${layout}`);
 }
 
