@@ -23,10 +23,39 @@ export interface ScenePlan {
   lights: LightSetting[];
 }
 
+// The lamp descriptions live in the wiki when one is mounted, so moving a lamp
+// or re-describing a room is an Obsidian edit rather than a redeploy. The copies
+// bundled here are the fallback: the wiki is a mounted volume and can simply be
+// absent (the dev machine has none), and scene design must not break because of
+// that.
+//
+// The designer briefing is NOT wiki content and deliberately stays in the repo -
+// "think like a lighting designer", the JSON output shape, the WiZ effect-speed
+// semantics. That's behaviour, and changing it is a code change.
+const WIKI_LIGHTING_DIR = "home";
+
+function readLightingDoc(name: string, log: (source: string) => void): string {
+  const wikiPath = join(config.wikiRoot, WIKI_LIGHTING_DIR, name);
+  try {
+    const content = readFileSync(wikiPath, "utf-8");
+    log(wikiPath);
+    return content;
+  } catch {
+    const bundled = join(__dirname, "prompts", name);
+    log(`${bundled} (bundled fallback - no wiki copy)`);
+    return readFileSync(bundled, "utf-8");
+  }
+}
+
 function loadPrompt(): string {
-  const context = readFileSync(join(__dirname, "prompts/lightning_context.md"), "utf-8");
-  const layout = readFileSync(join(__dirname, "prompts/lightning_layout.md"), "utf-8");
-  const template = readFileSync(join(__dirname, "prompts/lightning_designer_prompt.md"), "utf-8");
+  const sources: string[] = [];
+  const note = (s: string) => sources.push(s);
+
+  const context = readLightingDoc("lighting_context.md", note);
+  const layout = readLightingDoc("lighting_layout.md", note);
+  const template = readFileSync(join(__dirname, "prompts/lighting_designer_prompt.md"), "utf-8");
+
+  moduleLog().info({ sources }, "Loaded lighting design context");
   return template.replace("{{lighting_context}}", `${context}\n\n${layout}`);
 }
 
