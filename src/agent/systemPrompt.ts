@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import { join } from "path";
+import { config } from "../config.js";
 import { homeControlPrompt } from "../homeControl/prompt.js";
 import { listsPrompt } from "../lists/prompt.js";
 import { remindersPrompt } from "../reminders/prompt.js";
@@ -27,10 +28,36 @@ const SECTIONS: PromptSection[] = [
   weatherPrompt,
   searchPrompt,
   wikiPrompt,
+  () => clockLine(),
 ];
 
 async function readMarkdown(name: string): Promise<string> {
   return (await fs.readFile(join(__dirname, "prompts", name), "utf-8")).trim();
+}
+
+// The model has no clock of its own, and nothing else in the prompt or the
+// tools told it the time - asked "what time is it" it could only say it had no
+// access to real-time information, and "tomorrow" meant nothing to it either.
+const CLOCK_PREFIX = "Current date and time:";
+
+function clockLine(now = new Date()): string {
+  const formatted = now.toLocaleString("en-GB", {
+    timeZone: config.timezone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${CLOCK_PREFIX} ${formatted} (${config.timezone}).`;
+}
+
+// The system prompt is built once per conversation and then stored with its
+// history, so without this the clock would stay frozen at the conversation's
+// first turn for as long as follow-ups keep it alive.
+export function refreshClock(systemPrompt: string): string {
+  return systemPrompt.replace(new RegExp(`^${CLOCK_PREFIX}.*$`, "m"), clockLine());
 }
 
 export async function buildSystemPrompt(): Promise<string> {

@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { tools } from "../tools/definitions.js";
 import { executeTool } from "../tools/executor.js";
-import { buildSystemPrompt } from "./systemPrompt.js";
+import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
 import { broadcastState } from "../display/displayState.js";
 import { classifyFollowUp } from "./continuationCheck.js";
 import { clearSpotifySuggestion } from "../spotify/spotify.js";
@@ -155,6 +155,9 @@ function cleanForSpeech(raw: string | undefined, toolsWereWithheld: boolean): st
     // own (confirmed even after reinforcing it) - strip it deterministically
     // instead of continuing to depend on prompt compliance for something a
     // TTS voice would otherwise read literally (asterisks, list numbers, etc).
+    // Links keep their text and lose the URL - seen live as
+    // "[time.gov](https://www.time.gov/)", which Piper read out in full.
+    .replace(/\[([^\]]+)\]\([^)\s]*\)/g, "$1")
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\*(.+?)\*/g, "$1")
     .replace(/__(.+?)__/g, "$1")
@@ -234,6 +237,9 @@ export async function runAgent(
   const messages: Message[] = existing
     ? [...existing.messages]
     : [{ role: "system", content: await buildSystemPrompt() }];
+  if (existing && messages[0]?.role === "system") {
+    messages[0] = { ...messages[0], content: refreshClock(messages[0].content) };
+  }
 
   const chatMode = existing?.chatMode ?? isChatModeRequest(userMessage);
 
