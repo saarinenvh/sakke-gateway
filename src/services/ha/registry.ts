@@ -1,7 +1,4 @@
-import { env } from "../../env.js";
-
-const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const token = env("HA_TOKEN") ?? "";
+import { config } from "../../config.js";
 
 export interface LightEntity {
   entity_id: string;
@@ -39,19 +36,19 @@ let scenesCache: SceneEntity[] = [];
 let scriptsCache: ScriptEntity[] = [];
 
 async function haGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(`${config.ha.baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${config.ha.token}` },
   });
   if (!res.ok) throw new Error(`HA API ${res.status} at ${path}`);
   return res.json() as Promise<T>;
 }
 
 async function haTemplate(template: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/template`, {
+  const res = await fetch(`${config.ha.baseUrl}/api/template`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${config.ha.token}`,
     },
     body: JSON.stringify({ template }),
   });

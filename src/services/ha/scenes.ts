@@ -2,12 +2,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { getLights } from "./registry.js";
 import { moduleLog } from "../logger.js";
-import { env } from "../../env.js";
-
-const openAiApiKey = env("OPENAI_API_KEY") ?? "";
-const openAiModel = env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o";
-const haBaseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const haToken = env("HA_TOKEN") ?? "";
+import { config } from "../../config.js";
 
 // Scene design is a big single completion, so more generous than the 5-8s used
 // for the quick HA/Spotify calls.
@@ -42,15 +37,15 @@ export async function designScene(description: string): Promise<ScenePlan> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${openAiApiKey}`,
+      "Authorization": `Bearer ${config.openai.apiKey}`,
     },
     body: JSON.stringify({
-      model: openAiModel,
+      model: config.openai.lightingModel,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: description },
       ],
-      ...(openAiModel.startsWith("o") ? {} : { temperature: 0.7 }),
+      ...(config.openai.lightingModel.startsWith("o") ? {} : { temperature: 0.7 }),
     }),
     // Every other outbound call in this service has a deadline; this one could
     // hang the whole conversation turn waiting on OpenAI.
@@ -59,7 +54,7 @@ export async function designScene(description: string): Promise<ScenePlan> {
 
   if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${await res.text()}`);
 
-  moduleLog().info({ model: openAiModel }, "OpenAI scene design call completed");
+  moduleLog().info({ model: config.openai.lightingModel }, "OpenAI scene design call completed");
 
   const json = await res.json() as { choices?: { message?: { content?: string } }[] };
   const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
@@ -110,8 +105,8 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
   const sceneId = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
-  const res = await fetch(`${haBaseUrl}/api/states`, {
-    headers: { Authorization: `Bearer ${haToken}` },
+  const res = await fetch(`${config.ha.baseUrl}/api/states`, {
+    headers: { Authorization: `Bearer ${config.ha.token}` },
   });
   if (!res.ok) throw new Error(`HA API ${res.status}`);
   const states: any[] = await res.json();
@@ -141,11 +136,11 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     entities[state.entity_id] = entry;
   }
 
-  const configRes = await fetch(`${haBaseUrl}/api/config/scene/config/${sceneId}`, {
+  const configRes = await fetch(`${config.ha.baseUrl}/api/config/scene/config/${sceneId}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${haToken}`,
+      Authorization: `Bearer ${config.ha.token}`,
     },
     body: JSON.stringify({ id: sceneId, name, entities }),
   });
@@ -159,11 +154,11 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
 }
 
 async function callHA(domain: string, service: string, data: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${haBaseUrl}/api/services/${domain}/${service}`, {
+  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${service}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${haToken}`,
+      Authorization: `Bearer ${config.ha.token}`,
     },
     body: JSON.stringify(data),
   });

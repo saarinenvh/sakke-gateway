@@ -1,12 +1,22 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import { runAgent } from "./agent.js";
 import { moduleLog } from "./logger.js";
-import { env } from "../env.js";
+import { config } from "../config.js";
 
-const haBase = env("HA_BASE_URL") ?? "http://localhost:8123";
-const haToken = env("HA_TOKEN") ?? "";
-const satelliteEntityId = env("ASSIST_SATELLITE_ENTITY_ID") ?? "assist_satellite.home_assistant_voice";
+// What happens when a timer finishes is injected, not imported. This module
+// used to import runAgent directly, which closed a cycle - timers -> agent ->
+// executor (the `timer` tool) -> timers - and meant importing the scheduler
+// pulled in 19 modules including every Home Assistant and Spotify client.
+// Phrasing an announcement was never the scheduler's job anyway: it knows
+// WHEN, not what to say. index.ts wires the real handler at startup; see
+// timerAnnouncer.ts.
+export type TimerHandler = (label: string) => Promise<void>;
+
+let onTimerFired: TimerHandler = async () => {};
+
+export function setTimerHandler(handler: TimerHandler): void {
+  onTimerFired = handler;
+}
 
 interface ActiveTimer {
   id: string;
@@ -23,8 +33,9 @@ const timers = new Map<string, ActiveTimer>();
 // startup. Best-effort throughout: if the state directory isn't writable the
 // timer still works for this process's lifetime, which is exactly the old
 // behaviour.
-const STATE_DIR = env("STATE_DIR") ?? "/data";
-const TIMERS_FILE = join(STATE_DIR, "timers.json");
+function timersFile(): string {
+  return join(config.stateDir, "timers.json");
+}
 
 interface PersistedTimer {
   id: string;
@@ -48,12 +59,12 @@ async function writeSnapshot(): Promise<void> {
     endsAt: t.endsAt.getTime(),
   }));
   try {
-    await fs.mkdir(STATE_DIR, { recursive: true });
-    const tmp = `${TIMERS_FILE}.tmp`;
+    await fs.mkdir(config.stateDir, { recursive: true });
+    const tmp = `${timersFile()}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(snapshot), "utf-8");
-    await fs.rename(tmp, TIMERS_FILE);
+    await fs.rename(tmp, timersFile());
   } catch (err: any) {
-    moduleLog().warn({ err: err.message, file: TIMERS_FILE }, "Could not persist timers - they will not survive a restart");
+    moduleLog().warn({ err: err.message, file: timersFile() }, "Could not persist timers - they will not survive a restart");
   }
 }
 
@@ -63,7 +74,7 @@ async function writeSnapshot(): Promise<void> {
 export async function restoreTimers(): Promise<void> {
   let saved: PersistedTimer[];
   try {
-    saved = JSON.parse(await fs.readFile(TIMERS_FILE, "utf-8")) as PersistedTimer[];
+    saved = JSON.parse(await fs.readFile(timersFile(), "utf-8")) as PersistedTimer[];
   } catch {
     return; // no state file yet, or unreadable - nothing to restore
   }
@@ -92,35 +103,9 @@ function armTimer(id: string, label: string, endsAt: Date, durationMs: number): 
   const handle = setTimeout(() => {
     timers.delete(id);
     void persist();
-    fireTimer(label).catch(() => {});
+    onTimerFired(label).catch(err => moduleLog().error({ label, err: err.message }, "Timer handler failed"));
   }, durationMs);
   timers.set(id, { id, label, endsAt, handle });
-}
-
-const silentLog = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  debug: () => {},
-  trace: () => {},
-  fatal: () => {},
-  child: () => silentLog,
-} as any;
-
-async function fireTimer(label: string): Promise<void> {
-  const { content } = await runAgent(
-    `A timer has finished. It was set for: ${label}. Announce it.`,
-    `timer-${Date.now()}`,
-    silentLog,
-  );
-  await fetch(`${haBase}/api/services/assist_satellite/announce`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${haToken}`,
-    },
-    body: JSON.stringify({ entity_id: satelliteEntityId, message: content }),
-  });
 }
 
 export function setTimer(durationMs: number, label: string): string {

@@ -1,7 +1,4 @@
-import { env } from "../../env.js";
-
-const lat = env("WEATHER_LAT") ?? "60.1583";
-const lon = env("WEATHER_LON") ?? "24.7339";
+import { config } from "../../config.js";
 
 const WMO_CODES: Record<number, string> = {
   0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
@@ -16,8 +13,8 @@ const WMO_CODES: Record<number, string> = {
 
 export async function getWeather(): Promise<string> {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
-  url.searchParams.set("latitude", lat);
-  url.searchParams.set("longitude", lon);
+  url.searchParams.set("latitude", config.weather.lat);
+  url.searchParams.set("longitude", config.weather.lon);
   url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,weather_code");
   url.searchParams.set("hourly", "temperature_2m,precipitation_probability,wind_speed_10m");
   url.searchParams.set("forecast_days", "1");

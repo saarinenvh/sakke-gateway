@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { env } from "../env.js";
+import { config } from "../config.js";
 
 // Deliberately independent of OLLAMA_BASE_URL/OLLAMA_MODEL (the main agent's
 // config) rather than falling back to them - once GPU routing sends the main
@@ -14,8 +14,6 @@ import { env } from "../env.js";
 // nothing is listening on it. The previous localhost default could not work in
 // any real deployment, and its failure mode is invisible (see below), so a
 // missing OLLAMA_CLASSIFIER_BASE_URL silently muted every follow-up.
-const baseUrl = env("OLLAMA_CLASSIFIER_BASE_URL") ?? "http://host.docker.internal:11434";
-const model = env("OLLAMA_CLASSIFIER_MODEL") ?? "qwen3:4b-instruct-2507-q8_0";
 
 export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 
@@ -51,6 +49,8 @@ Classify the new speech into exactly one of these three categories:
 - noise: not actually directed at the assistant at all - talking to someone else, background chatter, an incomplete fragment, or anything ambiguous.
 
 Answer with exactly one word: continuation, new_request, or noise.`;
+
+  const { baseUrl, model } = config.ollama.classifier;
 
   try {
     const res = await fetch(`${baseUrl}/api/chat`, {

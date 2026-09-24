@@ -1,17 +1,14 @@
 import type { Intent } from "../../types/intent.js";
 import { getLights, getScenes, getAreas, resolveArea } from "./registry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
-import { env } from "../../env.js";
-
-const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const token = env("HA_TOKEN") ?? "";
+import { config } from "../../config.js";
 
 async function callService(domain: string, service: string, data: Record<string, unknown> = {}): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/services/${domain}/${service}`, {
+  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${service}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${config.ha.token}`,
     },
     body: JSON.stringify(data),
   });

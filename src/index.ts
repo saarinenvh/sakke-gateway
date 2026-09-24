@@ -7,10 +7,10 @@ import { displayRoutes } from "./routes/display.js";
 import { gpuStatusRoutes } from "./routes/gpuStatus.js";
 import { loadEntities } from "./services/ha/registry.js";
 import { setModuleLogger } from "./services/logger.js";
-import { restoreTimers } from "./services/timers.js";
-import { env } from "./env.js";
+import { restoreTimers, setTimerHandler } from "./services/timers.js";
+import { announceFinishedTimer } from "./services/timerAnnouncer.js";
+import { config } from "./config.js";
 
-const port = parseInt(env("PORT") ?? "3100", 10);
 
 const SILENT_ROUTES = new Set(["/health", "/reminders/check", "/display/events", "/internal/gpu-status"]);
 
@@ -47,8 +47,19 @@ app.get("/health", async () => ({ ok: true }));
 // Modules without a request logger (scenes.ts, spotify.ts) log through this.
 setModuleLogger(app.log);
 
+// Composition root: the scheduler knows when a timer fires, this decides what
+// happens when it does. Wired here so timers.ts doesn't have to import the
+// agent - see the note in that file about the import cycle.
+setTimerHandler(announceFinishedTimer);
+
+// Anything missing or implausible in the environment, reported once, up front,
+// instead of surfacing later as an inexplicable runtime failure.
+for (const problem of config.problems) {
+  app.log.error({ problem }, "Configuration problem");
+}
+
 function listen(): void {
-  app.listen({ port, host: "0.0.0.0" }, (err) => {
+  app.listen({ port: config.port, host: "0.0.0.0" }, (err) => {
     if (err) {
       app.log.error(err);
       process.exit(1);

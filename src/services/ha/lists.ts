@@ -1,7 +1,4 @@
-import { env } from "../../env.js";
-
-const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const token = env("HA_TOKEN") ?? "";
+import { config } from "../../config.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },
@@ -38,10 +35,10 @@ interface TodoItem {
 }
 
 async function haPost(path: string, body: object): Promise<any> {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${config.ha.baseUrl}${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${config.ha.token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -127,8 +124,8 @@ async function reorderList(entityId: string, items: TodoItem[], current: string[
 }
 
 export async function getTodoLists(): Promise<{ entity_id: string; name: string }[]> {
-  const res = await fetch(`${baseUrl}/api/states`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(`${config.ha.baseUrl}/api/states`, {
+    headers: { Authorization: `Bearer ${config.ha.token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) return [];

@@ -1,9 +1,7 @@
-import { env } from "../../env.js";
-
-const searxngUrl = env("SEARXNG_URL") ?? "http://searxng:8080";
+import { config } from "../../config.js";
 
 export async function webSearch(query: string): Promise<string> {
-  const url = `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&language=en`;
+  const url = `${config.search.searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&language=en`;
 
   const res = await fetch(url, {
     signal: AbortSignal.timeout(8000),

@@ -6,68 +6,7 @@ import { broadcastState } from "./displayState.js";
 import { classifyFollowUp } from "./continuationCheck.js";
 import { clearSpotifySuggestion } from "./integrations/spotify.js";
 import { getGpuStatus } from "./gpuStatus.js";
-
-interface OllamaTarget {
-  baseUrl: string;
-  model: string;
-  numCtx: number;
-  think: boolean | undefined;
-  keepAlive: string | undefined;
-}
-
-// A .env routinely carries blank entries ("OLLAMA_THINK="), and docker-compose
-// substitutes an unset variable as an empty string - both arrive here as "",
-// which is NOT the same as unset. Number("") is 0, so an empty OLLAMA_NUM_CTX
-// would silently mean a zero-length context; `?? fallback` never fires for ""
-// either, so an empty PC_OLLAMA_MODEL would override the model with nothing.
-function env(name: string): string | undefined {
-  const value = process.env[name];
-  return value === undefined || value.trim() === "" ? undefined : value;
-}
-
-function parseThink(value: string | undefined): boolean | undefined {
-  return value === "true" ? true : value === "false" ? false : undefined;
-}
-
-// Without an explicit num_ctx, Ollama's default context window is small
-// enough that the system prompt + full tool schema (+ accumulated tool
-// results in longer tool-calling turns) can get silently truncated -
-// confirmed directly against gpt-oss:20b: the same real prompt/tools
-// evaluated only ~2050 tokens and produced a hallucinated, tool-call-free
-// response, vs. the correct tool call once num_ctx was set large enough to
-// actually fit the prompt (~8800 tokens). The models themselves support far
-// more (qwen3 up to 256K, gpt-oss up to 128K) - the real ceiling is VRAM for
-// the KV cache, which differs a lot per GPU/model, so this stays
-// env-overridable per deployment rather than fixed.
-const serverTarget: OllamaTarget = {
-  baseUrl: env("OLLAMA_BASE_URL") ?? "http://host.docker.internal:11434",
-  model: env("OLLAMA_MODEL") ?? "qwen3:8b",
-  numCtx: Number(env("OLLAMA_NUM_CTX") ?? "32768"),
-  think: parseThink(env("OLLAMA_THINK")),
-  // Left unset (Ollama's own default keep-alive, normally 5min) unless
-  // explicitly configured - the server is dedicated to Sakke, so there's no
-  // reason to be eager about freeing its VRAM the way the PC target is.
-  keepAlive: env("OLLAMA_KEEP_ALIVE"),
-};
-
-// Only defined if PC_OLLAMA_BASE_URL is actually set - otherwise routing
-// always falls back to the server, same as before Phase 3 existed.
-const pcTarget: OllamaTarget | null = env("PC_OLLAMA_BASE_URL")
-  ? {
-      baseUrl: env("PC_OLLAMA_BASE_URL")!,
-      model: env("PC_OLLAMA_MODEL") ?? serverTarget.model,
-      numCtx: Number(env("PC_OLLAMA_NUM_CTX") ?? "32768"),
-      think: parseThink(env("PC_OLLAMA_THINK")),
-      // Left unset by default, same as the server target - a short default
-      // here would force a cold reload on every single PC-routed request,
-      // including consecutive ones seconds apart within the same
-      // conversation. Freeing VRAM when something else needs it (a game
-      // starting) is instead handled proactively by status-service.ps1 on
-      // the PC itself, right at the moment it detects the GPU going busy -
-      // see that script's Unload-OllamaModels function.
-      keepAlive: env("PC_OLLAMA_KEEP_ALIVE"),
-    }
-  : null;
+import { config, type OllamaTargetConfig } from "../config.js";
 
 // Per gpu_routing_design.md: the routing check happens once per conversation
 // turn, not continuously mid-generation or per tool-call iteration within a
@@ -76,17 +15,19 @@ const pcTarget: OllamaTarget | null = env("PC_OLLAMA_BASE_URL")
 // configured at all) both fail closed to the always-on server model -
 // preferring the recoverable outcome over guessing wrong about whether the
 // PC is actually reachable.
-function getOllamaTarget(log: FastifyBaseLogger): OllamaTarget {
-  if (!pcTarget) return serverTarget;
+function getOllamaTarget(log: FastifyBaseLogger): OllamaTargetConfig {
+  // Read at call time, not captured at import - see config.ts.
+  const { server, pc } = config.ollama;
+  if (!pc) return server;
 
   const gpu = getGpuStatus();
   if (gpu.state === "available") {
     log.info({ gpuSource: gpu.source, gpuLastSeen: gpu.lastSeen }, "Routing to PC");
-    return pcTarget;
+    return pc;
   }
 
   log.info({ gpuState: gpu.state, gpuStaleMs: gpu.staleMs }, "Routing to server");
-  return serverTarget;
+  return server;
 }
 
 const CONVERSATION_TIMEOUT_MS = 10 * 60 * 1000;

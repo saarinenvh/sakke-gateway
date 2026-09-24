@@ -1,10 +1,5 @@
 import { moduleLog } from "../logger.js";
-import { env } from "../../env.js";
-const clientId = env("SPOTIFY_CLIENT_ID") ?? "";
-const clientSecret = env("SPOTIFY_CLIENT_SECRET") ?? "";
-const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const token = env("HA_TOKEN") ?? "";
-
+import { config } from "../../config.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
@@ -54,8 +49,8 @@ let accessToken: string | null = null;
 let tokenExpiry = 0;
 
 async function getEntity(entityId: string): Promise<{ state: string; attributes: Record<string, unknown> }> {
-  const res = await fetch(`${baseUrl}/api/states/${entityId}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(`${config.ha.baseUrl}/api/states/${entityId}`, {
+    headers: { Authorization: `Bearer ${config.ha.token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
@@ -116,7 +111,7 @@ async function getAccessToken(): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      Authorization: `Basic ${Buffer.from(`${config.spotify.clientId}:${config.spotify.clientSecret}`).toString("base64")}`,
     },
     body: "grant_type=client_credentials",
     signal: AbortSignal.timeout(5000),
@@ -132,9 +127,9 @@ async function getAccessToken(): Promise<string> {
 async function haService(service: string, data: Record<string, unknown>): Promise<void> {
   const [domain, action] = service.split(".");
   moduleLog().info({ tool: "spotify", service, data }, "Spotify HA service call");
-  const res = await fetch(`${baseUrl}/api/services/${domain}/${action}`, {
+  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${action}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${config.ha.token}`, "Content-Type": "application/json" },
     body: JSON.stringify(data),
     signal: AbortSignal.timeout(8000),
   });
@@ -150,7 +145,7 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}&market=FI`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${config.ha.token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify search failed: ${res.status}`);
@@ -235,7 +230,7 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album&limit=1&market=FI`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${config.ha.token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify albums fetch failed: ${res.status}`);

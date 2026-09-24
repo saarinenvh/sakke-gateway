@@ -1,14 +1,8 @@
-import { env } from "../../env.js";
+import { config } from "../../config.js";
 
-const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
-const token = env("HA_TOKEN") ?? "";
-
-const TASKS_TODO_ENTITY = env("TASKS_TODO") ?? "todo.sakke_tasks";
-const CALENDAR_ENTITIES: string[] = (env("CALENDAR_ENTITIES") ?? "").split(",").filter(Boolean);
-// TZ, not TIMEZONE: the compose file, .env and .env.example all set TZ, and
-// nothing ever set TIMEZONE - this only ever worked because the hardcoded
+// TZ, not config.timezone: the compose file, .env and .env.example all set TZ, and
+// nothing ever set config.timezone - this only ever worked because the hardcoded
 // fallback happened to be right.
-const TIMEZONE = env("TZ") ?? "Europe/Helsinki";
 
 interface CalendarEvent {
   summary: string;
@@ -23,8 +17,8 @@ interface TodoItem {
 }
 
 async function haGet(path: string): Promise<any> {
-  const res = await fetch(`${baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await fetch(`${config.ha.baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${config.ha.token}` },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
@@ -32,10 +26,10 @@ async function haGet(path: string): Promise<any> {
 }
 
 async function haPost(path: string, body: object): Promise<any> {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${config.ha.baseUrl}${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${config.ha.token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -58,12 +52,12 @@ async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date
 
 function getDateRange(period: string): { start: string; end: string } {
   const now = new Date();
-  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: TIMEZONE });
+  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: config.timezone });
 
   if (period === "tomorrow") {
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
-    const tomorrowStr = tomorrow.toLocaleDateString("sv-SE", { timeZone: TIMEZONE });
+    const tomorrowStr = tomorrow.toLocaleDateString("sv-SE", { timeZone: config.timezone });
     return { start: tomorrowStr, end: tomorrowStr };
   }
 
@@ -74,8 +68,8 @@ function getDateRange(period: string): { start: string; end: string } {
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     return {
-      start: monday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
-      end: sunday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+      start: monday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+      end: sunday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
     };
   }
 
@@ -86,8 +80,8 @@ function getDateRange(period: string): { start: string; end: string } {
     const nextSunday = new Date(nextMonday);
     nextSunday.setDate(nextMonday.getDate() + 6);
     return {
-      start: nextMonday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
-      end: nextSunday.toLocaleDateString("sv-SE", { timeZone: TIMEZONE }),
+      start: nextMonday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+      end: nextSunday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
     };
   }
 
@@ -96,10 +90,10 @@ function getDateRange(period: string): { start: string; end: string } {
 
 async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
   const data = await haPost("/api/services/todo/get_items?return_response=true", {
-    entity_id: TASKS_TODO_ENTITY,
+    entity_id: config.ha.tasksTodo,
   });
   const root = data?.service_response ?? data;
-  const items = (root[TASKS_TODO_ENTITY]?.items ?? []) as TodoItem[];
+  const items = (root[config.ha.tasksTodo]?.items ?? []) as TodoItem[];
   const { start, end } = getDateRange(period);
   // Compare the date portion only. start/end are date-only ("2026-09-24"), but
   // a due value carrying a time ("2026-09-24T10:00:00") is a longer string that
@@ -114,7 +108,7 @@ async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
 function formatEventTime(event: CalendarEvent): string {
   const dt = event.start.dateTime;
   if (!dt) return event.summary;
-  const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TIMEZONE });
+  const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone });
   return `${event.summary} at ${time}`;
 }
 
@@ -129,7 +123,7 @@ export async function getCalendarText(period = "today"): Promise<string> {
   const startDt = new Date(`${start}T00:00:00`);
   const endDt = new Date(`${end}T23:59:59`);
   const parts: string[] = [];
-  for (const calendarId of CALENDAR_ENTITIES) {
+  for (const calendarId of config.ha.calendarEntities) {
     const events = await getTodayEvents(calendarId, startDt, endDt);
     if (events.length > 0) {
       parts.push(...events.map(formatEventTime));
@@ -148,7 +142,7 @@ export async function getMorningGreeting(): Promise<string> {
     parts.push(`Tasks for today: ${taskList}`);
   }
 
-  for (const calendarId of CALENDAR_ENTITIES) {
+  for (const calendarId of config.ha.calendarEntities) {
     const events = await getTodayEvents(calendarId);
     if (events.length > 0) {
       const eventList = events.map(formatEventTime).join(", ");

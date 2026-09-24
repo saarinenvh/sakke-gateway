@@ -11,13 +11,11 @@ import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
 import { setManualOverride, clearManualOverride } from "../services/gpuStatus.js";
 import type { Intent } from "../types/intent.js";
-import { env } from "../env.js";
+import { config } from "../config.js";
 
-const WIKI_ROOT = "/wiki";
-
-const haBase = env("HA_BASE_URL") ?? "http://localhost:8123";
-const haToken = env("HA_TOKEN") ?? "";
-const haHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${haToken}` };
+function haHeadersNow(): Record<string, string> {
+  return { "Content-Type": "application/json", Authorization: `Bearer ${config.ha.token}` };
+}
 
 // Prefer deep links over bare package names - HA's androidtv_remote docs warn that
 // launching by application ID "doesn't work for many apps due to a Google Play Store
@@ -170,24 +168,24 @@ export async function executeTool(
     if (!pkg) return `Unknown app: ${app}`;
     log.info({ conversationId, tool: "open_tv_app", app, pkg }, "Tool call: open TV app");
     try {
-      const stateRes = await fetch(`${haBase}/api/states/remote.living_room_tv`, {
-        headers: { Authorization: `Bearer ${haToken}` },
+      const stateRes = await fetch(`${config.ha.baseUrl}/api/states/remote.living_room_tv`, {
+        headers: { Authorization: `Bearer ${config.ha.token}` },
       });
       if (!stateRes.ok) throw new Error(`HA API ${stateRes.status}`);
       const state = await stateRes.json() as { state: string };
 
       if (state.state !== "on") {
-        await fetch(`${haBase}/api/services/remote/turn_on`, {
+        await fetch(`${config.ha.baseUrl}/api/services/remote/turn_on`, {
           method: "POST",
-          headers: haHeaders,
+          headers: haHeadersNow(),
           body: JSON.stringify({ entity_id: "remote.living_room_tv" }),
         });
         await new Promise(r => setTimeout(r, 5000));
       }
 
-      const res = await fetch(`${haBase}/api/services/remote/turn_on`, {
+      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/turn_on`, {
         method: "POST",
-        headers: haHeaders,
+        headers: haHeadersNow(),
         body: JSON.stringify({ entity_id: "remote.living_room_tv", activity: pkg }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
@@ -205,9 +203,9 @@ export async function executeTool(
     if (!keycode) return `Unknown remote command: ${command}`;
     log.info({ conversationId, tool: "tv_remote_command", command, keycode }, "Tool call: TV remote command");
     try {
-      const res = await fetch(`${haBase}/api/services/remote/send_command`, {
+      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/send_command`, {
         method: "POST",
-        headers: haHeaders,
+        headers: haHeadersNow(),
         body: JSON.stringify({ entity_id: "remote.living_room_tv", command: keycode }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
@@ -233,9 +231,9 @@ export async function executeTool(
     const text = args.text as string;
     log.info({ conversationId, tool: "tv_send_text", text }, "Tool call: TV text input");
     try {
-      const res = await fetch(`${haBase}/api/services/remote/send_command`, {
+      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/send_command`, {
         method: "POST",
-        headers: haHeaders,
+        headers: haHeadersNow(),
         body: JSON.stringify({ entity_id: "remote.living_room_tv", command: `text:${text}` }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
@@ -251,8 +249,8 @@ export async function executeTool(
     const entityId = args.entity_id as string;
     log.info({ conversationId, tool: "get_device_state", entityId }, "Tool call: device state");
     try {
-      const res = await fetch(`${haBase}/api/states/${entityId}`, {
-        headers: { Authorization: `Bearer ${haToken}` },
+      const res = await fetch(`${config.ha.baseUrl}/api/states/${entityId}`, {
+        headers: { Authorization: `Bearer ${config.ha.token}` },
       });
       if (!res.ok) throw new Error(`HA API ${res.status}`);
       const state = await res.json() as { state: string; attributes: Record<string, unknown> };
@@ -267,9 +265,9 @@ export async function executeTool(
     const scriptId = args.script_id as string;
     log.info({ conversationId, tool: "run_routine", scriptId }, "Tool call: routine");
     try {
-      const res = await fetch(`${haBase}/api/services/script/turn_on`, {
+      const res = await fetch(`${config.ha.baseUrl}/api/services/script/turn_on`, {
         method: "POST",
-        headers: haHeaders,
+        headers: haHeadersNow(),
         body: JSON.stringify({ entity_id: `script.${scriptId}` }),
       });
       if (!res.ok) throw new Error(`HA API ${res.status}: ${await res.text()}`);
@@ -289,8 +287,8 @@ export async function executeTool(
     // of the mount. Resolve it and check where it actually landed rather than
     // trying to spot bad input, which is the same reason create_knowledge
     // below sanitises its filename.
-    const filePath = resolve(WIKI_ROOT, `${page}.md`);
-    if (filePath !== WIKI_ROOT && !filePath.startsWith(`${WIKI_ROOT}/`)) {
+    const filePath = resolve(config.wikiRoot, `${page}.md`);
+    if (filePath !== config.wikiRoot && !filePath.startsWith(`${config.wikiRoot}/`)) {
       log.warn({ conversationId, tool: "get_context", page, filePath }, "get_context path escapes the wiki root");
       return `No knowledge base page found for "${page}". Available pages are listed in the system prompt.`;
     }
@@ -306,7 +304,7 @@ export async function executeTool(
   if (name === "create_knowledge") {
     const filename = (args.filename as string).replace(/[^a-z0-9_-]/gi, "_");
     const content = args.content as string;
-    const docsDir = `${WIKI_ROOT}/sakke-knowledge`;
+    const docsDir = `${config.wikiRoot}/sakke-knowledge`;
     const filePath = `${docsDir}/${filename}.md`;
     const indexPath = `${docsDir}/sakke-index.md`;
     log.info({ conversationId, tool: "create_knowledge", filename }, "Tool call: create_knowledge");
@@ -387,7 +385,7 @@ export async function executeTool(
 
   if (name === "set_gaming_mode") {
     const mode = args.mode as string;
-    const pcOllamaUrl = env("PC_OLLAMA_BASE_URL");
+    const pcOllamaUrl = config.ollama.pc?.baseUrl;
     log.info({ conversationId, tool: "set_gaming_mode", mode }, "Tool call: set gaming mode");
     if (!pcOllamaUrl) return "GPU routing to your PC isn't configured, so there's nothing to override.";
 
