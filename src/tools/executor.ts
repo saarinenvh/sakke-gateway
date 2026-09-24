@@ -11,11 +11,12 @@ import { setTimer, cancelTimer, listTimers } from "../services/timers.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../services/ha/registry.js";
 import { setManualOverride, clearManualOverride } from "../services/gpuStatus.js";
 import type { Intent } from "../types/intent.js";
+import { env } from "../env.js";
 
 const WIKI_ROOT = "/wiki";
 
-const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const haToken = process.env.HA_TOKEN ?? "";
+const haBase = env("HA_BASE_URL") ?? "http://localhost:8123";
+const haToken = env("HA_TOKEN") ?? "";
 const haHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${haToken}` };
 
 // Prefer deep links over bare package names - HA's androidtv_remote docs warn that
@@ -386,7 +387,7 @@ export async function executeTool(
 
   if (name === "set_gaming_mode") {
     const mode = args.mode as string;
-    const pcOllamaUrl = process.env.PC_OLLAMA_BASE_URL;
+    const pcOllamaUrl = env("PC_OLLAMA_BASE_URL");
     log.info({ conversationId, tool: "set_gaming_mode", mode }, "Tool call: set gaming mode");
     if (!pcOllamaUrl) return "GPU routing to your PC isn't configured, so there's nothing to override.";
 

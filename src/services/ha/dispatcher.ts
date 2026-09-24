@@ -1,9 +1,10 @@
 import type { Intent } from "../../types/intent.js";
 import { getLights, getScenes, getAreas, resolveArea } from "./registry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
+import { env } from "../../env.js";
 
-const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const token = process.env.HA_TOKEN ?? "";
+const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const token = env("HA_TOKEN") ?? "";
 
 async function callService(domain: string, service: string, data: Record<string, unknown> = {}): Promise<void> {
   const res = await fetch(`${baseUrl}/api/services/${domain}/${service}`, {

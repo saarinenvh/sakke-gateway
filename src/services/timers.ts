@@ -2,10 +2,11 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { runAgent } from "./agent.js";
 import { moduleLog } from "./logger.js";
+import { env } from "../env.js";
 
-const haBase = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const haToken = process.env.HA_TOKEN ?? "";
-const satelliteEntityId = process.env.ASSIST_SATELLITE_ENTITY_ID ?? "assist_satellite.home_assistant_voice";
+const haBase = env("HA_BASE_URL") ?? "http://localhost:8123";
+const haToken = env("HA_TOKEN") ?? "";
+const satelliteEntityId = env("ASSIST_SATELLITE_ENTITY_ID") ?? "assist_satellite.home_assistant_voice";
 
 interface ActiveTimer {
   id: string;
@@ -22,7 +23,7 @@ const timers = new Map<string, ActiveTimer>();
 // startup. Best-effort throughout: if the state directory isn't writable the
 // timer still works for this process's lifetime, which is exactly the old
 // behaviour.
-const STATE_DIR = process.env.STATE_DIR ?? "/data";
+const STATE_DIR = env("STATE_DIR") ?? "/data";
 const TIMERS_FILE = join(STATE_DIR, "timers.json");
 
 interface PersistedTimer {

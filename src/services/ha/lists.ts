@@ -1,5 +1,7 @@
-const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const token = process.env.HA_TOKEN ?? "";
+import { env } from "../../env.js";
+
+const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const token = env("HA_TOKEN") ?? "";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },

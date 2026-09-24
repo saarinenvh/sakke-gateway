@@ -1,8 +1,9 @@
 import { moduleLog } from "../logger.js";
-const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
-const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
-const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const token = process.env.HA_TOKEN ?? "";
+import { env } from "../../env.js";
+const clientId = env("SPOTIFY_CLIENT_ID") ?? "";
+const clientSecret = env("SPOTIFY_CLIENT_SECRET") ?? "";
+const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const token = env("HA_TOKEN") ?? "";
 
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";

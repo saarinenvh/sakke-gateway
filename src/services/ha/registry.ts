@@ -1,5 +1,7 @@
-const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const token = process.env.HA_TOKEN ?? "";
+import { env } from "../../env.js";
+
+const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const token = env("HA_TOKEN") ?? "";
 
 export interface LightEntity {
   entity_id: string;
@@ -66,15 +68,6 @@ export async function loadEntities(): Promise<void> {
     !s.attributes?.entity_ids
   );
 
-  // Asks HA for the REAL area_id alongside the friendly name. These are not
-  // interchangeable: HA assigns area_id when the area is created and keeps it
-  // when the area is renamed, so deriving it by slugifying the current name
-  // (what this did before) is only correct until someone renames something.
-  // When they disagree, the service call targets an area that doesn't exist -
-  // and HA answers 200 with an empty result, so the failure arrives as Sakke
-  // cheerfully confirming an action that never happened.
-  // Pipe-separated because an area name may contain a colon; entity ids cannot
-  // contain either.
   // One template call returns the whole area registry plus each area's
   // entities, which replaces two separate guesses that were both wrong:
   //
@@ -86,6 +79,9 @@ export async function loadEntities(): Promise<void> {
   //   - the list of areas was inferred from whichever entities were lights, so
   //     an area containing only a switch or a media player didn't exist as far
   //     as Sakke was concerned.
+  //
+  // Pipe-separated because an area name may contain a colon; entity ids cannot
+  // contain either.
   const areaMap = new Map<string, { id: string; name: string }>();
   const areaTemplate = `{% for a in areas() %}{{ a }}|{{ area_name(a) }}|{{ area_entities(a) | join(',') }}
 {% endfor %}`;

@@ -2,11 +2,12 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { getLights } from "./registry.js";
 import { moduleLog } from "../logger.js";
+import { env } from "../../env.js";
 
-const openAiApiKey = process.env.OPENAI_API_KEY ?? "";
-const openAiModel = process.env.OPENAI_LIGHTING_MODEL ?? "gpt-4o";
-const haBaseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const haToken = process.env.HA_TOKEN ?? "";
+const openAiApiKey = env("OPENAI_API_KEY") ?? "";
+const openAiModel = env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o";
+const haBaseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const haToken = env("HA_TOKEN") ?? "";
 
 // Scene design is a big single completion, so more generous than the 5-8s used
 // for the quick HA/Spotify calls.

@@ -8,8 +8,9 @@ import { gpuStatusRoutes } from "./routes/gpuStatus.js";
 import { loadEntities } from "./services/ha/registry.js";
 import { setModuleLogger } from "./services/logger.js";
 import { restoreTimers } from "./services/timers.js";
+import { env } from "./env.js";
 
-const port = parseInt(process.env.PORT ?? "3100", 10);
+const port = parseInt(env("PORT") ?? "3100", 10);
 
 const SILENT_ROUTES = new Set(["/health", "/reminders/check", "/display/events", "/internal/gpu-status"]);
 

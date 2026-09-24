@@ -1,12 +1,14 @@
-const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
-const token = process.env.HA_TOKEN ?? "";
+import { env } from "../../env.js";
 
-const TASKS_TODO_ENTITY = process.env.TASKS_TODO ?? "todo.sakke_tasks";
-const CALENDAR_ENTITIES: string[] = (process.env.CALENDAR_ENTITIES ?? "").split(",").filter(Boolean);
+const baseUrl = env("HA_BASE_URL") ?? "http://localhost:8123";
+const token = env("HA_TOKEN") ?? "";
+
+const TASKS_TODO_ENTITY = env("TASKS_TODO") ?? "todo.sakke_tasks";
+const CALENDAR_ENTITIES: string[] = (env("CALENDAR_ENTITIES") ?? "").split(",").filter(Boolean);
 // TZ, not TIMEZONE: the compose file, .env and .env.example all set TZ, and
 // nothing ever set TIMEZONE - this only ever worked because the hardcoded
 // fallback happened to be right.
-const TIMEZONE = process.env.TZ ?? "Europe/Helsinki";
+const TIMEZONE = env("TZ") ?? "Europe/Helsinki";
 
 interface CalendarEvent {
   summary: string;

@@ -1,4 +1,6 @@
-const searxngUrl = process.env.SEARXNG_URL ?? "http://searxng:8080";
+import { env } from "../../env.js";
+
+const searxngUrl = env("SEARXNG_URL") ?? "http://searxng:8080";
 
 export async function webSearch(query: string): Promise<string> {
   const url = `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&language=en`;

@@ -1,5 +1,7 @@
-const lat = process.env.WEATHER_LAT ?? "60.1583";
-const lon = process.env.WEATHER_LON ?? "24.7339";
+import { env } from "../../env.js";
+
+const lat = env("WEATHER_LAT") ?? "60.1583";
+const lon = env("WEATHER_LON") ?? "24.7339";
 
 const WMO_CODES: Record<number, string> = {
   0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
