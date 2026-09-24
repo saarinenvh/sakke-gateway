@@ -15,6 +15,16 @@ interface OllamaTarget {
   keepAlive: string | undefined;
 }
 
+// A .env routinely carries blank entries ("OLLAMA_THINK="), and docker-compose
+// substitutes an unset variable as an empty string - both arrive here as "",
+// which is NOT the same as unset. Number("") is 0, so an empty OLLAMA_NUM_CTX
+// would silently mean a zero-length context; `?? fallback` never fires for ""
+// either, so an empty PC_OLLAMA_MODEL would override the model with nothing.
+function env(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value.trim() === "" ? undefined : value;
+}
+
 function parseThink(value: string | undefined): boolean | undefined {
   return value === "true" ? true : value === "false" ? false : undefined;
 }
@@ -30,24 +40,24 @@ function parseThink(value: string | undefined): boolean | undefined {
 // the KV cache, which differs a lot per GPU/model, so this stays
 // env-overridable per deployment rather than fixed.
 const serverTarget: OllamaTarget = {
-  baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
-  model: process.env.OLLAMA_MODEL ?? "qwen3:8b",
-  numCtx: Number(process.env.OLLAMA_NUM_CTX ?? "32768"),
-  think: parseThink(process.env.OLLAMA_THINK),
+  baseUrl: env("OLLAMA_BASE_URL") ?? "http://host.docker.internal:11434",
+  model: env("OLLAMA_MODEL") ?? "qwen3:8b",
+  numCtx: Number(env("OLLAMA_NUM_CTX") ?? "32768"),
+  think: parseThink(env("OLLAMA_THINK")),
   // Left unset (Ollama's own default keep-alive, normally 5min) unless
   // explicitly configured - the server is dedicated to Sakke, so there's no
   // reason to be eager about freeing its VRAM the way the PC target is.
-  keepAlive: process.env.OLLAMA_KEEP_ALIVE,
+  keepAlive: env("OLLAMA_KEEP_ALIVE"),
 };
 
 // Only defined if PC_OLLAMA_BASE_URL is actually set - otherwise routing
 // always falls back to the server, same as before Phase 3 existed.
-const pcTarget: OllamaTarget | null = process.env.PC_OLLAMA_BASE_URL
+const pcTarget: OllamaTarget | null = env("PC_OLLAMA_BASE_URL")
   ? {
-      baseUrl: process.env.PC_OLLAMA_BASE_URL,
-      model: process.env.PC_OLLAMA_MODEL ?? serverTarget.model,
-      numCtx: Number(process.env.PC_OLLAMA_NUM_CTX ?? "32768"),
-      think: parseThink(process.env.PC_OLLAMA_THINK),
+      baseUrl: env("PC_OLLAMA_BASE_URL")!,
+      model: env("PC_OLLAMA_MODEL") ?? serverTarget.model,
+      numCtx: Number(env("PC_OLLAMA_NUM_CTX") ?? "32768"),
+      think: parseThink(env("PC_OLLAMA_THINK")),
       // Left unset by default, same as the server target - a short default
       // here would force a cold reload on every single PC-routed request,
       // including consecutive ones seconds apart within the same
@@ -55,7 +65,7 @@ const pcTarget: OllamaTarget | null = process.env.PC_OLLAMA_BASE_URL
       // starting) is instead handled proactively by status-service.ps1 on
       // the PC itself, right at the moment it detects the GPU going busy -
       // see that script's Unload-OllamaModels function.
-      keepAlive: process.env.PC_OLLAMA_KEEP_ALIVE,
+      keepAlive: env("PC_OLLAMA_KEEP_ALIVE"),
     }
   : null;
 

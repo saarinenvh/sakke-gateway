@@ -22,7 +22,7 @@ export const tools = [
           scene: { type: "string", description: "Scene id for scene_activate" },
           scene_name: { type: "string", description: "Name for scene_create (saves current light state as a scene)" },
           scene_description: { type: "string", description: "REQUIRED for scene_design: describe the atmosphere or mood and the AI generates and applies a custom lighting scene. Use this when the user says 'design', 'create a scene for', 'make it look like', 'gaming den', etc." },
-          brightness: { type: "number", description: "0-255 for light_dim" },
+          brightness_pct: { type: "number", description: "Brightness percentage, 0-100, for light_dim. \"Dim the lights\" with no number given is about 30." },
           color: { type: "string", description: "Color name for light_color" },
           volume: { type: "number", description: "0-100 for media_volume" },
         },

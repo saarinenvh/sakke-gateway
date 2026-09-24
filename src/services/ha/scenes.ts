@@ -1,11 +1,16 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { getLights } from "./registry.js";
+import { moduleLog } from "../logger.js";
 
 const openAiApiKey = process.env.OPENAI_API_KEY ?? "";
 const openAiModel = process.env.OPENAI_LIGHTING_MODEL ?? "gpt-4o";
 const haBaseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
 const haToken = process.env.HA_TOKEN ?? "";
+
+// Scene design is a big single completion, so more generous than the 5-8s used
+// for the quick HA/Spotify calls.
+const SCENE_DESIGN_TIMEOUT_MS = 30000;
 
 export interface LightSetting {
   entity_id: string;
@@ -46,15 +51,18 @@ export async function designScene(description: string): Promise<ScenePlan> {
       ],
       ...(openAiModel.startsWith("o") ? {} : { temperature: 0.7 }),
     }),
+    // Every other outbound call in this service has a deadline; this one could
+    // hang the whole conversation turn waiting on OpenAI.
+    signal: AbortSignal.timeout(SCENE_DESIGN_TIMEOUT_MS),
   });
 
   if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}: ${await res.text()}`);
 
-  console.log(`🎨 OpenAI scene design call completed (model: ${openAiModel})`);
+  moduleLog().info({ model: openAiModel }, "OpenAI scene design call completed");
 
   const json = await res.json() as { choices?: { message?: { content?: string } }[] };
   const content = json?.choices?.[0]?.message?.content?.trim() ?? "";
-  console.log(`🎨 OpenAI scene response:\n${content}`);
+  moduleLog().debug({ response: content }, "OpenAI scene response");
 
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
 
@@ -71,7 +79,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
     try {
       await callHA("light", "turn_off", { entity_id: light.entity_id });
     } catch (err: any) {
-      console.error(`Failed to turn off ${light.entity_id}: ${err.message}`);
+      moduleLog().error({ entityId: light.entity_id, err: err.message }, "Failed to turn off light before applying scene");
     }
   }));
 
@@ -93,7 +101,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 
       await callHA("light", "turn_on", body);
     } catch (err: any) {
-      console.error(`Failed to apply light ${light.entity_id}: ${err.message}`);
+      moduleLog().error({ entityId: light.entity_id, err: err.message }, "Failed to apply light in scene");
     }
   }));
 }

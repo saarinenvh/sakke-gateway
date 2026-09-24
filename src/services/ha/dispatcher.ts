@@ -49,9 +49,14 @@ export async function dispatch(intent: Intent): Promise<string> {
       await callService("light", "turn_off", target);
       return reply(intent.area ? `Lights off in ${intent.area}.` : "Lights off.");
 
-    case "light_dim":
-      await callService("light", "turn_on", { ...target, brightness: intent.brightness ?? 128 });
-      return reply("Brightness set.");
+    case "light_dim": {
+      // Percent, not 0-255. The tool used to take HA's raw `brightness` scale,
+      // so a model asked to "dim to 50%" sent 50 and got 20% brightness - the
+      // one number a person is most likely to say was also the most wrong.
+      const pct = Math.max(0, Math.min(100, Math.round(intent.brightness_pct ?? 50)));
+      await callService("light", "turn_on", { ...target, brightness_pct: pct });
+      return reply(`Brightness set to ${pct}%.`);
+    }
 
     case "light_color":
       await callService("light", "turn_on", { ...target, color_name: intent.color });
@@ -106,12 +111,19 @@ export async function dispatch(intent: Intent): Promise<string> {
       return reply(`Volume set to ${intent.volume}%.`);
 
     case "switch_on":
-      await callService("homeassistant", "turn_on", { entity_id: intent.device });
-      return reply("Turned on.");
-
-    case "switch_off":
-      await callService("homeassistant", "turn_off", { entity_id: intent.device });
-      return reply("Turned off.");
+    case "switch_off": {
+      // These were the only actions using intent.device directly instead of
+      // the computed target, so an area-scoped switch command sent
+      // `entity_id: undefined` and quietly did nothing. Falling back to
+      // target's default (every light in the house) would be worse than
+      // doing nothing, so an unspecified switch is an error instead.
+      if (!intent.device && !intent.area) {
+        return "I need to know which switch - name the device or the area.";
+      }
+      const on = intent.action === "switch_on";
+      await callService("homeassistant", on ? "turn_on" : "turn_off", target);
+      return reply(on ? "Turned on." : "Turned off.");
+    }
 
     case "unknown":
     default:

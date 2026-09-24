@@ -17,7 +17,7 @@ export interface Intent {
   scene?: string;      // for scene_activate
   scene_name?: string;        // for scene_create (human-given name)
   scene_description?: string; // for scene_design (atmosphere description)
-  brightness?: number; // 0–255 for light_dim
+  brightness_pct?: number; // 0–100 percent for light_dim
   color?: string;      // color name for light_color
   volume?: number;     // 0–100 for media_volume
   raw: string;         // original command text

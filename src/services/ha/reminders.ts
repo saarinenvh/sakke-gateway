@@ -3,7 +3,10 @@ const token = process.env.HA_TOKEN ?? "";
 
 const TASKS_TODO_ENTITY = process.env.TASKS_TODO ?? "todo.sakke_tasks";
 const CALENDAR_ENTITIES: string[] = (process.env.CALENDAR_ENTITIES ?? "").split(",").filter(Boolean);
-const TIMEZONE = process.env.TIMEZONE ?? "Europe/Helsinki";
+// TZ, not TIMEZONE: the compose file, .env and .env.example all set TZ, and
+// nothing ever set TIMEZONE - this only ever worked because the hardcoded
+// fallback happened to be right.
+const TIMEZONE = process.env.TZ ?? "Europe/Helsinki";
 
 interface CalendarEvent {
   summary: string;

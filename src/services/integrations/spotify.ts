@@ -1,3 +1,4 @@
+import { moduleLog } from "../logger.js";
 const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
 const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
 const baseUrl = process.env.HA_BASE_URL ?? "http://localhost:8123";
@@ -57,11 +58,11 @@ async function getEntity(entityId: string): Promise<{ state: string; attributes:
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
-    console.error(`[spotify] getEntity ${entityId} FAILED: ${res.status}`);
+    moduleLog().error({ tool: "spotify" }, `getEntity ${entityId} FAILED: ${res.status}`);
     throw new Error(`HA API ${res.status}`);
   }
   const data = await res.json() as { state: string; attributes: Record<string, unknown> };
-  console.log(`[spotify] getEntity ${entityId} state=${data.state} source_list=${JSON.stringify(data.attributes.source_list ?? [])}`);
+  moduleLog().info({ tool: "spotify" }, `getEntity ${entityId} state=${data.state} source_list=${JSON.stringify(data.attributes.source_list ?? [])}`);
   return data;
 }
 
@@ -77,18 +78,18 @@ async function getState(entityId: string): Promise<string> {
 async function ensureActiveDevice(): Promise<void> {
   const spotifyState = await getState(SPOTIFY_ENTITY);
   if (spotifyState === "playing") {
-    console.log("[spotify] ensureActiveDevice: already playing, skipping TV wake");
+    moduleLog().info({ tool: "spotify" }, "ensureActiveDevice: already playing, skipping TV wake");
     return;
   }
 
   const tvState = await getState(TV_REMOTE_ENTITY);
   if (tvState !== "on") {
-    console.log("[spotify] ensureActiveDevice: TV not on, turning on and waiting 5s");
+    moduleLog().info({ tool: "spotify" }, "ensureActiveDevice: TV not on, turning on and waiting 5s");
     await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY });
     await new Promise(r => setTimeout(r, 5000));
   }
 
-  console.log("[spotify] ensureActiveDevice: opening Spotify on TV");
+  moduleLog().info({ tool: "spotify" }, "ensureActiveDevice: opening Spotify on TV");
   await haService("remote.turn_on", { entity_id: TV_REMOTE_ENTITY, activity: "spotify://" });
 
   // The app being open isn't enough - Spotify needs to register the TV as a
@@ -99,12 +100,12 @@ async function ensureActiveDevice(): Promise<void> {
     const { attributes } = await getEntity(SPOTIFY_ENTITY);
     const sourceList = (attributes.source_list as string[] | undefined) ?? [];
     if (sourceList.includes(SPOTIFY_TV_SOURCE)) {
-      console.log(`[spotify] ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" available, selecting it`);
+      moduleLog().info({ tool: "spotify" }, `ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" available, selecting it`);
       await haService("media_player.select_source", { entity_id: SPOTIFY_ENTITY, source: SPOTIFY_TV_SOURCE });
       return;
     }
   }
-  console.warn(`[spotify] ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" never appeared in source_list, proceeding anyway`);
+  moduleLog().warn({ tool: "spotify" }, `ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" never appeared in source_list, proceeding anyway`);
 }
 
 async function getAccessToken(): Promise<string> {
@@ -129,7 +130,7 @@ async function getAccessToken(): Promise<string> {
 
 async function haService(service: string, data: Record<string, unknown>): Promise<void> {
   const [domain, action] = service.split(".");
-  console.log(`[spotify] haService ${service}`, JSON.stringify(data));
+  moduleLog().info({ tool: "spotify", service, data }, "Spotify HA service call");
   const res = await fetch(`${baseUrl}/api/services/${domain}/${action}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -138,10 +139,10 @@ async function haService(service: string, data: Record<string, unknown>): Promis
   });
   if (!res.ok) {
     const body = await res.text();
-    console.error(`[spotify] haService ${service} FAILED: ${res.status} ${body}`);
+    moduleLog().error({ tool: "spotify" }, `haService ${service} FAILED: ${res.status} ${body}`);
     throw new Error(`HA ${res.status}: ${body}`);
   }
-  console.log(`[spotify] haService ${service} OK`);
+  moduleLog().info({ tool: "spotify" }, `haService ${service} OK`);
 }
 
 async function spotifySearchMultiple(query: string, type: "track" | "artist" | "playlist" | "album", limit: number, offset: number): Promise<{ uri: string; name: string; artist?: string; id?: string }[]> {
@@ -244,7 +245,7 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
 }
 
 export async function spotifyPlay(uri?: string, type?: "track" | "artist" | "playlist" | "album"): Promise<string> {
-  console.log(`[spotify] spotifyPlay uri=${uri ?? "(none)"} type=${type ?? "(none)"}`);
+  moduleLog().info({ tool: "spotify" }, `spotifyPlay uri=${uri ?? "(none)"} type=${type ?? "(none)"}`);
   await ensureActiveDevice();
   const data: Record<string, unknown> = { entity_id: SPOTIFY_ENTITY };
   if (uri) {

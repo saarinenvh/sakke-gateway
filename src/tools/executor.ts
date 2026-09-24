@@ -335,9 +335,12 @@ export async function executeTool(
       if (!duration_minutes || duration_minutes <= 0) return "Duration is required to set a timer.";
       const mins = Math.round(duration_minutes);
       const timerLabel = label ?? "timer";
-      setTimer(mins * 60 * 1000, timerLabel);
+      // The id is what `timer cancel` and `timer list` identify a timer by, and
+      // it used to be discarded here - so it was never something the user could
+      // have known.
+      const timerId = setTimer(mins * 60 * 1000, timerLabel);
       const human = mins === 1 ? "1 minute" : `${mins} minutes`;
-      return `Timer set for ${human}. Label: ${timerLabel}.`;
+      return `Timer set for ${human}. Label: ${timerLabel}. ID: ${timerId}.`;
     }
 
     if (action === "cancel") {

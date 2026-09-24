@@ -6,6 +6,8 @@ import { reminderRoutes } from "./routes/reminders.js";
 import { displayRoutes } from "./routes/display.js";
 import { gpuStatusRoutes } from "./routes/gpuStatus.js";
 import { loadEntities } from "./services/ha/registry.js";
+import { setModuleLogger } from "./services/logger.js";
+import { restoreTimers } from "./services/timers.js";
 
 const port = parseInt(process.env.PORT ?? "3100", 10);
 
@@ -27,7 +29,9 @@ const app = Fastify({
 });
 
 app.addHook("onResponse", async (request, reply) => {
-  if (SILENT_ROUTES.has(request.url)) return;
+  // request.url carries the query string, so "/display/events?foo=1" never
+  // matched and logged on every reconnect.
+  if (SILENT_ROUTES.has(request.url.split("?")[0])) return;
   app.log.info(`${request.method} ${request.url} ${reply.statusCode} (${Math.round(reply.elapsedTime)}ms)`);
 });
 
@@ -39,22 +43,23 @@ app.register(gpuStatusRoutes);
 
 app.get("/health", async () => ({ ok: true }));
 
-loadEntities()
-  .then(() => {
-    app.log.info("HA entities loaded");
-    app.listen({ port, host: "0.0.0.0" }, (err) => {
-      if (err) {
-        app.log.error(err);
-        process.exit(1);
-      }
-    });
-  })
-  .catch((err) => {
-    app.log.error({ err }, "Failed to load HA entities, starting anyway");
-    app.listen({ port, host: "0.0.0.0" }, (err) => {
-      if (err) {
-        app.log.error(err);
-        process.exit(1);
-      }
-    });
+// Modules without a request logger (scenes.ts, spotify.ts) log through this.
+setModuleLogger(app.log);
+
+function listen(): void {
+  app.listen({ port, host: "0.0.0.0" }, (err) => {
+    if (err) {
+      app.log.error(err);
+      process.exit(1);
+    }
   });
+}
+
+// Starts either way - a dead HA at boot shouldn't stop the gateway coming up,
+// and refresh_home_data can reload the registry once it's back.
+void restoreTimers();
+
+loadEntities()
+  .then(() => app.log.info("HA entities loaded"))
+  .catch((err) => app.log.error({ err }, "Failed to load HA entities, starting anyway"))
+  .finally(listen);
