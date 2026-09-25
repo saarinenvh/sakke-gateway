@@ -1,5 +1,6 @@
 import { runAgent } from "../agent/agent.js";
 import { config } from "../config.js";
+import { callService } from "../integrations/homeAssistant/client.js";
 import { moduleLog } from "../logger.js";
 
 // The "what to say when a timer finishes" half of the timer feature, kept out
@@ -27,16 +28,10 @@ export async function announceFinishedTimer(label: string): Promise<void> {
     silentLog,
   );
 
-  const res = await fetch(`${config.ha.baseUrl}/api/services/assist_satellite/announce`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.ha.token}`,
-    },
-    body: JSON.stringify({ entity_id: config.ha.satelliteEntityId, message: content }),
-    signal: AbortSignal.timeout(15000),
-  });
+  // Longer than the default: the satellite has to actually speak the line.
+  await callService("assist_satellite", "announce",
+    { entity_id: config.ha.satelliteEntityId, message: content },
+    { timeoutMs: 15_000 });
 
-  if (!res.ok) throw new Error(`HA announce ${res.status}: ${await res.text()}`);
   moduleLog().info({ label }, "Timer announced");
 }

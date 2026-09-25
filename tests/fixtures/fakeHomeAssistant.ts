@@ -25,6 +25,10 @@ export interface FakeHomeAssistant {
   failAfter(calls: number): void;
   /** Service calls made so far, e.g. "add_item:milk". */
   calls(): string[];
+  /** Every service call as {domain, service, data}, for non-todo domains too. */
+  serviceCalls(): { domain: string; service: string; data: Record<string, unknown> }[];
+  /** State for a single entity, returned by GET /api/states/<id>. */
+  setState(entityId: string, state: string, attributes?: Record<string, unknown>): void;
   close(): Promise<void>;
 }
 
@@ -33,6 +37,8 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
   let callCount = 0;
   let failThreshold = Infinity;
   const callLog: string[] = [];
+  const services: { domain: string; service: string; data: Record<string, unknown> }[] = [];
+  const states = new Map<string, { state: string; attributes: Record<string, unknown> }>();
 
   const server = http.createServer((req, res) => {
     let raw = "";
@@ -44,11 +50,26 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
         res.end(JSON.stringify(payload));
       };
 
+      // A single entity, e.g. /api/states/remote.living_room_tv
+      const singleState = url.match(/^\/api\/states\/(.+)$/);
+      if (singleState) {
+        const entityId = decodeURIComponent(singleState[1]);
+        const known = states.get(entityId);
+        if (!known) {
+          res.writeHead(404);
+          return res.end("Entity not found.");
+        }
+        return json({ entity_id: entityId, ...known });
+      }
+
       if (url.startsWith("/api/states")) {
-        return json([...lists.keys()].map(entity_id => ({
-          entity_id,
-          attributes: { friendly_name: entity_id.replace("todo.", "") },
-        })));
+        return json([
+          ...[...lists.keys()].map(entity_id => ({
+            entity_id,
+            attributes: { friendly_name: entity_id.replace("todo.", "") },
+          })),
+          ...[...states.entries()].map(([entity_id, s]) => ({ entity_id, ...s })),
+        ]);
       }
 
       const body = raw ? JSON.parse(raw) : {};
@@ -65,6 +86,11 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
       if (callCount > failThreshold) {
         res.writeHead(500);
         return res.end("fake HA: injected failure");
+      }
+
+      const service = url.match(/^\/api\/services\/([^/]+)\/([^/?]+)/);
+      if (service) {
+        services.push({ domain: service[1], service: service[2], data: body });
       }
 
       if (url.endsWith("/add_item")) {
@@ -100,8 +126,11 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
       callCount = 0;
       failThreshold = Infinity;
       callLog.length = 0;
+      services.length = 0;
     },
     items: entityId => lists.get(entityId) ?? [],
+    serviceCalls: () => services,
+    setState: (entityId, state, attributes = {}) => states.set(entityId, { state, attributes }),
     failAfter: calls => { failThreshold = calls; },
     calls: () => callLog,
     close: () => new Promise<void>(resolve => server.close(() => resolve())),

@@ -1,22 +1,11 @@
 import type { Intent } from "./intent.js";
 import { getLights, getScenes, getAreas, resolveArea } from "../integrations/homeAssistant/registry.js";
 import { designScene, applyScene, saveCurrentStateAsScene } from "../scenes/scenes.js";
-import { config } from "../config.js";
+import { callService as haCallService } from "../integrations/homeAssistant/client.js";
 
+// Thin wrapper so the switch below reads unchanged.
 async function callService(domain: string, service: string, data: Record<string, unknown> = {}): Promise<void> {
-  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${service}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.ha.token}`,
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HA API ${res.status}: ${body}`);
-  }
+  await haCallService(domain, service, data);
 }
 
 export async function dispatch(intent: Intent): Promise<string> {

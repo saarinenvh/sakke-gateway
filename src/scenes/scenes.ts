@@ -3,6 +3,7 @@ import { join } from "path";
 import { getLights } from "../integrations/homeAssistant/registry.js";
 import { moduleLog } from "../logger.js";
 import { config } from "../config.js";
+import { getAllStates, callService, haPost } from "../integrations/homeAssistant/client.js";
 
 // Scene design is a big single completion, so more generous than the 5-8s used
 // for the quick HA/Spotify calls.
@@ -118,7 +119,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
   // Step 1: turn off all known lights first, then apply scene — avoids race conditions with group entities
   await Promise.all(getLights().map(async (light) => {
     try {
-      await callHA("light", "turn_off", { entity_id: light.entity_id });
+      await callService("light", "turn_off", { entity_id: light.entity_id });
     } catch (err: any) {
       moduleLog().error({ entityId: light.entity_id, err: err.message }, "Failed to turn off light before applying scene");
     }
@@ -128,7 +129,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
   await Promise.all(plan.lights.map(async (light) => {
     try {
       if (light.value !== undefined) {
-        await callHA("number", "set_value", { entity_id: light.entity_id, value: light.value });
+        await callService("number", "set_value", { entity_id: light.entity_id, value: light.value });
         return;
       }
 
@@ -140,7 +141,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
       if (light.color && !isWhite) body.rgb_color = light.color;
       if (light.effect) body.effect = light.effect;
 
-      await callHA("light", "turn_on", body);
+      await callService("light", "turn_on", body);
     } catch (err: any) {
       moduleLog().error({ entityId: light.entity_id, err: err.message }, "Failed to apply light in scene");
     }
@@ -150,11 +151,7 @@ export async function applyScene(plan: ScenePlan): Promise<void> {
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
   const sceneId = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
-  const res = await fetch(`${config.ha.baseUrl}/api/states`, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
-  });
-  if (!res.ok) throw new Error(`HA API ${res.status}`);
-  const states: any[] = await res.json();
+  const states = await getAllStates() as any[];
 
   const entities: Record<string, any> = {};
   for (const state of states) {
@@ -181,34 +178,7 @@ export async function saveCurrentStateAsScene(name: string, entityIds: string[])
     entities[state.entity_id] = entry;
   }
 
-  const configRes = await fetch(`${config.ha.baseUrl}/api/config/scene/config/${sceneId}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.ha.token}`,
-    },
-    body: JSON.stringify({ id: sceneId, name, entities }),
-  });
-
-  if (!configRes.ok) {
-    const body = await configRes.text();
-    throw new Error(`HA config API ${configRes.status}: ${body}`);
-  }
+  await haPost(`/api/config/scene/config/${sceneId}`, { id: sceneId, name, entities });
 
   return `scene.${sceneId}`;
-}
-
-async function callHA(domain: string, service: string, data: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${service}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.ha.token}`,
-    },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`HA API ${res.status}: ${body}`);
-  }
 }

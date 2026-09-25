@@ -1,5 +1,6 @@
 import { moduleLog } from "../logger.js";
 import { config } from "../config.js";
+import { getState as haGetState, callService } from "../integrations/homeAssistant/client.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
@@ -49,15 +50,7 @@ let accessToken: string | null = null;
 let tokenExpiry = 0;
 
 async function getEntity(entityId: string): Promise<{ state: string; attributes: Record<string, unknown> }> {
-  const res = await fetch(`${config.ha.baseUrl}/api/states/${entityId}`, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) {
-    moduleLog().error({ tool: "spotify" }, `getEntity ${entityId} FAILED: ${res.status}`);
-    throw new Error(`HA API ${res.status}`);
-  }
-  const data = await res.json() as { state: string; attributes: Record<string, unknown> };
+  const data = await haGetState(entityId, { timeoutMs: 5000 });
   moduleLog().info({ tool: "spotify" }, `getEntity ${entityId} state=${data.state} source_list=${JSON.stringify(data.attributes.source_list ?? [])}`);
   return data;
 }
@@ -127,16 +120,11 @@ async function getAccessToken(): Promise<string> {
 async function haService(service: string, data: Record<string, unknown>): Promise<void> {
   const [domain, action] = service.split(".");
   moduleLog().info({ tool: "spotify", service, data }, "Spotify HA service call");
-  const res = await fetch(`${config.ha.baseUrl}/api/services/${domain}/${action}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${config.ha.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    moduleLog().error({ tool: "spotify" }, `haService ${service} FAILED: ${res.status} ${body}`);
-    throw new Error(`HA ${res.status}: ${body}`);
+  try {
+    await callService(domain, action, data, { timeoutMs: 8000 });
+  } catch (err: any) {
+    moduleLog().error({ tool: "spotify", err: err.message }, `haService ${service} failed`);
+    throw err;
   }
   moduleLog().info({ tool: "spotify" }, `haService ${service} OK`);
 }

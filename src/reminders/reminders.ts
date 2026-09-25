@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { haGet, callServiceWithResponse } from "../integrations/homeAssistant/client.js";
 
 // TZ, not config.timezone: the compose file, .env and .env.example all set TZ, and
 // nothing ever set config.timezone - this only ever worked because the hardcoded
@@ -16,38 +17,14 @@ interface TodoItem {
   due?: string;
 }
 
-async function haGet(path: string): Promise<any> {
-  const res = await fetch(`${config.ha.baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
-  return res.json();
-}
-
-async function haPost(path: string, body: object): Promise<any> {
-  const res = await fetch(`${config.ha.baseUrl}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.ha.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
-  return res.json();
-}
-
 async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date): Promise<CalendarEvent[]> {
   const now = new Date();
   const s = start ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const e = end ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-  const events = await haGet(
+  return haGet<CalendarEvent[]>(
     `/api/calendars/${calendarEntityId}?start=${s.toISOString()}&end=${e.toISOString()}`
   );
-  return events as CalendarEvent[];
 }
 
 // Compares the date portion only. start/end are date-only ("2026-09-25"), but a
@@ -100,11 +77,9 @@ export function getDateRange(period: string): { start: string; end: string } {
 }
 
 async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
-  const data = await haPost("/api/services/todo/get_items?return_response=true", {
-    entity_id: config.ha.tasksTodo,
-  });
-  const root = data?.service_response ?? data;
-  const items = (root[config.ha.tasksTodo]?.items ?? []) as TodoItem[];
+  const response = await callServiceWithResponse<Record<string, { items?: TodoItem[] }>>(
+    "todo", "get_items", { entity_id: config.ha.tasksTodo });
+  const items = response?.[config.ha.tasksTodo]?.items ?? [];
   const { start, end } = getDateRange(period);
   return items.filter(i => i.status !== "completed" && isDueInRange(i.due, start, end));
 }

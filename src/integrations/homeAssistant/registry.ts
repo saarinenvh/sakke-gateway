@@ -1,4 +1,4 @@
-import { config } from "../../config.js";
+import { getAllStates, renderTemplate } from "./client.js";
 
 export interface LightEntity {
   entity_id: string;
@@ -35,29 +35,8 @@ let areasCache: AreaInfo[] = [];
 let scenesCache: SceneEntity[] = [];
 let scriptsCache: ScriptEntity[] = [];
 
-async function haGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${config.ha.baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
-  });
-  if (!res.ok) throw new Error(`HA API ${res.status} at ${path}`);
-  return res.json() as Promise<T>;
-}
-
-async function haTemplate(template: string): Promise<string> {
-  const res = await fetch(`${config.ha.baseUrl}/api/template`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.ha.token}`,
-    },
-    body: JSON.stringify({ template }),
-  });
-  if (!res.ok) throw new Error(`HA template API ${res.status}`);
-  return res.text();
-}
-
 export async function loadEntities(): Promise<void> {
-  const states = await haGet<any[]>("/api/states");
+  const states = await getAllStates() as any[];
 
   const lightStates = states.filter((s: any) =>
     s.entity_id.startsWith("light.") &&
@@ -85,7 +64,7 @@ export async function loadEntities(): Promise<void> {
 
   const byId = new Map<string, AreaInfo>();
   try {
-    const areaResult = await haTemplate(areaTemplate);
+    const areaResult = await renderTemplate(areaTemplate);
     for (const line of areaResult.split("\n")) {
       const [areaId, areaName, entityIds] = line.split("|");
       if (!areaId?.trim() || !areaName?.trim()) continue;
@@ -110,7 +89,7 @@ export async function loadEntities(): Promise<void> {
       .map(s => `${s.entity_id}|{{ area_name('${s.entity_id}') or '' }}|{{ area_id('${s.entity_id}') or '' }}`)
       .join("\n");
     try {
-      const result = await haTemplate(perEntityTemplate);
+      const result = await renderTemplate(perEntityTemplate);
       for (const line of result.split("\n")) {
         const [entityId, areaName, areaId] = line.split("|");
         if (!entityId?.trim() || !areaName?.trim()) continue;

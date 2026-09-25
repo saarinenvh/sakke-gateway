@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { callService, callServiceWithResponse, getAllStates } from "../integrations/homeAssistant/client.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },
@@ -34,24 +34,10 @@ interface TodoItem {
   description?: string;
 }
 
-async function haPost(path: string, body: object): Promise<any> {
-  const res = await fetch(`${config.ha.baseUrl}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.ha.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new Error(`HA ${res.status}: ${await res.text()}`);
-  return res.json();
-}
-
 async function getItems(entityId: string): Promise<TodoItem[]> {
-  const data = await haPost(`/api/services/todo/get_items?return_response=true`, { entity_id: entityId });
-  const root = data?.service_response ?? data;
-  return (root[entityId]?.items ?? []) as TodoItem[];
+  const response = await callServiceWithResponse<Record<string, { items?: TodoItem[] }>>(
+    "todo", "get_items", { entity_id: entityId });
+  return response?.[entityId]?.items ?? [];
 }
 
 function findItem(items: TodoItem[], query: string): TodoItem | undefined {
@@ -102,7 +88,7 @@ async function restoreItemFields(entityId: string, item: TodoItem | undefined): 
   if (Object.keys(fields).length === 0) return;
 
   try {
-    await haPost("/api/services/todo/update_item", { entity_id: entityId, item: item.summary, ...fields });
+    await callService("todo", "update_item", { entity_id: entityId, item: item.summary, ...fields });
   } catch {
     // Not every todo integration supports every field (Google Tasks and
     // local_todo differ), and a rejected optional field must not take the
@@ -116,23 +102,18 @@ async function reorderList(entityId: string, items: TodoItem[], current: string[
 
   const bySummary = new Map(items.map(i => [i.summary, i]));
   for (const summary of moves) {
-    await haPost("/api/services/todo/remove_item", { entity_id: entityId, item: summary });
-    await haPost("/api/services/todo/add_item", { entity_id: entityId, item: summary });
+    await callService("todo", "remove_item", { entity_id: entityId, item: summary });
+    await callService("todo", "add_item", { entity_id: entityId, item: summary });
     await restoreItemFields(entityId, bySummary.get(summary));
   }
   return moves.length;
 }
 
 export async function getTodoLists(): Promise<{ entity_id: string; name: string }[]> {
-  const res = await fetch(`${config.ha.baseUrl}/api/states`, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) return [];
-  const states = await res.json() as { entity_id: string; attributes: { friendly_name?: string } }[];
+  const states = await getAllStates({ timeoutMs: 5000 });
   return states
     .filter(s => s.entity_id.startsWith("todo."))
-    .map(s => ({ entity_id: s.entity_id, name: s.attributes.friendly_name ?? s.entity_id }));
+    .map(s => ({ entity_id: s.entity_id, name: (s.attributes.friendly_name as string) ?? s.entity_id }));
 }
 
 export async function sortList(entityId: string): Promise<string> {
@@ -171,7 +152,7 @@ export async function addToList(entityId: string, newItems: string[]): Promise<s
 
   // Add first, so the new items exist even if the reorder below fails partway.
   for (const item of toAdd) {
-    await haPost("/api/services/todo/add_item", { entity_id: entityId, item });
+    await callService("todo", "add_item", { entity_id: entityId, item });
   }
 
   // New items land at the end of the list; only re-sort if that isn't already
@@ -192,7 +173,7 @@ export async function completeInList(entityId: string, itemQuery: string): Promi
   const items = await getItems(entityId);
   const match = findItem(items.filter(i => i.status === "needs_action"), itemQuery);
   if (!match) return `Couldn't find "${itemQuery}" in the list.`;
-  await haPost("/api/services/todo/update_item", { entity_id: entityId, item: match.summary, status: "completed" });
+  await callService("todo", "update_item", { entity_id: entityId, item: match.summary, status: "completed" });
   return `Marked "${match.summary}" as done.`;
 }
 
@@ -200,6 +181,6 @@ export async function removeFromList(entityId: string, itemQuery: string): Promi
   const items = await getItems(entityId);
   const match = findItem(items, itemQuery);
   if (!match) return `Couldn't find "${itemQuery}" in the list.`;
-  await haPost("/api/services/todo/remove_item", { entity_id: entityId, item: match.summary });
+  await callService("todo", "remove_item", { entity_id: entityId, item: match.summary });
   return `Removed "${match.summary}".`;
 }

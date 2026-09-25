@@ -12,10 +12,7 @@ import { loadEntities, getAreas, getScenes, getScripts } from "../integrations/h
 import { setManualOverride, clearManualOverride } from "../gpu/gpuStatus.js";
 import type { Intent } from "../homeControl/intent.js";
 import { config } from "../config.js";
-
-function haHeadersNow(): Record<string, string> {
-  return { "Content-Type": "application/json", Authorization: `Bearer ${config.ha.token}` };
-}
+import { getState, callService } from "../integrations/homeAssistant/client.js";
 
 // Prefer deep links over bare package names - HA's androidtv_remote docs warn that
 // launching by application ID "doesn't work for many apps due to a Google Play Store
@@ -168,27 +165,14 @@ export async function executeTool(
     if (!pkg) return `Unknown app: ${app}`;
     log.info({ conversationId, tool: "open_tv_app", app, pkg }, "Tool call: open TV app");
     try {
-      const stateRes = await fetch(`${config.ha.baseUrl}/api/states/remote.living_room_tv`, {
-        headers: { Authorization: `Bearer ${config.ha.token}` },
-      });
-      if (!stateRes.ok) throw new Error(`HA API ${stateRes.status}`);
-      const state = await stateRes.json() as { state: string };
+      const state = await getState("remote.living_room_tv");
 
       if (state.state !== "on") {
-        await fetch(`${config.ha.baseUrl}/api/services/remote/turn_on`, {
-          method: "POST",
-          headers: haHeadersNow(),
-          body: JSON.stringify({ entity_id: "remote.living_room_tv" }),
-        });
+        await callService("remote", "turn_on", { entity_id: "remote.living_room_tv" });
         await new Promise(r => setTimeout(r, 5000));
       }
 
-      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/turn_on`, {
-        method: "POST",
-        headers: haHeadersNow(),
-        body: JSON.stringify({ entity_id: "remote.living_room_tv", activity: pkg }),
-      });
-      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      await callService("remote", "turn_on", { entity_id: "remote.living_room_tv", activity: pkg });
       log.info({ conversationId, tool: "open_tv_app", app }, "Open TV app result");
       return `Opened ${app} on the TV.`;
     } catch (err: any) {
@@ -203,12 +187,7 @@ export async function executeTool(
     if (!keycode) return `Unknown remote command: ${command}`;
     log.info({ conversationId, tool: "tv_remote_command", command, keycode }, "Tool call: TV remote command");
     try {
-      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/send_command`, {
-        method: "POST",
-        headers: haHeadersNow(),
-        body: JSON.stringify({ entity_id: "remote.living_room_tv", command: keycode }),
-      });
-      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      await callService("remote", "send_command", { entity_id: "remote.living_room_tv", command: keycode });
       // Ambiguous phrasing here (e.g. "Sent home to the TV") reads as a normal
       // English sentence and has confused the model into asking the user to
       // clarify their own tool result - use unambiguous, command-specific text.
@@ -231,12 +210,7 @@ export async function executeTool(
     const text = args.text as string;
     log.info({ conversationId, tool: "tv_send_text", text }, "Tool call: TV text input");
     try {
-      const res = await fetch(`${config.ha.baseUrl}/api/services/remote/send_command`, {
-        method: "POST",
-        headers: haHeadersNow(),
-        body: JSON.stringify({ entity_id: "remote.living_room_tv", command: `text:${text}` }),
-      });
-      if (!res.ok) throw new Error(`HA API ${res.status}`);
+      await callService("remote", "send_command", { entity_id: "remote.living_room_tv", command: `text:${text}` });
       log.info({ conversationId, tool: "tv_send_text" }, "TV text input result");
       return `Typed "${text}" on the TV.`;
     } catch (err: any) {
@@ -249,11 +223,7 @@ export async function executeTool(
     const entityId = args.entity_id as string;
     log.info({ conversationId, tool: "get_device_state", entityId }, "Tool call: device state");
     try {
-      const res = await fetch(`${config.ha.baseUrl}/api/states/${entityId}`, {
-        headers: { Authorization: `Bearer ${config.ha.token}` },
-      });
-      if (!res.ok) throw new Error(`HA API ${res.status}`);
-      const state = await res.json() as { state: string; attributes: Record<string, unknown> };
+      const state = await getState(entityId);
       return JSON.stringify({ state: state.state, attributes: state.attributes });
     } catch (err: any) {
       log.error({ conversationId, tool: "get_device_state", entityId, err: err.message }, "Device state error");
@@ -265,12 +235,7 @@ export async function executeTool(
     const scriptId = args.script_id as string;
     log.info({ conversationId, tool: "run_routine", scriptId }, "Tool call: routine");
     try {
-      const res = await fetch(`${config.ha.baseUrl}/api/services/script/turn_on`, {
-        method: "POST",
-        headers: haHeadersNow(),
-        body: JSON.stringify({ entity_id: `script.${scriptId}` }),
-      });
-      if (!res.ok) throw new Error(`HA API ${res.status}: ${await res.text()}`);
+      await callService("script", "turn_on", { entity_id: `script.${scriptId}` });
       log.info({ conversationId, tool: "run_routine", scriptId }, "Routine triggered");
       return `Routine "${scriptId}" started.`;
     } catch (err: any) {
