@@ -32,7 +32,12 @@ export interface ScenePlan {
 // The designer briefing is NOT wiki content and deliberately stays in the repo -
 // "think like a lighting designer", the JSON output shape, the WiZ effect-speed
 // semantics. That's behaviour, and changing it is a code change.
-const WIKI_LIGHTING_DIR = "home";
+// Its own folder, deliberately not under home/ and deliberately NOT listed in
+// the vault's index.md. index.md is injected into the voice agent's system
+// prompt as its get_context menu; these two files are read straight off disk by
+// the scene designer and are 12KB the agent has no use for. Obsidian shows them
+// in the file tree regardless.
+const WIKI_LIGHTING_DIR = "lighting-designer";
 
 function readLightingDoc(name: string, log: (source: string) => void): string {
   const wikiPath = join(config.wikiRoot, WIKI_LIGHTING_DIR, name);

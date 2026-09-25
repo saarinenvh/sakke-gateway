@@ -5,14 +5,15 @@ export function homeControlPrompt(): string {
   const scenes = getScenes().map(s => `  - ${s.name} (${s.scene_id})`).join("\n");
   const scripts = getScripts().map(s => `  - ${s.name} (${s.script_id})`).join("\n") || "  (none defined)";
 
-  // The device list below is a deliberate hot-path cache of the wiki's
-  // home/devices page, not an oversight. Home Assistant is the authority for
-  // what exists and the wiki page repeats it, but both are only reachable via a
-  // tool call - and inlining the handful of devices used constantly turns "turn
-  // off the TV" into one round trip instead of two. The cost is that it has to
-  // be kept in step by hand: the wiki has already drifted once, still listing a
-  // Spotify search_and_play capability that was removed from the code.
-  return `Home control: use control_home_assistant. If a light or device name is unfamiliar, call get_context("home/lighting") or get_context("home/devices") to look it up, then act on the original request — never summarise the context back at the user. Skip get_context if you already know the entity ID. If a scene, area or routine isn't listed below, or the user asks you to refresh what you know about the house, call refresh_home_data before claiming it doesn't exist.
+  // The device list below is now the ONLY description of these devices - the
+  // wiki's home/devices page was deleted, because it was a hand-maintained copy
+  // of entities Home Assistant already knows, and it had drifted (it still
+  // advertised a Spotify search_and_play capability removed from the code).
+  // Inlining the handful of devices used constantly also means "turn off the
+  // TV" costs no extra round trip. The eventual replacement for the hand-kept
+  // part is a lookup_entity tool over the live registry - see REFACTOR_PLAN.md
+  // section 5.
+  return `Home control: use control_home_assistant. If a LIGHT name is unfamiliar, call get_context("home/lighting") to map it to an entity ID, then act on the original request — never summarise the context back at the user. Skip get_context if you already know the entity ID. If a scene, area or routine isn't listed below, or the user asks you to refresh what you know about the house, call refresh_home_data before claiming it doesn't exist.
 
 Devices:
 - "TV" with no room means the living room TV. Never ask which one.
