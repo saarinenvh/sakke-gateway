@@ -1,48 +1,12 @@
 import "dotenv/config";
-import Fastify from "fastify";
-import { sceneRoutes } from "./scenes/route.js";
-import { conversationRoutes } from "./agent/route.js";
-import { reminderRoutes } from "./reminders/route.js";
-import { displayRoutes } from "./display/route.js";
-import { gpuStatusRoutes } from "./gpu/route.js";
+import { buildApp } from "./app.js";
 import { loadEntities } from "./integrations/homeAssistant/registry.js";
 import { setModuleLogger } from "./logger.js";
 import { restoreTimers, setTimerHandler } from "./timers/timers.js";
 import { announceFinishedTimer } from "./timers/timerAnnouncer.js";
 import { config } from "./config.js";
 
-
-const SILENT_ROUTES = new Set(["/health", "/reminders/check", "/display/events", "/internal/gpu-status"]);
-
-const app = Fastify({
-  logger: {
-    transport: {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        translateTime: "HH:MM:ss",
-        ignore: "pid,hostname,reqId",
-      },
-    },
-  },
-  disableRequestLogging: true,
-  genReqId: () => Math.random().toString(36).slice(2, 6),
-});
-
-app.addHook("onResponse", async (request, reply) => {
-  // request.url carries the query string, so "/display/events?foo=1" never
-  // matched and logged on every reconnect.
-  if (SILENT_ROUTES.has(request.url.split("?")[0])) return;
-  app.log.info(`${request.method} ${request.url} ${reply.statusCode} (${Math.round(reply.elapsedTime)}ms)`);
-});
-
-app.register(sceneRoutes);
-app.register(conversationRoutes);
-app.register(reminderRoutes);
-app.register(displayRoutes);
-app.register(gpuStatusRoutes);
-
-app.get("/health", async () => ({ ok: true }));
+const app = buildApp();
 
 // Modules without a request logger (scenes.ts, spotify.ts) log through this.
 setModuleLogger(app.log);
@@ -67,10 +31,10 @@ function listen(): void {
   });
 }
 
-// Starts either way - a dead HA at boot shouldn't stop the gateway coming up,
-// and refresh_home_data can reload the registry once it's back.
 void restoreTimers();
 
+// Starts either way - a dead HA at boot shouldn't stop the gateway coming up,
+// and refresh_home_data can reload the registry once it's back.
 loadEntities()
   .then(() => app.log.info("HA entities loaded"))
   .catch((err) => app.log.error({ err }, "Failed to load HA entities, starting anyway"))
