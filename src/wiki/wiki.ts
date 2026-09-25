@@ -1,5 +1,5 @@
-import { promises as fs } from "fs";
-import { resolve } from "path";
+import { promises as fs, readFileSync } from "fs";
+import { join, resolve } from "path";
 import { config } from "../config.js";
 
 export type PageResult =
@@ -39,4 +39,35 @@ export async function saveNote(rawFilename: string, content: string): Promise<Sa
   await fs.writeFile(path, content);
   if (isNew) await fs.appendFile(`${docsDir}/sakke-index.md`, `- [[sakke-knowledge/${filename}]]\n`);
   return { filename, isNew };
+}
+
+// Strips Obsidian's --- frontmatter block so it doesn't arrive as noise in a
+// model's context. Left in the source files since it's useful to a human
+// browsing the vault.
+export function stripFrontmatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const end = content.indexOf("\n---", 3);
+  return end === -1 ? content : content.slice(end + 4).trimStart();
+}
+
+// Reads a doc from the mounted wiki, falling back to a bundled repo copy when
+// no wiki is mounted (e.g. the dev machine) or the file doesn't exist there.
+// filename is always a caller-chosen constant, not model input, so unlike
+// readPage above there's no path-traversal surface to guard against.
+export function readWikiDocWithFallback(
+  wikiSubdir: string,
+  filename: string,
+  bundledDir: string,
+  log: (source: string) => void,
+): string {
+  const wikiPath = join(config.wikiRoot, wikiSubdir, filename);
+  try {
+    const content = readFileSync(wikiPath, "utf-8");
+    log(wikiPath);
+    return stripFrontmatter(content);
+  } catch {
+    const bundledPath = join(bundledDir, filename);
+    log(`${bundledPath} (bundled fallback - no wiki copy)`);
+    return stripFrontmatter(readFileSync(bundledPath, "utf-8"));
+  }
 }

@@ -77,8 +77,14 @@ export async function dispatch(intent: Intent): Promise<string> {
     case "scene_design": {
       const description = intent.scene_description ?? intent.raw;
       const plan = await designScene(description);
-      await applyScene(plan);
-      return reply(`Scene "${plan.name}" applied.`);
+      const result = await applyScene(plan);
+
+      // A pre-canned intent.response would confidently confirm success even
+      // on partial/total failure - bypass reply() for those cases rather than
+      // letting the model's own guess override what actually happened.
+      if (result.allSucceeded) return reply(`Scene "${plan.name}" applied.`);
+      if (result.anySucceeded) return `Scene "${plan.name}" only partially applied - some lights didn't respond.`;
+      return `Couldn't apply the "${plan.name}" scene - none of the lights responded.`;
     }
 
     case "media_play":

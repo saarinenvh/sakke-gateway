@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { designScene, applyScene, saveCurrentStateAsScene } from "./scenes.js";
+import { designScene, applyScene, saveCurrentStateAsScene, InvalidScenePlanError } from "./scenes.js";
 import { getLights } from "../integrations/homeAssistant/registry.js";
 
 interface SceneBody {
@@ -27,14 +27,30 @@ export async function sceneRoutes(app: FastifyInstance): Promise<void> {
   }, async (request, reply) => {
     const { description, apply = false } = request.body;
 
-    const plan = await designScene(description);
+    let plan;
+    try {
+      plan = await designScene(description);
+    } catch (err) {
+      if (err instanceof InvalidScenePlanError) {
+        return reply.code(400).send({ ok: false, error: "invalid scene plan", issues: err.issues });
+      }
+      throw err;
+    }
     app.log.info({ plan }, "Scene designed");
 
-    if (apply) {
-      await applyScene(plan);
+    if (!apply) {
+      return reply.send({ ok: true, plan, applied: false });
     }
 
-    return reply.send({ ok: true, plan, applied: apply });
+    const result = await applyScene(plan);
+    return reply.send({
+      ok: result.allSucceeded,
+      plan,
+      applied: true,
+      all_succeeded: result.allSucceeded,
+      any_succeeded: result.anySucceeded,
+      outcomes: result.outcomes,
+    });
   });
 
   app.post<{ Body: SaveSceneBody }>("/scene/save", {
