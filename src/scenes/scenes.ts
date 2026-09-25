@@ -39,16 +39,27 @@ export interface ScenePlan {
 // in the file tree regardless.
 const WIKI_LIGHTING_DIR = "lighting-designer";
 
+// Obsidian frontmatter is bookkeeping for the vault - id, summary, which file
+// shadows which. The whole document is sent to GPT-4o, so left in place it
+// would arrive as several hundred bytes of instructions-shaped noise at the top
+// of the lighting brief. Stripped here rather than left out of the files,
+// because the metadata is genuinely useful to a human opening the vault.
+function stripFrontmatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const end = content.indexOf("\n---", 3);
+  return end === -1 ? content : content.slice(end + 4).trimStart();
+}
+
 function readLightingDoc(name: string, log: (source: string) => void): string {
   const wikiPath = join(config.wikiRoot, WIKI_LIGHTING_DIR, name);
   try {
     const content = readFileSync(wikiPath, "utf-8");
     log(wikiPath);
-    return content;
+    return stripFrontmatter(content);
   } catch {
     const bundled = join(__dirname, "prompts", name);
     log(`${bundled} (bundled fallback - no wiki copy)`);
-    return readFileSync(bundled, "utf-8");
+    return stripFrontmatter(readFileSync(bundled, "utf-8"));
   }
 }
 
