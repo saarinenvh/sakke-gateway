@@ -137,7 +137,7 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}&market=FI`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
+    headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify search failed: ${res.status}`);
@@ -224,7 +224,7 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album&limit=1&market=FI`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${config.ha.token}` },
+    headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify albums fetch failed: ${res.status}`);
