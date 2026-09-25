@@ -18,7 +18,7 @@ const STORE_LAYOUT = [
 
 export const STORE_LAYOUT_SECTIONS = STORE_LAYOUT.map(s => s.section);
 
-function categorizeItem(name: string): number {
+export function categorizeItem(name: string): number {
   const lower = name.toLowerCase();
   for (let i = 0; i < STORE_LAYOUT.length; i++) {
     if (STORE_LAYOUT[i].keywords.some(kw => lower.includes(kw))) return i;
@@ -78,7 +78,7 @@ function findItem(items: TodoItem[], query: string): TodoItem | undefined {
 //
 // Common cases cost nothing at all: a list that's already sorted, or a new item
 // whose section sorts last, produce zero moves.
-function itemsToMove(current: string[], target: string[]): string[] {
+export function itemsToMove(current: string[], target: string[]): string[] {
   let kept = 0;
   for (const summary of current) {
     if (kept < target.length && target[kept] === summary) kept++;

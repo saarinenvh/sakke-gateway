@@ -23,7 +23,13 @@ export async function getWeather(): Promise<string> {
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
 
-  const data = await res.json() as any;
+  return formatWeather(await res.json());
+}
+
+// Split from getWeather so the mapping and the guards can be exercised without
+// a network call - and because "fetch" and "turn it into something speakable"
+// are separate jobs.
+export function formatWeather(data: any): string {
   const c = data.current;
   const hourly = data.hourly;
 

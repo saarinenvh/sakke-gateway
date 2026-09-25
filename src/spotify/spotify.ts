@@ -35,7 +35,7 @@ const FILLER_WORDS = /\b(playlist|song|track|please|the)\b/g;
 // and filler words the model tacks on (e.g. "metal playlist" for "metal") by
 // stripping them before comparing, with a short edit-distance allowed on top,
 // scaled down for short names to avoid false-positive matches on short/generic words.
-function findPersonalPlaylist(query: string): string | null {
+export function findPersonalPlaylist(query: string): string | null {
   const normalized = query.trim().toLowerCase().replace(FILLER_WORDS, "").replace(/\s+/g, " ").trim();
   if (PERSONAL_PLAYLISTS[normalized]) return PERSONAL_PLAYLISTS[normalized];
   for (const [name, uri] of Object.entries(PERSONAL_PLAYLISTS)) {
