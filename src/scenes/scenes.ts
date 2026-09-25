@@ -44,7 +44,7 @@ const WIKI_LIGHTING_DIR = "lighting-designer";
 // would arrive as several hundred bytes of instructions-shaped noise at the top
 // of the lighting brief. Stripped here rather than left out of the files,
 // because the metadata is genuinely useful to a human opening the vault.
-function stripFrontmatter(content: string): string {
+export function stripFrontmatter(content: string): string {
   if (!content.startsWith("---")) return content;
   const end = content.indexOf("\n---", 3);
   return end === -1 ? content : content.slice(end + 4).trimStart();
