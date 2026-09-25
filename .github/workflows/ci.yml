@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the Dockerfile, so CI can't pass on a runtime the image
+          # doesn't use.
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check
+        # Covers the tests too: the main tsconfig includes them, and only
+        # tsconfig.build.json leaves them out.
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        # Not redundant with the type-check - the build also copies the prompt
+        # markdown that tsc doesn't emit, and that copy has broken before.
+        run: npm run build
+
+  image:
+    # The artifact that actually gets deployed. Type-checking and tests both
+    # pass against source that the image could still fail to produce.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build -t ci-check .
