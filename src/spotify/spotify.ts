@@ -130,6 +130,10 @@ async function haService(service: string, data: Record<string, unknown>): Promis
 }
 
 async function spotifySearchMultiple(query: string, type: "track" | "artist" | "playlist" | "album", limit: number, offset: number): Promise<{ uri: string; name: string; artist?: string; id?: string }[]> {
+  // Known bug, left in place on purpose: Trello "Spotify sends the Home
+  // Assistant token instead of its own". Fix uses this token below instead
+  // of config.ha.token.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}&market=FI`;
   const res = await fetch(url, {
@@ -215,6 +219,8 @@ async function playResolved(choice: SuggestionItem, type: "track" | "artist" | "
 // Client Credentials flow as of Spotify's Feb 2026 API changes. Get Artist's
 // Albums remains a proper, active endpoint - use it instead.
 async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name: string } | null> {
+  // Same known bug as spotifySearchMultiple above.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album&limit=1&market=FI`;
   const res = await fetch(url, {
