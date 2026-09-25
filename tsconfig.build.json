@@ -1,8 +1,13 @@
 {
-  // Build-only. The main tsconfig deliberately includes *.test.ts so that
-  // `tsc --noEmit` type-checks the tests too; this one keeps them out of dist,
-  // and so out of the Docker image, where they would sit alongside a vitest
-  // import that `npm prune --omit=dev` has already removed.
+  // Build-only. The main tsconfig covers src/ and tests/ without a rootDir so
+  // it can type-check both; this one narrows to src/, restores rootDir so dist/
+  // isn't nested under a src/ folder, and drops the test files - they would
+  // otherwise ship in the Docker image next to a vitest import that
+  // `npm prune --omit=dev` has already removed.
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
