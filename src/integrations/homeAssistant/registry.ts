@@ -28,12 +28,18 @@ export interface ScriptEntity {
   script_id: string;
 }
 
+export interface NumberEntity {
+  entity_id: string;
+  name: string;
+}
+
 let lightsCache: LightEntity[] = [];
 let switchesCache: SwitchEntity[] = [];
 let allSwitchesCache: SwitchEntity[] = [];
 let areasCache: AreaInfo[] = [];
 let scenesCache: SceneEntity[] = [];
 let scriptsCache: ScriptEntity[] = [];
+let numberEntitiesCache: NumberEntity[] = [];
 
 export async function loadEntities(): Promise<void> {
   const states = await getAllStates() as any[];
@@ -141,6 +147,13 @@ export async function loadEntities(): Promise<void> {
       name: s.attributes?.friendly_name ?? s.entity_id,
       script_id: s.entity_id.replace("script.", ""),
     }));
+
+  numberEntitiesCache = states
+    .filter((s: any) => s.entity_id.startsWith("number."))
+    .map((s: any) => ({
+      entity_id: s.entity_id,
+      name: s.attributes?.friendly_name ?? s.entity_id,
+    }));
 }
 
 export function getLights(): LightEntity[] {
@@ -165,6 +178,10 @@ export function getScenes(): SceneEntity[] {
 
 export function getScripts(): ScriptEntity[] {
   return scriptsCache;
+}
+
+export function getNumberEntities(): NumberEntity[] {
+  return numberEntitiesCache;
 }
 
 // Matches whatever the model supplied against the real area registry - it is
