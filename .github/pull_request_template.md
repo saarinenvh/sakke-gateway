@@ -2,6 +2,13 @@
 
 <!-- What changed, and why. Link the finding/design doc it comes from if relevant. -->
 
+## Testing instructions
+
+<!-- Steps for testing this for real once it's deployed: what to do, and what
+     a failure would look like or what to watch for. Leave empty only when
+     there is genuinely nothing to test - a doc-only or comment-only change,
+     for example. -->
+
 ## Trello
 
 <!-- e.g. https://trello.com/c/xxxxxxxx -->
