@@ -69,6 +69,10 @@ export interface Config {
     tasksTodo: string;
     calendarEntities: string[];
   };
+  // How long to wait after waking the living room TV before sending it an app
+  // to launch. Five seconds was tuned against one particular TV; it is
+  // configuration, not a constant, and tests set it to zero.
+  tvWakeMs: number;
   spotify: { clientId: string; clientSecret: string };
   openai: { apiKey: string; lightingModel: string };
   search: { searxngUrl: string };
@@ -146,6 +150,7 @@ function loadConfig(): Config {
       tasksTodo: env("TASKS_TODO") ?? "todo.sakke_tasks",
       calendarEntities: (env("CALENDAR_ENTITIES") ?? "").split(",").map(s => s.trim()).filter(Boolean),
     },
+    tvWakeMs: num("TV_WAKE_MS", 5000),
     spotify: {
       clientId: env("SPOTIFY_CLIENT_ID") ?? "",
       clientSecret: env("SPOTIFY_CLIENT_SECRET") ?? "",

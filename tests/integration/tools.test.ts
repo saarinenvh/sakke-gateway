@@ -16,6 +16,8 @@ beforeAll(async () => {
   ha = await startFakeHomeAssistant();
   process.env.HA_BASE_URL = ha.url;
   process.env.HA_TOKEN = "test-token";
+  // No point sitting through a real TV's boot time.
+  process.env.TV_WAKE_MS = "0";
   reloadConfig();
 });
 
@@ -23,6 +25,7 @@ afterAll(async () => {
   await ha.close();
   delete process.env.HA_BASE_URL;
   delete process.env.HA_TOKEN;
+  delete process.env.TV_WAKE_MS;
   reloadConfig();
 });
 
@@ -70,7 +73,7 @@ describe("open_tv_app", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].data).not.toHaveProperty("activity");   // the wake
     expect(calls[1].data).toHaveProperty("activity");       // then the launch
-  }, 10_000);   // the wake path sleeps 5s for the TV to come up
+  });
 
   it("refuses an app it doesn't know, without calling Home Assistant", async () => {
     ha.setState("remote.living_room_tv", "on");

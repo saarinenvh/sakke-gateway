@@ -169,7 +169,7 @@ export async function executeTool(
 
       if (state.state !== "on") {
         await callService("remote", "turn_on", { entity_id: "remote.living_room_tv" });
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, config.tvWakeMs));
       }
 
       await callService("remote", "turn_on", { entity_id: "remote.living_room_tv", activity: pkg });
