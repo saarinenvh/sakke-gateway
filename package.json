@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "fastify": "^5.3.3",
+    "fastify": "^5.12.5",
     "js-logger": "^1.6.1",
     "js-yaml": "^4.1.0",
     "pino-pretty": "^13.1.3"
