@@ -1,12 +1,14 @@
 {
   "name": "sakke-gateway",
   "version": "0.1.0",
-  "description": "AI Gateway — parses natural language commands and dispatches to Home Assistant",
+  "description": "AI Gateway \u2014 parses natural language commands and dispatches to Home Assistant",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && find src -name '*.md' -exec sh -c 'for f; do d=\"dist/${f#src/}\"; mkdir -p \"$(dirname \"$d\")\"; cp \"$f\" \"$d\"; done' _ {} +",
+    "build": "tsc -p tsconfig.build.json && find src -name '*.md' -exec sh -c 'for f; do d=\"dist/${f#src/}\"; mkdir -p \"$(dirname \"$d\")\"; cp \"$f\" \"$d\"; done' _ {} +",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -19,6 +21,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.11"
   }
 }
