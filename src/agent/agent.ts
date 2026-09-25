@@ -1,6 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { tools } from "../tools/definitions.js";
-import { executeTool } from "../tools/executor.js";
+import { tools, executeTool } from "../tools/registry.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
 import { broadcastState } from "../display/displayState.js";
 import { classifyFollowUp } from "./continuationCheck.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
-import { executeTool } from "../../src/tools/executor.js";
+import { executeTool } from "../../src/tools/registry.js";
 import { reloadConfig } from "../../src/config.js";
 
 // The tool layer's Home Assistant paths - TV control, device state, routines.
@@ -40,7 +40,8 @@ describe("get_device_state", () => {
 
   it("reports an error for an unknown entity rather than throwing", async () => {
     const result = await run("get_device_state", { entity_id: "light.does_not_exist" });
-    expect(result).toContain("Error fetching state");
+    expect(result).toContain("get_device_state failed");
+    expect(result).toContain("404");
   });
 });
 
@@ -122,10 +123,25 @@ describe("error handling", () => {
     // take down the whole turn instead of giving the model something to react to.
     ha.failAfter(0);
     const result = await run("run_routine", { script_id: "good_night" });
-    expect(result).toContain("Routine failed");
+    // The registry wraps every tool, so the message names the tool that failed
+    // and carries the cause. It used to be 17 hand-written prefixes, several of
+    // which said only "failed" and left the model nothing to work with.
+    expect(result).toContain("run_routine failed");
+    expect(result).toContain("injected failure");
   });
 
   it("names an unknown tool instead of failing silently", async () => {
     expect(await run("teleport")).toContain("Unknown tool");
+  });
+});
+
+describe("registry", () => {
+  it("offers every tool it can execute, and can execute every tool it offers", async () => {
+    // The old split between definitions.ts and executor.ts let these drift: a
+    // schema with no branch (the model calls it, nothing happens) or a branch
+    // with no schema (dead code) were both silently possible.
+    const { tools, toolNames } = await import("../../src/tools/registry.js");
+    expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
+    expect(tools).toHaveLength(17);
   });
 });
