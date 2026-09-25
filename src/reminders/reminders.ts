@@ -50,7 +50,18 @@ async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date
   return events as CalendarEvent[];
 }
 
-function getDateRange(period: string): { start: string; end: string } {
+// Compares the date portion only. start/end are date-only ("2026-09-25"), but a
+// due value carrying a time ("2026-09-25T10:00:00") is a longer string that
+// sorts AFTER the plain date - so a plain `due <= end` was false for anything
+// due at a specific time today, and it vanished from the briefing rather than
+// being reported late. An undated task always counts.
+export function isDueInRange(due: string | undefined, start: string, end: string): boolean {
+  if (!due) return true;
+  const day = due.slice(0, 10);
+  return day >= start && day <= end;
+}
+
+export function getDateRange(period: string): { start: string; end: string } {
   const now = new Date();
   const todayStr = now.toLocaleDateString("sv-SE", { timeZone: config.timezone });
 
@@ -95,14 +106,7 @@ async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
   const root = data?.service_response ?? data;
   const items = (root[config.ha.tasksTodo]?.items ?? []) as TodoItem[];
   const { start, end } = getDateRange(period);
-  // Compare the date portion only. start/end are date-only ("2026-09-24"), but
-  // a due value carrying a time ("2026-09-24T10:00:00") is a longer string that
-  // sorts AFTER the plain date, so `due <= end` was false for anything due at a
-  // specific time today - silently dropped from the briefing rather than
-  // reported late.
-  return items.filter(i =>
-    i.status !== "completed" && (!i.due || (i.due.slice(0, 10) >= start && i.due.slice(0, 10) <= end))
-  );
+  return items.filter(i => i.status !== "completed" && isDueInRange(i.due, start, end));
 }
 
 function formatEventTime(event: CalendarEvent): string {

@@ -194,9 +194,15 @@ export function getScripts(): ScriptEntity[] {
 // rather than guessing, so callers can fail loudly instead of sending HA an
 // area that doesn't exist.
 export function resolveArea(query: string): AreaInfo | undefined {
+  return matchArea(query, areasCache);
+}
+
+// Split out from resolveArea so the matching rules can be tested without
+// standing up a Home Assistant to populate the cache.
+export function matchArea(query: string, areas: AreaInfo[]): AreaInfo | undefined {
   const q = query.trim().toLowerCase();
   const slug = q.replace(/\s+/g, "_");
-  return areasCache.find(a =>
+  return areas.find(a =>
     a.area_id.toLowerCase() === q ||
     a.area_id.toLowerCase() === slug ||
     a.name.toLowerCase() === q
