@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # Minor/patch bumps are grouped into one weekly PR so they don't repeat the
+  # 12-stale-PR situation sakariheitaja had. A major bump is excluded from the
+  # group on purpose - that's a real decision, not something to wave through
+  # in a batch.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 10
+
+  # Keeps the CI workflow's own actions (checkout, setup-node) current -
+  # otherwise a pinned action version is the one thing in this repo nothing
+  # ever prompts you to look at.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
