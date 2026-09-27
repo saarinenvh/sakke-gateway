@@ -29,6 +29,7 @@ export interface FakeHomeAssistant {
   serviceCalls(): { domain: string; service: string; data: Record<string, unknown> }[];
   /** State for a single entity, returned by GET /api/states/<id>. */
   setState(entityId: string, state: string, attributes?: Record<string, unknown>): void;
+  removeState(entityId: string): void;
   close(): Promise<void>;
 }
 
@@ -64,12 +65,21 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
 
       if (url.startsWith("/api/states")) {
         return json([
-          ...[...lists.keys()].map(entity_id => ({
+          // Real HA gives a todo list's item count as its state.
+          ...[...lists.entries()].map(([entity_id, items]) => ({
             entity_id,
+            state: String(items.filter(i => i.status === "needs_action").length),
             attributes: { friendly_name: entity_id.replace("todo.", "") },
           })),
           ...[...states.entries()].map(([entity_id, s]) => ({ entity_id, ...s })),
         ]);
+      }
+
+      // Template rendering (the area registry): an empty render, which the
+      // registry treats as "no areas" - not a todo call.
+      if (url.startsWith("/api/template")) {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        return res.end("");
       }
 
       const body = raw ? JSON.parse(raw) : {};
@@ -111,7 +121,9 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
         }
       }
 
-      lists.set(entity, items);
+      // Only todo services touch a list; any other service call (vacuum.start,
+      // light.turn_on) would otherwise invent a phantom list for its entity.
+      if (url.startsWith("/api/services/todo/")) lists.set(entity, items);
       json({});
     });
   });
@@ -131,6 +143,7 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
     items: entityId => lists.get(entityId) ?? [],
     serviceCalls: () => services,
     setState: (entityId, state, attributes = {}) => states.set(entityId, { state, attributes }),
+    removeState: entityId => { states.delete(entityId); },
     failAfter: calls => { failThreshold = calls; },
     calls: () => callLog,
     close: () => new Promise<void>(resolve => server.close(() => resolve())),
