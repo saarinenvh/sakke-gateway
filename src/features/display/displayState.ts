@@ -1,4 +1,8 @@
-export type SakkeState = "idle" | "listening" | "thinking" | "speaking";
+import { z } from "zod";
+
+export const sakkeStateSchema = z.enum(["idle", "listening", "thinking", "speaking"]);
+
+export type SakkeState = z.output<typeof sakkeStateSchema>;
 
 let currentState: SakkeState = "idle";
 const clients = new Set<(data: string) => void>();

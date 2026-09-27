@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
 import { ollamaChat, OllamaError } from "../integrations/ollama/client.js";
+import { ValidationError } from "../util/validation.js";
 
 // Deliberately independent of OLLAMA_BASE_URL/OLLAMA_MODEL (the main agent's
 // config) rather than falling back to them - once GPU routing sends the main
@@ -85,9 +86,9 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     // classifier is an outage, not an ambiguous utterance - it silences every
     // follow-up for as long as it lasts, so it gets logged as an error rather
     // than a warning that blends into the noise.
-    if (err instanceof OllamaError && err.kind === "http") {
+    if (err instanceof OllamaError) {
       log.error({ model, baseUrl, status: err.status, err: err.message }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
-    } else if (err instanceof OllamaError && err.kind === "invalid_response") {
+    } else if (err instanceof ValidationError) {
       log.error({ model, baseUrl, err: err.message }, "Continuation check got an invalid response - follow-ups will be ignored until this is fixed");
     } else {
       log.error(

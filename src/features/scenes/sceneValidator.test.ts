@@ -123,6 +123,38 @@ describe("validateScenePlan", () => {
     expect(issues).toEqual([{ path: "lights[0].state", message: 'must be "on" or "off"' }]);
   });
 
+  it("reports every invalid entry and field in one pass, not just the first", () => {
+    const raw = {
+      name: "x",
+      description: "y",
+      lights: [
+        { entity_id: "light.hallucinated_lamp" },
+        { entity_id: "light.hue_infuse_ceiling_1", brightness: 300, state: "blinking" },
+        "not an entry",
+      ],
+    };
+    const issues = issuesOf(() => validateScenePlan(raw, KNOWN_LIGHTS, KNOWN_NUMBER_ENTITIES));
+    expect(issues).toEqual([
+      { path: "lights[0].entity_id", message: 'unknown light entity: "light.hallucinated_lamp"' },
+      { path: "lights[1].state", message: 'must be "on" or "off"' },
+      { path: "lights[1].brightness", message: "must be a number between 0 and 255" },
+      { path: "lights[2]", message: "must be an object" },
+    ]);
+  });
+
+  it("accepts its own output again - applyScene re-validates an already-validated plan", () => {
+    const raw = {
+      name: "Party",
+      description: "Fast effects.",
+      lights: [
+        { entity_id: "light.hue_infuse_ceiling_1", brightness: 120 },
+        { entity_id: "number.wiz_lamp_effect_speed", value: 60 },
+      ],
+    };
+    const plan = validateScenePlan(raw, KNOWN_LIGHTS, KNOWN_NUMBER_ENTITIES);
+    expect(validateScenePlan(plan, KNOWN_LIGHTS, KNOWN_NUMBER_ENTITIES)).toEqual(plan);
+  });
+
   it("rejects the same entity id appearing twice - concurrent commands would race for the final state", () => {
     const raw = {
       name: "x",

@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { registerSSEClient, broadcastState, getCurrentState } from "./displayState.js";
+import { z } from "zod";
+import { registerSSEClient, broadcastState, getCurrentState, sakkeStateSchema } from "./displayState.js";
+
+const stateChangeSchema = z.object({ state: sakkeStateSchema });
 
 const HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -246,13 +249,11 @@ export async function displayRoutes(app: FastifyInstance): Promise<void> {
 
   // HA automation calls this when voice pipeline state changes
   app.post("/display/state", async (req, reply) => {
-    const { state } = req.body as { state: string };
-    const valid = ["idle", "listening", "thinking", "speaking"];
-    if (valid.includes(state)) {
-      broadcastState(state as any);
-      return { ok: true };
-    }
-    return reply.code(400).send({ error: "invalid state" });
+    const change = stateChangeSchema.safeParse(req.body);
+    if (!change.success) return reply.code(400).send({ error: "invalid state" });
+
+    broadcastState(change.data.state);
+    return { ok: true };
   });
 
   app.get("/display/state", async () => ({ state: getCurrentState() }));

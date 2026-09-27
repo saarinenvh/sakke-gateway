@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { applyScene, type ScenePlan } from "./scenes.js";
-import { callService } from "../../integrations/homeAssistant/client.js";
+import { applyScene, saveCurrentStateAsScene, type ScenePlan } from "./scenes.js";
+import { callService, getAllStates, haPost } from "../../integrations/homeAssistant/client.js";
 import { getLights, getNumberEntities } from "../../integrations/homeAssistant/registry.js";
+import { ValidationError } from "../../util/validation.js";
 
-vi.mock("../../integrations/homeAssistant/client.js", () => ({ callService: vi.fn() }));
+vi.mock("../../integrations/homeAssistant/client.js", () => ({ callService: vi.fn(), getAllStates: vi.fn(), haPost: vi.fn() }));
 vi.mock("../../integrations/homeAssistant/registry.js", () => ({ getLights: vi.fn(), getNumberEntities: vi.fn() }));
 
 const mockedCallService = vi.mocked(callService);
+const mockedGetAllStates = vi.mocked(getAllStates);
+const mockedHaPost = vi.mocked(haPost);
 const mockedGetLights = vi.mocked(getLights);
 const mockedGetNumberEntities = vi.mocked(getNumberEntities);
 
@@ -17,6 +20,7 @@ const KNOWN_LIGHTS = [
 
 beforeEach(() => {
   mockedCallService.mockReset().mockResolvedValue(undefined as any);
+  mockedHaPost.mockReset().mockResolvedValue(undefined);
   mockedGetLights.mockReturnValue(KNOWN_LIGHTS as any);
   mockedGetNumberEntities.mockReturnValue([]);
 });
@@ -128,5 +132,35 @@ describe("applyScene", () => {
     expect(mockedCallService).toHaveBeenCalledWith("number", "set_value", { entity_id: "number.wiz_lamp_1_effect_speed", value: 60 });
     expect(result.outcomes).toContainEqual({ entity_id: "number.wiz_lamp_1_effect_speed", ok: true });
     expect(result.allSucceeded).toBe(true);
+  });
+});
+
+describe("saveCurrentStateAsScene", () => {
+  it("saves an off light, whose attributes HA reports as null, alongside a coloured one", async () => {
+    mockedGetAllStates.mockResolvedValue([
+      { entity_id: "light.a", state: "off", attributes: { friendly_name: "A", brightness: null, color_mode: null, rgb_color: null } },
+      { entity_id: "light.b", state: "on", attributes: { friendly_name: "B", brightness: 200, color_mode: "rgb", rgb_color: [255, 100, 0] } },
+      { entity_id: "light.unrelated", state: "on", attributes: {} },
+    ]);
+
+    await expect(saveCurrentStateAsScene("Evening", ["light.a", "light.b"])).resolves.toBe("scene.evening");
+
+    expect(mockedHaPost).toHaveBeenCalledWith("/api/config/scene/config/evening", {
+      id: "evening",
+      name: "Evening",
+      entities: {
+        "light.a": { state: "off", brightness: null },
+        "light.b": { state: "on", brightness: 200, rgb_color: [255, 100, 0] },
+      },
+    });
+  });
+
+  it("refuses to save when a light's attributes have the wrong shape", async () => {
+    mockedGetAllStates.mockResolvedValue([
+      { entity_id: "light.a", state: "on", attributes: { brightness: "bright" } },
+    ]);
+
+    await expect(saveCurrentStateAsScene("Evening", ["light.a"])).rejects.toBeInstanceOf(ValidationError);
+    expect(mockedHaPost).not.toHaveBeenCalled();
   });
 });

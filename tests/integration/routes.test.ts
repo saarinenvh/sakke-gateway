@@ -57,10 +57,32 @@ describe("POST /internal/gpu-status", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects a push with no body as a bad request, not a server error", async () => {
+    const res = await app.inject({ method: "POST", url: "/internal/gpu-status" });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("reports the cached state back", async () => {
     await app.inject({ method: "POST", url: "/internal/gpu-status", payload: { state: "busy" } });
     const res = await app.inject({ method: "GET", url: "/internal/gpu-status" });
     expect(res.json()).toMatchObject({ state: "busy", source: "auto" });
+  });
+});
+
+describe("POST /display/state", () => {
+  it("accepts a known state and reports it back", async () => {
+    const res = await app.inject({ method: "POST", url: "/display/state", payload: { state: "listening" } });
+    expect(res.statusCode).toBe(200);
+
+    const current = await app.inject({ method: "GET", url: "/display/state" });
+    expect(current.json()).toEqual({ state: "listening" });
+
+    await app.inject({ method: "POST", url: "/display/state", payload: { state: "idle" } });
+  });
+
+  it.each([{ state: "dancing" }, { state: null }, undefined])("rejects an invalid state change: %o", async (payload) => {
+    const res = await app.inject({ method: "POST", url: "/display/state", payload });
+    expect(res.statusCode).toBe(400);
   });
 });
 

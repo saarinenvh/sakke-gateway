@@ -1,4 +1,9 @@
+import { z } from "zod";
 import { config } from "../../config.js";
+import { parseJsonResponse } from "../../util/validation.js";
+import { entityStateSchema, entityStatesSchema, todoItemsSchema, type EntityState, type TodoItem } from "./schemas.js";
+
+export type { EntityState };
 
 // One Home Assistant client.
 //
@@ -17,12 +22,6 @@ import { config } from "../../config.js";
 // their own.
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-export interface EntityState {
-  entity_id: string;
-  state: string;
-  attributes: Record<string, unknown>;
-}
-
 export class HaError extends Error {
   constructor(
     readonly status: number,
@@ -40,6 +39,66 @@ export class HaError extends Error {
 
 export interface RequestOptions {
   timeoutMs?: number;
+}
+
+// Newer HA versions wrap a service's data as { changed_states, service_response };
+// older ones return the data bare.
+const serviceResponseEnvelopeSchema = z.object({
+  service_response: z.record(z.string(), z.unknown()),
+});
+
+export async function haGet<S extends z.ZodType>(path: string, schema: S, options?: RequestOptions): Promise<z.output<S>> {
+  const res = await request("GET", path, undefined, options);
+  return parseJsonResponse(res, schema, `HA GET ${path}`);
+}
+
+// For calls whose answer nobody reads. The body is still drained so the
+// connection is released.
+export async function haPost(path: string, body: unknown = {}, options?: RequestOptions): Promise<void> {
+  const res = await request("POST", path, body, options);
+  await res.text();
+}
+
+export async function getState(entityId: string, options?: RequestOptions): Promise<EntityState> {
+  return haGet(`/api/states/${entityId}`, entityStateSchema, options);
+}
+
+export async function getAllStates(options?: RequestOptions): Promise<EntityState[]> {
+  return haGet("/api/states", entityStatesSchema, options);
+}
+
+export async function callService(
+  domain: string,
+  service: string,
+  data: Record<string, unknown> = {},
+  options?: RequestOptions,
+): Promise<void> {
+  await haPost(`/api/services/${domain}/${service}`, data, options);
+}
+
+// Services that return data (todo.get_items) need return_response.
+export async function callServiceWithResponse<S extends z.ZodType>(
+  domain: string,
+  service: string,
+  data: Record<string, unknown>,
+  schema: S,
+  options?: RequestOptions,
+): Promise<z.output<S>> {
+  const path = `/api/services/${domain}/${service}?return_response=true`;
+  const res = await request("POST", path, data, options);
+  return parseJsonResponse(res, z.preprocess(unwrapServiceResponse, schema), `HA POST ${path}`);
+}
+
+// todo.get_items answers keyed by entity id. The entity asked about must be
+// in the answer - a missing one is a malformed response, not an empty list.
+export async function getTodoItems(entityId: string, options?: RequestOptions): Promise<TodoItem[]> {
+  const schema = z.object({ [entityId]: todoItemsSchema });
+  const response = await callServiceWithResponse("todo", "get_items", { entity_id: entityId }, schema, options);
+  return response[entityId].items;
+}
+
+export async function renderTemplate(template: string, options?: RequestOptions): Promise<string> {
+  return (await request("POST", "/api/template", { template }, options)).text();
 }
 
 async function request(
@@ -62,47 +121,7 @@ async function request(
   return res;
 }
 
-export async function haGet<T>(path: string, options?: RequestOptions): Promise<T> {
-  return (await request("GET", path, undefined, options)).json() as Promise<T>;
-}
-
-export async function haPost<T>(path: string, body: unknown = {}, options?: RequestOptions): Promise<T> {
-  const res = await request("POST", path, body, options);
-  // Some HA endpoints answer 200 with an empty body; callers that ignore the
-  // result shouldn't have to care.
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
-}
-
-export async function getState(entityId: string, options?: RequestOptions): Promise<EntityState> {
-  return haGet<EntityState>(`/api/states/${entityId}`, options);
-}
-
-export async function getAllStates(options?: RequestOptions): Promise<EntityState[]> {
-  return haGet<EntityState[]>("/api/states", options);
-}
-
-export async function callService<T = unknown>(
-  domain: string,
-  service: string,
-  data: Record<string, unknown> = {},
-  options?: RequestOptions,
-): Promise<T> {
-  return haPost<T>(`/api/services/${domain}/${service}`, data, options);
-}
-
-// Services that return data (todo.get_items) need return_response, and answer
-// under a service_response key - except when they don't, depending on version.
-export async function callServiceWithResponse<T>(
-  domain: string,
-  service: string,
-  data: Record<string, unknown>,
-  options?: RequestOptions,
-): Promise<T> {
-  const raw = await haPost<any>(`/api/services/${domain}/${service}?return_response=true`, data, options);
-  return (raw?.service_response ?? raw) as T;
-}
-
-export async function renderTemplate(template: string, options?: RequestOptions): Promise<string> {
-  return (await request("POST", "/api/template", { template }, options)).text();
+function unwrapServiceResponse(body: unknown): unknown {
+  const envelope = serviceResponseEnvelopeSchema.safeParse(body);
+  return envelope.success ? envelope.data.service_response : body;
 }

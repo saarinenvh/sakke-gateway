@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { config } from "../../config.js";
+import { parseJsonResponse } from "../../util/validation.js";
 
 // One OpenAI client, mirroring homeAssistant/client.ts's shape: a single place
 // for auth headers, timeout and error handling instead of each caller building
@@ -28,9 +30,12 @@ export interface ChatCompletionOptions {
   timeoutMs?: number;
 }
 
-export interface ChatCompletionResponse {
-  choices?: { message?: { content?: string } }[];
-}
+// content is null when the model refuses or answers with tool calls instead.
+const chatCompletionResponseSchema = z.object({
+  choices: z
+    .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
+    .min(1),
+});
 
 export async function chatCompletion(
   model: string,
@@ -57,6 +62,6 @@ export async function chatCompletion(
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text().catch(() => ""), path);
 
-  const json = await res.json() as ChatCompletionResponse;
-  return json?.choices?.[0]?.message?.content?.trim() ?? "";
+  const response = await parseJsonResponse(res, chatCompletionResponseSchema, `OpenAI POST ${path}`);
+  return response.choices[0].message.content?.trim() ?? "";
 }
