@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { config } from "../../config.js";
+import { parseOrThrow } from "../../util/validation.js";
 
 // One OpenAI client, mirroring homeAssistant/client.ts's shape: a single place
 // for auth headers, timeout and error handling instead of each caller building
@@ -16,18 +17,6 @@ export class OpenAiError extends Error {
   ) {
     super(`OpenAI ${status} on ${path}${body ? `: ${body.slice(0, 500)}` : ""}`);
     this.name = "OpenAiError";
-  }
-}
-
-// OpenAI accepted the request but answered with a body of the wrong shape -
-// there is no status to report, unlike OpenAiError.
-export class OpenAiInvalidResponseError extends Error {
-  constructor(
-    readonly path: string,
-    readonly issues: string,
-  ) {
-    super(`OpenAI returned an unexpected response on ${path}: ${issues}`);
-    this.name = "OpenAiInvalidResponseError";
   }
 }
 
@@ -73,8 +62,6 @@ export async function chatCompletion(
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text().catch(() => ""), path);
 
-  const parsed = chatCompletionResponseSchema.safeParse(await res.json());
-  if (!parsed.success) throw new OpenAiInvalidResponseError(path, z.prettifyError(parsed.error));
-
-  return parsed.data.choices[0].message.content?.trim() ?? "";
+  const response = parseOrThrow(chatCompletionResponseSchema, await res.json(), `OpenAI POST ${path}`);
+  return response.choices[0].message.content?.trim() ?? "";
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { chatCompletion, OpenAiError, OpenAiInvalidResponseError } from "./client.js";
+import { chatCompletion, OpenAiError } from "./client.js";
+import { ValidationError } from "../../util/validation.js";
 
 function respondWith(body: unknown, status = 200): void {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
@@ -27,7 +28,7 @@ describe("chatCompletion", () => {
   it("rejects a response with no choices instead of treating it as an empty answer", async () => {
     respondWith({ choices: [] });
 
-    await expect(chatCompletion("gpt-4o", MESSAGES)).rejects.toBeInstanceOf(OpenAiInvalidResponseError);
+    await expect(chatCompletion("gpt-4o", MESSAGES)).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("keeps an HTTP failure an OpenAiError", async () => {

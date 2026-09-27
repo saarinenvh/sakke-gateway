@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { z } from "zod";
-import { callServiceWithResponse, getAllStates, getState, HaError, HaInvalidResponseError } from "./client.js";
+import { ValidationError } from "../../util/validation.js";
+import { callServiceWithResponse, getAllStates, getState, HaError } from "./client.js";
 
 function respondWith(body: unknown, status = 200): void {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
@@ -29,7 +30,7 @@ describe("entity state reads", () => {
   it("rejects a states list where an entity is missing its state", async () => {
     respondWith([{ entity_id: "light.ceiling", attributes: {} }]);
 
-    await expect(getAllStates()).rejects.toBeInstanceOf(HaInvalidResponseError);
+    await expect(getAllStates()).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("keeps an HTTP failure an HaError, not a validation error", async () => {
@@ -60,8 +61,8 @@ describe("callServiceWithResponse", () => {
     respondWith({ service_response: { "todo.shopping": { items: "milk" } } });
 
     const error = await callServiceWithResponse("todo", "get_items", {}, itemsSchema).catch(err => err);
-    expect(error).toBeInstanceOf(HaInvalidResponseError);
-    expect(error.path).toBe("/api/services/todo/get_items?return_response=true");
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.source).toBe("HA POST /api/services/todo/get_items?return_response=true");
     expect(error.issues).toContain("items");
   });
 });

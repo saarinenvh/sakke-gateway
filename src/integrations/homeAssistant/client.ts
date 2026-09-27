@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { config } from "../../config.js";
+import { parseOrThrow } from "../../util/validation.js";
 import { entityStateSchema, entityStatesSchema, type EntityState } from "./schemas.js";
 
 export type { EntityState };
@@ -36,20 +37,6 @@ export class HaError extends Error {
   }
 }
 
-// HA accepted the request but answered with a body of the wrong shape. Kept
-// apart from HaError because there is no status to report, and the usual
-// cause is an HA version change rather than a rejected call.
-export class HaInvalidResponseError extends Error {
-  constructor(
-    readonly method: string,
-    readonly path: string,
-    readonly issues: string,
-  ) {
-    super(`HA returned an unexpected response on ${method} ${path}: ${issues}`);
-    this.name = "HaInvalidResponseError";
-  }
-}
-
 export interface RequestOptions {
   timeoutMs?: number;
 }
@@ -62,7 +49,7 @@ const serviceResponseEnvelopeSchema = z.object({
 
 export async function haGet<S extends z.ZodType>(path: string, schema: S, options?: RequestOptions): Promise<z.output<S>> {
   const res = await request("GET", path, undefined, options);
-  return parseResponse(schema, await res.json(), "GET", path);
+  return parseOrThrow(schema, await res.json(), `HA GET ${path}`);
 }
 
 // For calls whose answer nobody reads. The body is still drained so the
@@ -99,7 +86,7 @@ export async function callServiceWithResponse<S extends z.ZodType>(
 ): Promise<z.output<S>> {
   const path = `/api/services/${domain}/${service}?return_response=true`;
   const res = await request("POST", path, data, options);
-  return parseResponse(schema, unwrapServiceResponse(await res.json()), "POST", path);
+  return parseOrThrow(schema, unwrapServiceResponse(await res.json()), `HA POST ${path}`);
 }
 
 export async function renderTemplate(template: string, options?: RequestOptions): Promise<string> {
@@ -129,10 +116,4 @@ async function request(
 function unwrapServiceResponse(body: unknown): unknown {
   const envelope = serviceResponseEnvelopeSchema.safeParse(body);
   return envelope.success ? envelope.data.service_response : body;
-}
-
-function parseResponse<S extends z.ZodType>(schema: S, body: unknown, method: string, path: string): z.output<S> {
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) throw new HaInvalidResponseError(method, path, z.prettifyError(parsed.error));
-  return parsed.data;
 }
