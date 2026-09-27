@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { config } from "../../config.js";
 
 // One OpenAI client, mirroring homeAssistant/client.ts's shape: a single place
@@ -18,6 +19,18 @@ export class OpenAiError extends Error {
   }
 }
 
+// OpenAI accepted the request but answered with a body of the wrong shape -
+// there is no status to report, unlike OpenAiError.
+export class OpenAiInvalidResponseError extends Error {
+  constructor(
+    readonly path: string,
+    readonly issues: string,
+  ) {
+    super(`OpenAI returned an unexpected response on ${path}: ${issues}`);
+    this.name = "OpenAiInvalidResponseError";
+  }
+}
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -28,9 +41,12 @@ export interface ChatCompletionOptions {
   timeoutMs?: number;
 }
 
-export interface ChatCompletionResponse {
-  choices?: { message?: { content?: string } }[];
-}
+// content is null when the model refuses or answers with tool calls instead.
+const chatCompletionResponseSchema = z.object({
+  choices: z
+    .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
+    .min(1),
+});
 
 export async function chatCompletion(
   model: string,
@@ -57,6 +73,8 @@ export async function chatCompletion(
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text().catch(() => ""), path);
 
-  const json = await res.json() as ChatCompletionResponse;
-  return json?.choices?.[0]?.message?.content?.trim() ?? "";
+  const parsed = chatCompletionResponseSchema.safeParse(await res.json());
+  if (!parsed.success) throw new OpenAiInvalidResponseError(path, z.prettifyError(parsed.error));
+
+  return parsed.data.choices[0].message.content?.trim() ?? "";
 }
