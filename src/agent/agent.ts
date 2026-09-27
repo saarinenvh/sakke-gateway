@@ -220,7 +220,7 @@ async function executeToolBatch(
   conversationId: string,
   log: FastifyBaseLogger,
 ): Promise<ToolBatchOutcome> {
-  const callKeys = toolCalls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
+  const callKeys = toolCalls.map(t => toolCallKey(t.function.name, t.function.arguments));
   const wholeBatchAlreadyRan = callKeys.every(k => completedToolCalls.has(k));
   if (wholeBatchAlreadyRan) {
     log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
@@ -253,6 +253,23 @@ async function executeToolBatch(
   }
 
   return "executed";
+}
+
+function toolCallKey(name: string, args: Record<string, unknown>): string {
+  return `${name}:${canonicalJson(args)}`;
+}
+
+// JSON.stringify preserves property insertion order, not a canonical one - two
+// calls with identical arguments but different key order would otherwise
+// produce different keys and silently bypass the dedup above.
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return `{${keys.map(k => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 // Applies the turn's completion side effects - speech cleanup, history

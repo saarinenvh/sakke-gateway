@@ -164,6 +164,28 @@ describe("duplicate tool calls within or across a batch", () => {
     expect(lastTwo[0].content).not.toContain("already ran this turn");
     expect(lastTwo[1].content).not.toContain("already ran this turn");
   });
+
+  // JSON.stringify preserves key insertion order, so the same logical
+  // arguments with a different key order (plausible from a model
+  // regenerating the same call) used to bypass the dedup key entirely.
+  it("recognizes a repeated call even when its argument keys are in a different order", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("timer", { action: "set", duration_minutes: 5, label: "tea" })] },
+      { toolCalls: [
+        toolCall("timer", { duration_minutes: 5, label: "tea", action: "set" }), // same call, keys reordered
+        toolCall("get_device_state", { entity_id: "light.hall" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("set a timer for tea, twice", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
+    const [repeated, fresh] = toolMessages.slice(-2);
+    expect(repeated.content).toBe("timer already ran this turn with the same arguments - not repeating it.");
+    expect(fresh.content).not.toContain("already ran this turn");
+  });
 });
 
 // Finding #4. messages used to be the same array object held in the
