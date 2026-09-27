@@ -239,7 +239,7 @@ async function executeToolBatch(
   for (const [i, call] of toolCalls.entries()) {
     const key = callKeys[i];
 
-    if (completedToolCalls.has(key) && !isRepeatable(call.function.name)) {
+    if (completedToolCalls.has(key) && !isRepeatable(call.function.name, call.function.arguments)) {
       log.warn({ conversationId, tool: call.function.name }, "Skipped repeat of a non-repeatable tool call");
       messages.push({
         role: "tool",

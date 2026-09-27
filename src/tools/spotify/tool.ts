@@ -28,7 +28,7 @@ export const spotifyTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  repeatable: () => false,
   execute: async (args, { conversationId }) => {
     const { action, query, type, volume, offset, index } = args as {
       action: string;

@@ -39,7 +39,7 @@ export const setGamingModeTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  repeatable: () => false,
   execute: async (args, { log }) => {
     const mode = args.mode as string;
     const pcOllamaUrl = config.ollama.pc?.baseUrl;

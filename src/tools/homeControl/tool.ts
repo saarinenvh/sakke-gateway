@@ -36,7 +36,7 @@ export const controlHomeAssistantTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  repeatable: () => false,
   execute: args => dispatch({ ...args, raw: JSON.stringify(args) } as Intent),
 };
 
@@ -55,7 +55,7 @@ export const getDeviceStateTool: Tool = {
       },
     },
   },
-  repeatable: true,
+  repeatable: () => true,
   execute: async args => {
     const state = await getState(args.entity_id as string);
     return JSON.stringify({ state: state.state, attributes: state.attributes });
@@ -77,7 +77,7 @@ export const runRoutineTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  repeatable: () => false,
   execute: async args => {
     const scriptId = args.script_id as string;
     await callService("script", "turn_on", { entity_id: `script.${scriptId}` });
@@ -94,7 +94,7 @@ export const refreshHomeDataTool: Tool = {
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
-  repeatable: true,
+  repeatable: () => true,
   execute: async () => {
     await loadEntities();
     const names = (xs: { name: string }[]) => xs.map(x => x.name).join(", ") || "none";

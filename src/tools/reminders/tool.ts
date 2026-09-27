@@ -21,7 +21,7 @@ export const getTasksTool: Tool = {
       },
     },
   },
-  repeatable: true,
+  repeatable: () => true,
   execute: args => getTasksText((args.period as string) ?? "today"),
 };
 
@@ -40,6 +40,6 @@ export const getCalendarTool: Tool = {
       },
     },
   },
-  repeatable: true,
+  repeatable: () => true,
   execute: args => getCalendarText((args.period as string) ?? "today"),
 };

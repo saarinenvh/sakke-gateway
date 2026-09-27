@@ -22,7 +22,8 @@ export const manageListTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  // Reading a list back is harmless to repeat; every mutating action isn't.
+  repeatable: args => args.action === "list_read",
   execute: async args => {
     const { action, list, items, item } = args as { action: string; list: string; items?: string[]; item?: string };
 

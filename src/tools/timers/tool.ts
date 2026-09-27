@@ -19,7 +19,8 @@ export const timerTool: Tool = {
       },
     },
   },
-  repeatable: false,
+  // Listing active timers is harmless to repeat; setting or cancelling isn't.
+  repeatable: args => args.action === "list",
   execute: args => {
     const { action, duration_minutes, label, timer_id } = args as {
       action: string;

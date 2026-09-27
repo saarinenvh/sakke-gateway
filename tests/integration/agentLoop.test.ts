@@ -208,6 +208,35 @@ describe("duplicate tool calls within or across a batch", () => {
     expect(repeated.content).toBe("timer already ran this turn with the same arguments - not repeating it.");
     expect(fresh.content).not.toContain("already ran this turn");
   });
+
+  // manage_list bundles several actions under one tool - repeatability is
+  // decided per action, not for the whole tool: list_read is a pure read,
+  // list_add is a mutation.
+  it("lets manage_list's list_read repeat but not a mutating action on the same tool", async () => {
+    const listArgs = { list: "todo.groceries" };
+    ollama.script(
+      { toolCalls: [toolCall("manage_list", { action: "list_add", ...listArgs, item: "milk" })] },
+      { toolCalls: [
+        toolCall("manage_list", { action: "list_add", ...listArgs, item: "milk" }), // repeat - mutating, skip
+        toolCall("manage_list", { action: "list_read", ...listArgs }), // new read
+      ] },
+      { toolCalls: [toolCall("manage_list", { action: "list_read", ...listArgs })] }, // repeat - read, re-executes
+      { content: "Done." },
+    );
+
+    const result = await runAgent("add milk twice, then check the list", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(4);
+    // Never withheld - the repeated read re-executed instead of being treated
+    // as a stuck loop.
+    expect(passes.map(p => p.hasTools)).toEqual([true, true, true, true]);
+
+    const toolMessages = passes[3].messages.filter(m => m.role === "tool");
+    const skipped = toolMessages.filter(m => m.content === "manage_list already ran this turn with the same arguments - not repeating it.");
+    expect(skipped).toHaveLength(1); // only the repeated list_add, not either list_read
+  });
 });
 
 // Finding #4. messages used to be the same array object held in the
