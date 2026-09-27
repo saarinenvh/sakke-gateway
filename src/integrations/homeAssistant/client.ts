@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { config } from "../../config.js";
 import { parseJsonResponse } from "../../util/validation.js";
-import { entityStateSchema, entityStatesSchema, todoItemsSchema, type EntityState, type TodoItem } from "./schemas.js";
+import { entityStateSchema, entityStatesSchema, stateHistorySchema, todoItemsSchema, type EntityState, type TodoItem } from "./schemas.js";
 
 export type { EntityState };
 
@@ -65,6 +65,23 @@ export async function getState(entityId: string, options?: RequestOptions): Prom
 
 export async function getAllStates(options?: RequestOptions): Promise<EntityState[]> {
   return haGet("/api/states", entityStatesSchema, options);
+}
+
+export interface StateChange {
+  state: string;
+  changedAt: number;
+}
+
+// One entity's state changes between two times, oldest first.
+export async function getStateHistory(entityId: string, since: number, until: number, options?: RequestOptions): Promise<StateChange[]> {
+  const query = new URLSearchParams({
+    filter_entity_id: entityId,
+    end_time: new Date(until).toISOString(),
+    minimal_response: "",
+    no_attributes: "",
+  });
+  const history = await haGet(`/api/history/period/${new Date(since).toISOString()}?${query}`, stateHistorySchema, options);
+  return (history[0] ?? []).map(change => ({ state: change.state, changedAt: Date.parse(change.last_changed) }));
 }
 
 export async function callService(

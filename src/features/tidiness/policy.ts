@@ -1,4 +1,5 @@
 import type { LocalTime } from "../../config.js";
+import type { StateChange } from "../../integrations/homeAssistant/client.js";
 
 // Pure rules: every input, including "now", is passed in.
 
@@ -132,18 +133,16 @@ export interface VacuumObservation {
 export type RunEvent =
   | { kind: "none" }
   | { kind: "started"; since: number }
-  | { kind: "finished"; finishedAt: number; durationMs: number; counted: boolean };
+  // estimatedStart is when a check first saw the run; the real start can be
+  // earlier - see runStartFromHistory.
+  | { kind: "finished"; finishedAt: number; estimatedStart: number };
 
 export interface RunTransition {
   cleaningSince: number | undefined;
   event: RunEvent;
 }
 
-export function observeVacuum(
-  cleaningSince: number | undefined,
-  observation: VacuumObservation,
-  minRunMs: number,
-): RunTransition {
+export function observeVacuum(cleaningSince: number | undefined, observation: VacuumObservation): RunTransition {
   if (INDETERMINATE_STATES.has(observation.state)) return { cleaningSince, event: { kind: "none" } };
 
   const changedAt = observation.changedAt ?? observation.observedAt;
@@ -155,12 +154,29 @@ export function observeVacuum(
 
   if (cleaningSince === undefined) return { cleaningSince, event: { kind: "none" } };
 
-  const durationMs = changedAt - cleaningSince;
   return {
     cleaningSince: undefined,
-    event: { kind: "finished", finishedAt: changedAt, durationMs, counted: durationMs >= minRunMs },
+    event: { kind: "finished", finishedAt: changedAt, estimatedStart: cleaningSince },
   };
 }
+
+// Walks back from the end of a run through cleaning and connection blips to
+// where it really began. A blip resets HA's last_changed, so without this a
+// long run could measure short.
+export function runStartFromHistory(history: StateChange[], finishedAt: number): number | undefined {
+  let start: number | undefined;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const change = history[i];
+    if (change.changedAt >= finishedAt) continue;
+    if (change.state === CLEANING_STATE) {
+      start = change.changedAt;
+    } else if (!INDETERMINATE_STATES.has(change.state)) {
+      break;
+    }
+  }
+  return start;
+}
+
 
 // --- Local calendar -------------------------------------------------------
 

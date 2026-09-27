@@ -17,6 +17,9 @@ export type EntityState = z.output<typeof entityStateSchema>;
 
 export const entityStatesSchema = z.array(entityStateSchema);
 
+// /api/history/period with minimal_response: one list per entity, oldest first.
+export const stateHistorySchema = z.array(z.array(z.object({ state: z.string(), last_changed: z.string() })));
+
 export const todoItemSchema = z.object({
   uid: z.string().optional(),
   summary: z.string(),

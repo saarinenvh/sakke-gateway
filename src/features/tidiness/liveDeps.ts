@@ -1,6 +1,6 @@
 import { runAgent } from "../../agent/agent.js";
 import { config } from "../../config.js";
-import { callService, getState } from "../../integrations/homeAssistant/client.js";
+import { callService, getState, getStateHistory } from "../../integrations/homeAssistant/client.js";
 import { moduleLog } from "../../logger.js";
 import type { CoachDeps } from "./coach.js";
 
@@ -12,6 +12,7 @@ const START_CONVERSATION_TIMEOUT_MS = 30_000;
 export const liveCoachDeps: CoachDeps = {
   now: () => Date.now(),
   readState: entityId => getState(entityId),
+  readHistory: (entityId, since, until) => getStateHistory(entityId, since, until),
 
   // Throwaway conversation, and no tools: writing a nag must never act.
   writeNag: async request => {

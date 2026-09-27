@@ -3,7 +3,7 @@ import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { reloadConfig } from "../../config.js";
-import type { EntityState } from "../../integrations/homeAssistant/client.js";
+import type { EntityState, StateChange } from "../../integrations/homeAssistant/client.js";
 import { runCoachTick, type CoachDeps } from "./coach.js";
 import { __resetTidinessState, getTidinessState, recordClean, restoreTidinessState } from "./store.js";
 
@@ -28,6 +28,7 @@ const DAY_7_MORNING = at("2026-10-08T10:05");
 interface FakeWorld {
   deps: CoachDeps;
   states: Map<string, EntityState>;
+  history: StateChange[];
   spoken: { question: string; context: string }[];
   setNow(at: number): void;
 }
@@ -36,6 +37,7 @@ function fakeWorld(): FakeWorld {
   let now = DAY_7_MORNING;
   const states = new Map<string, EntityState>();
   const spoken: FakeWorld["spoken"] = [];
+  const history: StateChange[] = [];
   const set = (entity_id: string, state: string) => states.set(entity_id, { entity_id, state, attributes: {} });
   set(VACUUM, "docked");
   set(PRESENCE, "home");
@@ -48,12 +50,13 @@ function fakeWorld(): FakeWorld {
       if (!state) throw new Error(`HA 404 on ${entityId}`);
       return state;
     },
+    readHistory: async () => history,
     writeNag: async () => "Shall I deal with the dust, or are you breeding it?",
     startConversation: async (question, context) => {
       spoken.push({ question, context });
     },
   };
-  return { deps, states, spoken, setNow: t => { now = t; } };
+  return { deps, states, history, spoken, setNow: t => { now = t; } };
 }
 
 let world: FakeWorld;
@@ -179,6 +182,42 @@ describe("last-cleaned tracking", () => {
     await runCoachTick(world.deps);
 
     expect(getTidinessState()).toMatchObject({ lastCleanedAt: end, lastCleanedBy: "vacuum", cleaningSince: undefined });
+  });
+
+  it("counts a long run that a connection blip made look short", async () => {
+    const start = at("2026-10-05T09:00");
+    const blip = at("2026-10-05T09:09");
+    const end = at("2026-10-05T09:12");
+    world.history.push(
+      { state: "cleaning", changedAt: start },
+      { state: "unknown", changedAt: blip },
+      { state: "cleaning", changedAt: blip + 1_000 },
+      { state: "returning", changedAt: end },
+    );
+
+    // The first check only sees the run after the blip reset last_changed.
+    world.states.set(VACUUM, { entity_id: VACUUM, state: "cleaning", attributes: {}, last_changed: new Date(blip + 1_000).toISOString() });
+    world.setNow(blip + 60_000);
+    await runCoachTick(world.deps);
+    world.states.set(VACUUM, { entity_id: VACUUM, state: "returning", attributes: {}, last_changed: new Date(end).toISOString() });
+    world.setNow(end + 60_000);
+    await runCoachTick(world.deps);
+
+    expect(getTidinessState().lastCleanedAt).toBe(end);
+  });
+
+  it("falls back to the check-time estimate when HA history is unavailable", async () => {
+    world.deps.readHistory = async () => { throw new Error("HA 500"); };
+    const start = at("2026-10-05T09:00");
+    const end = at("2026-10-05T09:30");
+    world.states.set(VACUUM, { entity_id: VACUUM, state: "cleaning", attributes: {}, last_changed: new Date(start).toISOString() });
+    world.setNow(start + 60_000);
+    await runCoachTick(world.deps);
+    world.states.set(VACUUM, { entity_id: VACUUM, state: "docked", attributes: {}, last_changed: new Date(end).toISOString() });
+    world.setNow(end + 60_000);
+    await runCoachTick(world.deps);
+
+    expect(getTidinessState().lastCleanedAt).toBe(end);
   });
 
   it("ignores a run too short to count", async () => {

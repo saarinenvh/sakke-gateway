@@ -1,7 +1,7 @@
 import { config } from "../../config.js";
-import type { EntityState } from "../../integrations/homeAssistant/client.js";
+import type { EntityState, StateChange } from "../../integrations/homeAssistant/client.js";
 import { moduleLog } from "../../logger.js";
-import { nextNag, observeVacuum, type NagDecision, type NoNagReason } from "./policy.js";
+import { nextNag, observeVacuum, runStartFromHistory, type NagDecision, type NoNagReason, type RunEvent } from "./policy.js";
 import { buildAnswerContext, buildNagRequest, type NagFacts } from "./prompts.js";
 import { getTidinessState, recordClean, recordNag, setCleaningSince, updateNag } from "./store.js";
 import { findSpokenVacuumName, findVacuum } from "./vacuum.js";
@@ -13,6 +13,8 @@ export interface CoachDeps {
   now(): number;
   /** Throws when the entity can't be read. */
   readState(entityId: string): Promise<EntityState>;
+  /** One entity's state changes, oldest first. Throws when unavailable. */
+  readHistory(entityId: string, since: number, until: number): Promise<StateChange[]>;
   /** The model's spoken question, written from the given request. */
   writeNag(request: string): Promise<string>;
   /** Speaks the question on the satellite and opens the mic for the answer. */
@@ -59,24 +61,39 @@ async function trackCleaningRun(deps: CoachDeps): Promise<void> {
 
   const observedAt = deps.now();
   const changedAt = vacuumState.last_changed ? Date.parse(vacuumState.last_changed) : undefined;
-  const transition = observeVacuum(
-    getTidinessState().cleaningSince,
-    { state: vacuumState.state, changedAt: Number.isNaN(changedAt) ? undefined : changedAt, observedAt },
-    config.tidiness.minRunMinutes * 60_000,
-  );
+  const transition = observeVacuum(getTidinessState().cleaningSince, {
+    state: vacuumState.state,
+    changedAt: Number.isNaN(changedAt) ? undefined : changedAt,
+    observedAt,
+  });
 
   await setCleaningSince(transition.cleaningSince);
 
   const { event } = transition;
   if (event.kind !== "finished") return;
 
-  const minutes = Math.round(event.durationMs / 60_000);
-  if (!event.counted) {
+  const start = await findRunStart(deps, lookup.vacuum.entity_id, event);
+  const durationMs = event.finishedAt - start;
+  const minutes = Math.round(durationMs / 60_000);
+  if (durationMs < config.tidiness.minRunMinutes * 60_000) {
     moduleLog().info({ minutes }, "Vacuum run too short to count as a clean");
     return;
   }
   await recordClean(event.finishedAt, "vacuum");
   moduleLog().info({ minutes }, "Vacuum run recorded as a clean");
+}
+
+// Covers any run plausible for a home robot vacuum.
+const RUN_HISTORY_LOOKBACK_MS = 6 * 3_600_000;
+
+// History when HA can give it, else the check-time estimate.
+async function findRunStart(deps: CoachDeps, entityId: string, event: Extract<RunEvent, { kind: "finished" }>): Promise<number> {
+  try {
+    const history = await deps.readHistory(entityId, event.finishedAt - RUN_HISTORY_LOOKBACK_MS, event.finishedAt);
+    return Math.min(runStartFromHistory(history, event.finishedAt) ?? event.estimatedStart, event.estimatedStart);
+  } catch {
+    return event.estimatedStart;
+  }
 }
 
 // --- Nag ----------------------------------------------------------------------

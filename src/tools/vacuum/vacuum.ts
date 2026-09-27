@@ -3,7 +3,7 @@ import { callService, getState } from "../../integrations/homeAssistant/client.j
 import type { VacuumEntity } from "../../integrations/homeAssistant/registry.js";
 import { findAnswerableNag, localDaysBetween } from "../../features/tidiness/policy.js";
 import { getTidinessState, recordClean, snoozeUntil, updateNag } from "../../features/tidiness/store.js";
-import { findVacuum, spokenVacuumName } from "../../features/tidiness/vacuum.js";
+import { findSpokenVacuumName, findVacuum, spokenVacuumName } from "../../features/tidiness/vacuum.js";
 
 export const VACUUM_ACTIONS = ["start", "stop", "dock", "status", "last_cleaned", "mark_cleaned", "decline", "snooze"] as const;
 export type VacuumAction = (typeof VACUUM_ACTIONS)[number];
@@ -97,7 +97,7 @@ export function describeLastCleaned(now: number): string {
   }
 
   const when = describeDaysAgo(lastCleanedAt, now);
-  const how = lastCleanedBy === "manual" ? "by hand, as reported" : "by the vacuum";
+  const how = lastCleanedBy === "manual" ? "by hand, as reported" : `by ${findSpokenVacuumName() ?? "the robot vacuum"}`;
   return `The house was last cleaned ${when}, ${how}.`;
 }
 

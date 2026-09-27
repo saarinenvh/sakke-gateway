@@ -5,6 +5,7 @@ import {
   localDaysBetween,
   nextNag,
   observeVacuum,
+  runStartFromHistory,
   toneLevel,
   type NagInput,
   type NagRecord,
@@ -110,34 +111,56 @@ describe("answering a nag", () => {
 });
 
 describe("cleaning runs", () => {
-  const MIN_RUN_MS = 10 * 60_000;
   const start = at("2026-10-05T09:00").getTime();
+  const min = (n: number) => start + n * 60_000;
 
   it("starts a run from when HA says cleaning began, not when it was noticed", () => {
-    const result = observeVacuum(undefined, { state: "cleaning", changedAt: start, observedAt: start + 90_000 }, MIN_RUN_MS);
+    const result = observeVacuum(undefined, { state: "cleaning", changedAt: start, observedAt: start + 90_000 });
     expect(result).toEqual({ cleaningSince: start, event: { kind: "started", since: start } });
   });
 
-  it("counts a run that lasted long enough", () => {
-    const end = start + 45 * 60_000;
-    const result = observeVacuum(start, { state: "returning", changedAt: end, observedAt: end }, MIN_RUN_MS);
-    expect(result).toEqual({ cleaningSince: undefined, event: { kind: "finished", finishedAt: end, durationMs: 45 * 60_000, counted: true } });
-  });
-
-  it("does not count a bump of the start button", () => {
-    const end = start + 2 * 60_000;
-    const result = observeVacuum(start, { state: "docked", changedAt: end, observedAt: end }, MIN_RUN_MS);
-    expect(result.event).toMatchObject({ kind: "finished", counted: false });
+  it("finishes the run when the vacuum leaves cleaning", () => {
+    const result = observeVacuum(start, { state: "returning", changedAt: min(45), observedAt: min(47) });
+    expect(result).toEqual({ cleaningSince: undefined, event: { kind: "finished", finishedAt: min(45), estimatedStart: start } });
   });
 
   it("treats a dropped connection as no change, not the end of a run", () => {
-    const result = observeVacuum(start, { state: "unavailable", changedAt: start + 60_000, observedAt: start + 60_000 }, MIN_RUN_MS);
+    const result = observeVacuum(start, { state: "unavailable", changedAt: min(1), observedAt: min(1) });
     expect(result).toEqual({ cleaningSince: start, event: { kind: "none" } });
   });
 
   it("falls back to the observation time when HA gives no change time", () => {
     const observedAt = start + 30_000;
-    expect(observeVacuum(undefined, { state: "cleaning", changedAt: undefined, observedAt }, MIN_RUN_MS).cleaningSince).toBe(observedAt);
+    expect(observeVacuum(undefined, { state: "cleaning", changedAt: undefined, observedAt }).cleaningSince).toBe(observedAt);
+  });
+});
+
+describe("the true start of a run", () => {
+  const t = (minute: number) => at("2026-10-05T09:00").getTime() + minute * 60_000;
+
+  it("reaches back across connection blips to where cleaning really began", () => {
+    const history = [
+      { state: "docked", changedAt: t(-30) },
+      { state: "cleaning", changedAt: t(0) },
+      { state: "unknown", changedAt: t(9) },
+      { state: "cleaning", changedAt: t(9.1) },
+      { state: "returning", changedAt: t(12) },
+    ];
+    expect(runStartFromHistory(history, t(12))).toBe(t(0));
+  });
+
+  it("stops at the previous run, not the one before it", () => {
+    const history = [
+      { state: "cleaning", changedAt: t(-60) },
+      { state: "docked", changedAt: t(-20) },
+      { state: "cleaning", changedAt: t(0) },
+      { state: "returning", changedAt: t(15) },
+    ];
+    expect(runStartFromHistory(history, t(15))).toBe(t(0));
+  });
+
+  it("has nothing to say when history shows no cleaning", () => {
+    expect(runStartFromHistory([{ state: "docked", changedAt: t(0) }], t(15))).toBeUndefined();
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { z } from "zod";
 import { ValidationError } from "../../util/validation.js";
-import { callServiceWithResponse, getAllStates, getState, getTodoItems, HaError } from "./client.js";
+import { callServiceWithResponse, getAllStates, getState, getStateHistory, getTodoItems, HaError } from "./client.js";
 
 function respondWith(body: unknown, status = 200): void {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
@@ -47,6 +47,25 @@ describe("entity state reads", () => {
     respondWith({ message: "Entity not found." }, 404);
 
     await expect(getState("light.missing")).rejects.toBeInstanceOf(HaError);
+  });
+});
+
+describe("getStateHistory", () => {
+  it("returns one entity's changes, oldest first, as timestamps", async () => {
+    respondWith([[
+      { entity_id: "vacuum.robot", state: "cleaning", last_changed: "2026-09-27T17:05:39+00:00", attributes: {} },
+      { state: "returning", last_changed: "2026-09-27T17:18:37+00:00" },
+    ]]);
+
+    await expect(getStateHistory("vacuum.robot", 0, 1)).resolves.toEqual([
+      { state: "cleaning", changedAt: Date.parse("2026-09-27T17:05:39+00:00") },
+      { state: "returning", changedAt: Date.parse("2026-09-27T17:18:37+00:00") },
+    ]);
+  });
+
+  it("returns nothing when HA has no history for the entity", async () => {
+    respondWith([]);
+    await expect(getStateHistory("vacuum.robot", 0, 1)).resolves.toEqual([]);
   });
 });
 

@@ -29,13 +29,14 @@ afterAll(async () => {
   reloadConfig();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   process.env.TIDINESS_VACUUM_ENTITY_ID = VACUUM;
   process.env.STATE_DIR = mkdtempSync(join(tmpdir(), "sakke-vacuum-"));
   reloadConfig();
   __resetTidinessState();
   ha.setItems("todo.unused", []); // also clears recorded service calls
   ha.setState(VACUUM, "docked", { battery_level: 80 });
+  await loadEntities(); // registry cache is module state; start each test unnamed
 });
 
 describe("moving the vacuum", () => {
@@ -77,6 +78,11 @@ describe("the vacuum's name", () => {
     expect(await run({ action: "start" })).toContain("James");
   });
 
+  it("says who did the last clean by name", async () => {
+    await recordClean(Date.now(), "vacuum");
+    expect(await run({ action: "last_cleaned" })).toContain("today, by James");
+  });
+
   it("tells the model the vacuum is called James", () => {
     expect(vacuumPrompt()).toContain("it is called James");
   });
@@ -109,7 +115,7 @@ describe("status", () => {
   it("answers when the house was last cleaned, with the date once it's days ago", async () => {
     await recordClean(Date.now() - 3 * 86_400_000, "vacuum");
     const result = await run({ action: "last_cleaned" });
-    expect(result).toMatch(/last cleaned 3 days ago, on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} \w+, by the vacuum/);
+    expect(result).toMatch(/last cleaned 3 days ago, on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} \w+, by the robot vacuum/);
     expect(result).not.toContain("battery");
   });
 
