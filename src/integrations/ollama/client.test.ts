@@ -58,6 +58,7 @@ describe("ollamaChat", () => {
     const err = await expectOllamaError(ollamaChat(server.url, REQUEST));
     expect(err.kind).toBe("http");
     expect(err.status).toBe(500);
+    expect(err.message).toContain("model not found");
   });
 
   // The bug CodeRabbit caught: res.json() throws SyntaxError on malformed
