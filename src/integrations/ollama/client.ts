@@ -52,7 +52,15 @@ export async function ollamaChat(baseUrl: string, request: OllamaChatRequest): P
 
   if (!res.ok) throw OllamaError.http(res.status, await res.text().catch(() => ""));
 
-  const parsed = chatResponseSchema.safeParse(await res.json());
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch (err) {
+    if (err instanceof SyntaxError) throw OllamaError.invalidResponse(`body is not JSON: ${err.message}`);
+    throw err;
+  }
+
+  const parsed = chatResponseSchema.safeParse(body);
   if (!parsed.success) throw OllamaError.invalidResponse(parsed.error.message);
 
   return parsed.data.message;

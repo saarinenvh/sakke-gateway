@@ -86,7 +86,7 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     // follow-up for as long as it lasts, so it gets logged as an error rather
     // than a warning that blends into the noise.
     if (err instanceof OllamaError && err.kind === "http") {
-      log.error({ model, baseUrl, status: err.status }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
+      log.error({ model, baseUrl, status: err.status, err: err.message }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
     } else if (err instanceof OllamaError && err.kind === "invalid_response") {
       log.error({ model, baseUrl, err: err.message }, "Continuation check got an invalid response - follow-ups will be ignored until this is fixed");
     } else {
