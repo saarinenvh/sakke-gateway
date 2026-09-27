@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { config } from "../../config.js";
-import { parseOrThrow } from "../../util/validation.js";
-import { entityStateSchema, entityStatesSchema, type EntityState } from "./schemas.js";
+import { parseJsonResponse } from "../../util/validation.js";
+import { entityStateSchema, entityStatesSchema, todoItemsSchema, type EntityState, type TodoItem } from "./schemas.js";
 
 export type { EntityState };
 
@@ -49,7 +49,7 @@ const serviceResponseEnvelopeSchema = z.object({
 
 export async function haGet<S extends z.ZodType>(path: string, schema: S, options?: RequestOptions): Promise<z.output<S>> {
   const res = await request("GET", path, undefined, options);
-  return parseOrThrow(schema, await res.json(), `HA GET ${path}`);
+  return parseJsonResponse(res, schema, `HA GET ${path}`);
 }
 
 // For calls whose answer nobody reads. The body is still drained so the
@@ -86,7 +86,15 @@ export async function callServiceWithResponse<S extends z.ZodType>(
 ): Promise<z.output<S>> {
   const path = `/api/services/${domain}/${service}?return_response=true`;
   const res = await request("POST", path, data, options);
-  return parseOrThrow(schema, unwrapServiceResponse(await res.json()), `HA POST ${path}`);
+  return parseJsonResponse(res, z.preprocess(unwrapServiceResponse, schema), `HA POST ${path}`);
+}
+
+// todo.get_items answers keyed by entity id. The entity asked about must be
+// in the answer - a missing one is a malformed response, not an empty list.
+export async function getTodoItems(entityId: string, options?: RequestOptions): Promise<TodoItem[]> {
+  const schema = z.object({ [entityId]: todoItemsSchema });
+  const response = await callServiceWithResponse("todo", "get_items", { entity_id: entityId }, schema, options);
+  return response[entityId].items;
 }
 
 export async function renderTemplate(template: string, options?: RequestOptions): Promise<string> {

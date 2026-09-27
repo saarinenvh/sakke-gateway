@@ -25,17 +25,24 @@ export const todoItemSchema = z.object({
 
 export type TodoItem = z.output<typeof todoItemSchema>;
 
-// todo.get_items answers keyed by the entity id it was asked about.
-export const todoItemsResponseSchema = z.record(
-  z.string(),
-  z.object({ items: z.array(todoItemSchema).optional() }),
-);
+// One entity's entry in a todo.get_items answer.
+export const todoItemsSchema = z.object({ items: z.array(todoItemSchema) });
 
-// A timed event carries dateTime, an all-day event carries date.
+const parseableDate = z.string().refine(value => !Number.isNaN(Date.parse(value)), {
+  error: "must be a parseable date",
+});
+
+// A timed event carries dateTime, an all-day event carries date - one of the
+// two is always there.
+const calendarEventStartSchema = z.union([
+  z.object({ dateTime: parseableDate }),
+  z.object({ date: parseableDate }),
+]);
+
 export const calendarEventsSchema = z.array(
   z.object({
     summary: z.string(),
-    start: z.object({ date: z.string().optional(), dateTime: z.string().optional() }),
+    start: calendarEventStartSchema,
   }),
 );
 

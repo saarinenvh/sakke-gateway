@@ -1,5 +1,5 @@
-import { callService, callServiceWithResponse, getAllStates } from "../integrations/homeAssistant/client.js";
-import { todoItemsResponseSchema, type TodoItem } from "../integrations/homeAssistant/schemas.js";
+import { callService, getAllStates, getTodoItems } from "../integrations/homeAssistant/client.js";
+import type { TodoItem } from "../integrations/homeAssistant/schemas.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },
@@ -25,12 +25,6 @@ export function categorizeItem(name: string): number {
     if (STORE_LAYOUT[i].keywords.some(kw => lower.includes(kw))) return i;
   }
   return STORE_LAYOUT.length;
-}
-
-async function getItems(entityId: string): Promise<TodoItem[]> {
-  const response = await callServiceWithResponse(
-    "todo", "get_items", { entity_id: entityId }, todoItemsResponseSchema);
-  return response[entityId]?.items ?? [];
 }
 
 function findItem(items: TodoItem[], query: string): TodoItem | undefined {
@@ -110,7 +104,7 @@ export async function getTodoLists(): Promise<{ entity_id: string; name: string 
 }
 
 export async function sortList(entityId: string): Promise<string> {
-  const items = await getItems(entityId);
+  const items = await getTodoItems(entityId);
   const pending = items.filter(i => i.status === "needs_action");
   const completed = items.filter(i => i.status === "completed");
 
@@ -128,14 +122,14 @@ export async function sortList(entityId: string): Promise<string> {
 }
 
 export async function readList(entityId: string): Promise<string> {
-  const items = await getItems(entityId);
+  const items = await getTodoItems(entityId);
   const pending = items.filter(i => i.status === "needs_action");
   if (pending.length === 0) return "List is empty.";
   return pending.map(i => `- ${i.summary}`).join("\n");
 }
 
 export async function addToList(entityId: string, newItems: string[]): Promise<string> {
-  const existing = await getItems(entityId);
+  const existing = await getTodoItems(entityId);
   const pending = existing.filter(i => i.status === "needs_action");
   const currentSummaries = pending.map(i => i.summary);
 
@@ -163,7 +157,7 @@ export async function addToList(entityId: string, newItems: string[]): Promise<s
 }
 
 export async function completeInList(entityId: string, itemQuery: string): Promise<string> {
-  const items = await getItems(entityId);
+  const items = await getTodoItems(entityId);
   const match = findItem(items.filter(i => i.status === "needs_action"), itemQuery);
   if (!match) return `Couldn't find "${itemQuery}" in the list.`;
   await callService("todo", "update_item", { entity_id: entityId, item: match.summary, status: "completed" });
@@ -171,7 +165,7 @@ export async function completeInList(entityId: string, itemQuery: string): Promi
 }
 
 export async function removeFromList(entityId: string, itemQuery: string): Promise<string> {
-  const items = await getItems(entityId);
+  const items = await getTodoItems(entityId);
   const match = findItem(items, itemQuery);
   if (!match) return `Couldn't find "${itemQuery}" in the list.`;
   await callService("todo", "remove_item", { entity_id: entityId, item: match.summary });

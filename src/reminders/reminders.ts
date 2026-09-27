@@ -1,8 +1,7 @@
 import { config } from "../config.js";
-import { haGet, callServiceWithResponse } from "../integrations/homeAssistant/client.js";
+import { haGet, getTodoItems } from "../integrations/homeAssistant/client.js";
 import {
   calendarEventsSchema,
-  todoItemsResponseSchema,
   type CalendarEvent,
   type TodoItem,
 } from "../integrations/homeAssistant/schemas.js";
@@ -72,16 +71,14 @@ export function getDateRange(period: string): { start: string; end: string } {
 }
 
 async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
-  const response = await callServiceWithResponse(
-    "todo", "get_items", { entity_id: config.ha.tasksTodo }, todoItemsResponseSchema);
-  const items = response[config.ha.tasksTodo]?.items ?? [];
+  const items = await getTodoItems(config.ha.tasksTodo);
   const { start, end } = getDateRange(period);
   return items.filter(i => i.status !== "completed" && isDueInRange(i.due, start, end));
 }
 
 function formatEventTime(event: CalendarEvent): string {
+  if (!("dateTime" in event.start)) return event.summary;
   const dt = event.start.dateTime;
-  if (!dt) return event.summary;
   const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone });
   return `${event.summary} at ${time}`;
 }

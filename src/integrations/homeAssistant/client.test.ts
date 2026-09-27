@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { z } from "zod";
 import { ValidationError } from "../../util/validation.js";
-import { callServiceWithResponse, getAllStates, getState, HaError } from "./client.js";
+import { callServiceWithResponse, getAllStates, getState, getTodoItems, HaError } from "./client.js";
 
 function respondWith(body: unknown, status = 200): void {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
@@ -31,6 +31,14 @@ describe("entity state reads", () => {
     respondWith([{ entity_id: "light.ceiling", attributes: {} }]);
 
     await expect(getAllStates()).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("treats a truncated 2xx body as a validation failure, not a crash in JSON parsing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('[{"entity_id": "light.ceil', { status: 200 })));
+
+    const error = await getAllStates().catch(err => err);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.issues).toContain("body is not JSON");
   });
 
   it("keeps an HTTP failure an HaError, not a validation error", async () => {
@@ -64,5 +72,22 @@ describe("callServiceWithResponse", () => {
     expect(error).toBeInstanceOf(ValidationError);
     expect(error.source).toBe("HA POST /api/services/todo/get_items?return_response=true");
     expect(error.issues).toContain("items");
+  });
+});
+
+describe("getTodoItems", () => {
+  it("returns the requested list's items", async () => {
+    respondWith({ service_response: { "todo.shopping": { items: [{ summary: "milk", status: "needs_action" }] } } });
+
+    await expect(getTodoItems("todo.shopping")).resolves.toEqual([{ summary: "milk", status: "needs_action" }]);
+  });
+
+  it.each([
+    ["the requested entity is missing", { service_response: { "todo.other": { items: [] } } }],
+    ["the entity has no items field", { service_response: { "todo.shopping": {} } }],
+  ])("rejects a response where %s, instead of reporting an empty list", async (_case, body) => {
+    respondWith(body);
+
+    await expect(getTodoItems("todo.shopping")).rejects.toBeInstanceOf(ValidationError);
   });
 });

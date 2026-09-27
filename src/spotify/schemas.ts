@@ -11,7 +11,7 @@ export const tokenResponseSchema = z.object({
 const searchItemSchema = z.object({
   uri: z.string(),
   name: z.string(),
-  id: z.string().optional(),
+  id: z.string(),
   artists: z.array(z.object({ name: z.string() })).optional(),
 });
 
@@ -19,12 +19,13 @@ const searchItemSchema = z.object({
 // playlists that still match the query).
 const searchPageSchema = z.object({ items: z.array(searchItemSchema.nullable()) });
 
-export const searchResponseSchema = z.object({
-  tracks: searchPageSchema.optional(),
-  artists: searchPageSchema.optional(),
-  playlists: searchPageSchema.optional(),
-  albums: searchPageSchema.optional(),
-});
+export type SearchResultKey = "tracks" | "artists" | "playlists" | "albums";
+
+// Spotify answers with one page per requested type; the page for the type
+// asked about must be there - a missing one is malformed, not "no results".
+export function searchResponseSchemaFor(key: SearchResultKey) {
+  return z.object({ [key]: searchPageSchema });
+}
 
 export const artistAlbumsResponseSchema = z.object({
   items: z.array(z.object({ uri: z.string(), name: z.string() })),

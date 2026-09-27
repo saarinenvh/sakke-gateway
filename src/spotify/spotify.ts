@@ -1,8 +1,8 @@
 import { moduleLog } from "../logger.js";
 import { config } from "../config.js";
 import { getState as haGetState, callService } from "../integrations/homeAssistant/client.js";
-import { parseOrThrow } from "../util/validation.js";
-import { artistAlbumsResponseSchema, searchResponseSchema, tokenResponseSchema } from "./schemas.js";
+import { parseJsonResponse } from "../util/validation.js";
+import { artistAlbumsResponseSchema, searchResponseSchemaFor, tokenResponseSchema, type SearchResultKey } from "./schemas.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
@@ -113,7 +113,7 @@ async function getAccessToken(): Promise<string> {
   });
 
   if (!res.ok) throw new Error(`Spotify auth failed: ${res.status}`);
-  const data = parseOrThrow(tokenResponseSchema, await res.json(), "Spotify token");
+  const data = await parseJsonResponse(res, tokenResponseSchema, "Spotify token");
   accessToken = data.access_token;
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
   return accessToken;
@@ -131,7 +131,7 @@ async function haService(service: string, data: Record<string, unknown>): Promis
   moduleLog().info({ tool: "spotify" }, `haService ${service} OK`);
 }
 
-async function spotifySearchMultiple(query: string, type: "track" | "artist" | "playlist" | "album", limit: number, offset: number): Promise<{ uri: string; name: string; artist?: string; id?: string }[]> {
+async function spotifySearchMultiple(query: string, type: "track" | "artist" | "playlist" | "album", limit: number, offset: number): Promise<SuggestionItem[]> {
   const token = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}&market=FI`;
   const res = await fetch(url, {
@@ -139,10 +139,9 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify search failed: ${res.status}`);
-  const data = parseOrThrow(searchResponseSchema, await res.json(), "Spotify search");
-
-  const key = type === "playlist" ? "playlists" : type === "artist" ? "artists" : type === "album" ? "albums" : "tracks";
-  const items = (data[key]?.items ?? []).filter(item => item !== null);
+  const key: SearchResultKey = type === "playlist" ? "playlists" : type === "artist" ? "artists" : type === "album" ? "albums" : "tracks";
+  const data = await parseJsonResponse(res, searchResponseSchemaFor(key), "Spotify search");
+  const items = data[key].items.filter(item => item !== null);
   return items.map(item => ({
     uri: item.uri,
     name: item.name,
@@ -164,7 +163,7 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
 // it. Between hearing "Found: 1. X, 2. Y, 3. Z" and saying "the second one",
 // position 2 could be a different track: the model does everything right and
 // the wrong song plays. Also saves a second API round-trip on the pick.
-interface SuggestionItem { uri: string; name: string; artist?: string; id?: string }
+interface SuggestionItem { uri: string; name: string; artist?: string; id: string }
 const lastSuggestion = new Map<string, { items: SuggestionItem[]; type: "track" | "artist" | "playlist" | "album"; query: string }>();
 
 // Presents 3 numbered results without playing anything.
@@ -198,7 +197,6 @@ async function playResolved(choice: SuggestionItem, type: "track" | "artist" | "
   // media_content_type "artist" isn't supported by HA's Spotify integration -
   // resolve to one of the artist's albums instead, same as before.
   if (type === "artist") {
-    if (!choice.id) return `Couldn't resolve "${choice.name}" to play.`;
     const album = await spotifyArtistAlbum(choice.id);
     if (!album) return `Found ${choice.name} but couldn't find an album to play.`;
     await spotifyPlay(album.uri, "album");
@@ -222,7 +220,7 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify albums fetch failed: ${res.status}`);
-  const data = parseOrThrow(artistAlbumsResponseSchema, await res.json(), "Spotify artist albums");
+  const data = await parseJsonResponse(res, artistAlbumsResponseSchema, "Spotify artist albums");
   const album = data.items[0];
   if (!album) return null;
   return { uri: album.uri, name: album.name };

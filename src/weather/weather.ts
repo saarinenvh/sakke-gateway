@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { config } from "../config.js";
-import { parseOrThrow } from "../util/validation.js";
+import { parseJsonResponse } from "../util/validation.js";
 
 const FORECAST_HOURS = 6;
 
@@ -47,7 +47,7 @@ export async function getWeather(): Promise<string> {
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
 
-  return formatWeather(parseOrThrow(weatherReadingSchema, await res.json(), "Open-Meteo forecast"));
+  return formatWeather(await parseJsonResponse(res, weatherReadingSchema, "Open-Meteo forecast"));
 }
 
 // Split from getWeather so the mapping and the guards can be exercised without

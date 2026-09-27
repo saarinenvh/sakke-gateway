@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { config } from "../../config.js";
-import { parseOrThrow } from "../../util/validation.js";
+import { parseJsonResponse } from "../../util/validation.js";
 
 // One OpenAI client, mirroring homeAssistant/client.ts's shape: a single place
 // for auth headers, timeout and error handling instead of each caller building
@@ -62,6 +62,6 @@ export async function chatCompletion(
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text().catch(() => ""), path);
 
-  const response = parseOrThrow(chatCompletionResponseSchema, await res.json(), `OpenAI POST ${path}`);
+  const response = await parseJsonResponse(res, chatCompletionResponseSchema, `OpenAI POST ${path}`);
   return response.choices[0].message.content?.trim() ?? "";
 }
