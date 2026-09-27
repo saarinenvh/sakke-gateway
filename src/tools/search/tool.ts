@@ -16,5 +16,6 @@ export const webSearchTool: Tool = {
       },
     },
   },
+  repeatable: () => true,
   execute: args => webSearch(args.query as string),
 };
