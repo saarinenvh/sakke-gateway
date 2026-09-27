@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
-import { addToList, sortList, readList, removeFromList, completeInList } from "../../src/lists/lists.js";
+import { addToList, sortList, readList, removeFromList, completeInList } from "../../src/tools/lists/lists.js";
 import { reloadConfig } from "../../src/config.js";
 
 // Finding #3 was the worst bug in the review: adding one item removed every

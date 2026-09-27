@@ -1,13 +1,13 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { config } from "../config.js";
-import { homeControlPrompt } from "../homeControl/prompt.js";
-import { listsPrompt } from "../lists/prompt.js";
-import { remindersPrompt } from "../reminders/prompt.js";
-import { spotifyPrompt } from "../spotify/prompt.js";
-import { weatherPrompt } from "../weather/prompt.js";
-import { searchPrompt } from "../search/prompt.js";
-import { wikiPrompt } from "../wiki/prompt.js";
+import { homeControlPrompt } from "../tools/homeControl/prompt.js";
+import { listsPrompt } from "../tools/lists/prompt.js";
+import { remindersPrompt } from "../tools/reminders/prompt.js";
+import { spotifyPrompt } from "../tools/spotify/prompt.js";
+import { weatherPrompt } from "../tools/weather/prompt.js";
+import { searchPrompt } from "../tools/search/prompt.js";
+import { wikiPrompt } from "../tools/wiki/prompt.js";
 
 // Composes the system prompt from per-feature fragments. Each feature owns the
 // rules for its own tools, so the two move together instead of drifting apart

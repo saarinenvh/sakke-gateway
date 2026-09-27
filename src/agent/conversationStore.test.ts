@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Message } from "../integrations/ollama/types.js";
 import {
-  type Message,
   contextBudgetChars,
   trimConversationHistory,
   getConversation,
@@ -8,13 +8,12 @@ import {
   clearAwaitingContinuation,
   dropConversation,
   pruneStale,
-  isChatModeRequest,
   isResetRequest,
   __clearAllConversations,
 } from "./conversationStore.js";
-import { clearSpotifySuggestion } from "../spotify/spotify.js";
+import { clearSpotifySuggestion } from "../tools/spotify/spotify.js";
 
-vi.mock("../spotify/spotify.js", () => ({ clearSpotifySuggestion: vi.fn() }));
+vi.mock("../tools/spotify/spotify.js", () => ({ clearSpotifySuggestion: vi.fn() }));
 
 const NUM_CTX = 16384;
 const BUDGET = contextBudgetChars(NUM_CTX);
@@ -129,9 +128,9 @@ describe("trimConversationHistory", () => {
 
 describe("the conversation store", () => {
   it("round-trips a saved conversation and stamps it active", () => {
-    saveConversation("c1", { messages: [sys()], chatMode: true, awaitingContinuation: true });
+    saveConversation("c1", { messages: [sys()], awaitingContinuation: true });
     const conv = getConversation("c1");
-    expect(conv?.chatMode).toBe(true);
+    expect(conv?.messages).toHaveLength(1);
     expect(conv?.lastActive).toBeGreaterThan(0);
   });
 
@@ -140,7 +139,7 @@ describe("the conversation store", () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(1_000_000);
-      saveConversation("c1", { messages: [sys()], chatMode: false, awaitingContinuation: true });
+      saveConversation("c1", { messages: [sys()], awaitingContinuation: true });
       const stamped = getConversation("c1")!.lastActive;
 
       vi.setSystemTime(1_000_000 + 60_000);
@@ -154,7 +153,7 @@ describe("the conversation store", () => {
   });
 
   it("forgets the Spotify suggestions keyed by the same id when a conversation is dropped", () => {
-    saveConversation("c1", { messages: [sys()], chatMode: false, awaitingContinuation: true });
+    saveConversation("c1", { messages: [sys()], awaitingContinuation: true });
     dropConversation("c1");
     expect(getConversation("c1")).toBeUndefined();
     expect(clearSpotifySuggestion).toHaveBeenCalledWith("c1");
@@ -164,10 +163,10 @@ describe("the conversation store", () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(1_000_000);
-      saveConversation("old", { messages: [sys()], chatMode: false, awaitingContinuation: true });
+      saveConversation("old", { messages: [sys()], awaitingContinuation: true });
 
       vi.setSystemTime(1_000_000 + 11 * 60 * 1000);
-      saveConversation("fresh", { messages: [sys()], chatMode: false, awaitingContinuation: true });
+      saveConversation("fresh", { messages: [sys()], awaitingContinuation: true });
       pruneStale();
 
       expect(getConversation("old")).toBeUndefined();
@@ -182,12 +181,6 @@ describe("the conversation store", () => {
 });
 
 describe("phrase matching", () => {
-  it("recognises chat mode through trailing punctuation and casing", () => {
-    expect(isChatModeRequest("Let's chat!")).toBe(true);
-    expect(isChatModeRequest("  LETS TALK.  ")).toBe(true);
-    expect(isChatModeRequest("let's chat about the weather")).toBe(false);
-  });
-
   it("recognises a reset without swallowing sentences that merely contain one", () => {
     expect(isResetRequest("Start over.")).toBe(true);
     expect(isResetRequest("reset")).toBe(true);
