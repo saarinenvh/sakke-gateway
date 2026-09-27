@@ -69,15 +69,17 @@ describe("a normal turn", () => {
 // tool had already succeeded.
 describe("when the model repeats a tool call", () => {
   it("withholds the tool schema and gets a real answer", async () => {
+    // run_routine is not repeatable - an identical repeat here has nothing
+    // else in the batch to make progress, so it's the actual stuck case.
     ollama.script(
-      { toolCalls: [toolCall("get_weather")] },
-      { toolCalls: [toolCall("get_weather")] },   // identical - the loop detector fires
-      { content: "Cold and damp. Obviously." },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },   // identical - the loop detector fires
+      { content: "Done. Obviously." },
     );
 
-    const result = await runAgent("weather", nextId(), log);
+    const result = await runAgent("good night", nextId(), log);
 
-    expect(result.content).toBe("Cold and damp. Obviously.");
+    expect(result.content).toBe("Done. Obviously.");
     expect(result.content).not.toContain("I got confused");
 
     const passes = ollama.requests();
@@ -89,14 +91,151 @@ describe("when the model repeats a tool call", () => {
     // Withholding the schema stops the runtime parsing a tool call, not the
     // model producing one - seen live, and read out by Piper verbatim.
     ollama.script(
-      { toolCalls: [toolCall("get_weather")] },
-      { toolCalls: [toolCall("get_weather")] },
-      { content: '<tool_call>{"name": "get_weather", "arguments": {}}</tool_call>' },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { content: '<tool_call>{"name": "run_routine", "arguments": {}}</tool_call>' },
     );
 
-    const result = await runAgent("weather", nextId(), log);
+    const result = await runAgent("good night", nextId(), log);
     expect(result.content).not.toContain("tool_call");
     expect(result.content).toBe("That didn't work. Ask me again.");
+  });
+
+  // A batch that's entirely a repeat of a REPEATABLE tool isn't actually
+  // stuck - it should just re-execute (fresh data), not force a final
+  // answer from stale context.
+  it("re-executes a repeatable tool instead of forcing a final answer, even when the whole batch already ran", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] },
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] }, // identical, but repeatable
+      { content: "Still off." },
+    );
+
+    const result = await runAgent("check the light again", nextId(), log);
+    expect(result.content).toBe("Still off.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(3);
+    // Never withheld - the repeat re-executed normally both times instead of
+    // triggering the stuck-loop path.
+    expect(passes.map(p => p.hasTools)).toEqual([true, true, true]);
+  });
+});
+
+const SKIPPED_REPEAT = "run_routine already ran this turn with the same arguments - not repeating it.";
+
+// Finding #7 (CtjMmdnP). The loop only used to withhold tools when the WHOLE
+// batch was already done - a batch mixing a repeat with a new call executed
+// both, and two identical calls within one batch both executed too.
+describe("duplicate tool calls within or across a batch", () => {
+  it("skips a repeated non-repeatable call in a mixed batch, but still runs the new one", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [
+        toolCall("run_routine", { script_id: "good_night" }), // repeat - not repeatable
+        toolCall("get_device_state", { entity_id: "light.hall" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("good night", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(3);
+
+    const toolMessages = passes[2].messages.filter(m => m.role === "tool");
+    const [repeated, fresh] = toolMessages.slice(-2);
+    expect(repeated.content).toBe(SKIPPED_REPEAT);
+    expect(fresh.content).not.toBe(SKIPPED_REPEAT);
+  });
+
+  it("skips the second of two identical non-repeatable calls in the same batch", async () => {
+    ollama.script(
+      { toolCalls: [
+        toolCall("run_routine", { script_id: "good_night" }),
+        toolCall("run_routine", { script_id: "good_night" }),
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("good night twice", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[1].messages.filter(m => m.role === "tool");
+    expect(toolMessages).toHaveLength(2);
+    expect(toolMessages[0].content).not.toBe(SKIPPED_REPEAT);
+    expect(toolMessages[1].content).toBe(SKIPPED_REPEAT);
+  });
+
+  it("still re-executes a repeatable tool even when the call is repeated", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] },
+      { toolCalls: [
+        toolCall("get_device_state", { entity_id: "light.hall" }), // repeat - repeatable, should run again
+        toolCall("run_routine", { script_id: "morning" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("check and run", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
+    const lastTwo = toolMessages.slice(-2);
+    expect(lastTwo[0].content).not.toContain("already ran this turn");
+    expect(lastTwo[1].content).not.toContain("already ran this turn");
+  });
+
+  // JSON.stringify preserves key insertion order, so the same logical
+  // arguments with a different key order (plausible from a model
+  // regenerating the same call) used to bypass the dedup key entirely.
+  it("recognizes a repeated call even when its argument keys are in a different order", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("timer", { action: "set", duration_minutes: 5, label: "tea" })] },
+      { toolCalls: [
+        toolCall("timer", { duration_minutes: 5, label: "tea", action: "set" }), // same call, keys reordered
+        toolCall("get_device_state", { entity_id: "light.hall" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("set a timer for tea, twice", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
+    const [repeated, fresh] = toolMessages.slice(-2);
+    expect(repeated.content).toBe("timer already ran this turn with the same arguments - not repeating it.");
+    expect(fresh.content).not.toContain("already ran this turn");
+  });
+
+  // manage_list bundles several actions under one tool - repeatability is
+  // decided per action, not for the whole tool: list_read is a pure read,
+  // list_add is a mutation.
+  it("lets manage_list's list_read repeat but not a mutating action on the same tool", async () => {
+    const listArgs = { list: "todo.groceries" };
+    ollama.script(
+      { toolCalls: [toolCall("manage_list", { action: "list_add", ...listArgs, item: "milk" })] },
+      { toolCalls: [
+        toolCall("manage_list", { action: "list_add", ...listArgs, item: "milk" }), // repeat - mutating, skip
+        toolCall("manage_list", { action: "list_read", ...listArgs }), // new read
+      ] },
+      { toolCalls: [toolCall("manage_list", { action: "list_read", ...listArgs })] }, // repeat - read, re-executes
+      { content: "Done." },
+    );
+
+    const result = await runAgent("add milk twice, then check the list", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(4);
+    // Never withheld - the repeated read re-executed instead of being treated
+    // as a stuck loop.
+    expect(passes.map(p => p.hasTools)).toEqual([true, true, true, true]);
+
+    const toolMessages = passes[3].messages.filter(m => m.role === "tool");
+    const skipped = toolMessages.filter(m => m.content === "manage_list already ran this turn with the same arguments - not repeating it.");
+    expect(skipped).toHaveLength(1); // only the repeated list_add, not either list_read
   });
 });
 

@@ -56,6 +56,13 @@ export function toolNames(): string[] {
   return [...byName.keys()];
 }
 
+// Unknown names shouldn't reach here (executeTool already handles that case),
+// but default to false regardless - re-executing something unrecognized is
+// never the safe assumption.
+export function isRepeatable(name: string, args: Record<string, unknown>): boolean {
+  return byName.get(name)?.repeatable(args) ?? false;
+}
+
 // Results go into the conversation, so they're logged in full only up to a
 // point - get_context returns whole wiki pages and web_search returns a page
 // of extracts.

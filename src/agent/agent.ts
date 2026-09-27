@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { tools, executeTool } from "../tools/registry.js";
+import { tools, executeTool, isRepeatable } from "../tools/registry.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
 import { broadcastState } from "../features/display/displayState.js";
 import { classifyFollowUp, type FollowUpVerdict } from "./continuationCheck.js";
@@ -209,10 +209,14 @@ function callOllama(messages: Message[], target: OllamaTargetConfig, forceFinalR
   });
 }
 
-// Executes one batch of tool calls. Only catches an exact repeat of the WHOLE
-// previous batch (the model stuck in a loop) - a mixed batch of new and
-// already-run calls still re-executes both; that's the separate "duplicate
-// tool-call detection" ticket (CtjMmdnP), not this refactor's job.
+// Keys are marked completed as the batch is processed, not in bulk
+// beforehand, so a duplicate within one batch is caught the same way as one
+// across batches. Whether the model is "stuck" isn't decided from the keys
+// upfront - it's whether processing the batch produced any new result at
+// all. A batch that's entirely skipped repeats of non-repeatable calls means
+// zero new information reached the model, which is the actual stuck case;
+// a batch containing even one new or repeatable call is real progress, even
+// if every key in it was already seen before.
 async function executeToolBatch(
   toolCalls: OllamaToolCall[],
   assistantContent: string,
@@ -221,13 +225,7 @@ async function executeToolBatch(
   conversationId: string,
   log: FastifyBaseLogger,
 ): Promise<ToolBatchOutcome> {
-  const callKeys = toolCalls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
-  const wholeBatchAlreadyRan = callKeys.every(k => completedToolCalls.has(k));
-  if (wholeBatchAlreadyRan) {
-    log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
-    return "repeated";
-  }
-  callKeys.forEach(k => completedToolCalls.add(k));
+  const callKeys = toolCalls.map(t => toolCallKey(t.function.name, t.function.arguments));
 
   log.info(
     { conversationId, tools: toolCalls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
@@ -236,12 +234,50 @@ async function executeToolBatch(
 
   messages.push({ role: "assistant", content: assistantContent, tool_calls: toolCalls });
 
-  for (const call of toolCalls) {
+  let anyExecuted = false;
+
+  for (const [i, call] of toolCalls.entries()) {
+    const key = callKeys[i];
+
+    if (completedToolCalls.has(key) && !isRepeatable(call.function.name, call.function.arguments)) {
+      log.warn({ conversationId, tool: call.function.name }, "Skipped repeat of a non-repeatable tool call");
+      messages.push({
+        role: "tool",
+        content: `${call.function.name} already ran this turn with the same arguments - not repeating it.`,
+        tool_call_id: call.id,
+      });
+      continue;
+    }
+
+    anyExecuted = true;
+    completedToolCalls.add(key);
     const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
     messages.push({ role: "tool", content: result, tool_call_id: call.id });
   }
 
+  if (!anyExecuted) {
+    log.warn({ conversationId, tools: callKeys }, "Every call in this batch was a repeat, withholding tools next pass");
+    return "repeated";
+  }
+
   return "executed";
+}
+
+function toolCallKey(name: string, args: Record<string, unknown>): string {
+  return `${name}:${canonicalJson(args)}`;
+}
+
+// JSON.stringify preserves property insertion order, not a canonical one - two
+// calls with identical arguments but different key order would otherwise
+// produce different keys and silently bypass the dedup above.
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return `{${keys.map(k => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 // Applies the turn's completion side effects - speech cleanup, history

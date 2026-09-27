@@ -10,5 +10,6 @@ export const weatherTool: Tool = {
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  repeatable: () => true,
   execute: () => getWeather(),
 };
