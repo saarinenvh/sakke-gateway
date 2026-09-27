@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
 import { executeTool } from "../../src/tools/registry.js";
+import { vacuumTool } from "../../src/tools/vacuum/tool.js";
 import { reloadConfig } from "../../src/config.js";
 import { loadEntities } from "../../src/integrations/homeAssistant/registry.js";
 import { __resetTidinessState, getTidinessState, recordClean, recordNag } from "../../src/features/tidiness/store.js";
@@ -104,6 +105,11 @@ describe("answers to a cleaning reminder", () => {
     const before = Date.now();
     await run({ action: "snooze" });
     expect(getTidinessState().snoozedUntil).toBeGreaterThanOrEqual(before + 24 * 3_600_000);
+  });
+
+  it("lets only the read-only actions repeat within a turn", () => {
+    expect(["status", "last_cleaned"].every(action => vacuumTool.repeatable({ action }))).toBe(true);
+    expect(["start", "stop", "dock", "mark_cleaned", "decline", "snooze"].some(action => vacuumTool.repeatable({ action }))).toBe(false);
   });
 
   it("rejects an unknown action through validation", async () => {

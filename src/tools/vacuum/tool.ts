@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Tool } from "../types.js";
 import { parseOrThrow } from "../../util/validation.js";
-import { runVacuumAction, VACUUM_ACTIONS } from "./vacuum.js";
+import { READ_ONLY_VACUUM_ACTIONS, runVacuumAction, VACUUM_ACTIONS } from "./vacuum.js";
 
 const vacuumArgsSchema = z.object({ action: z.enum(VACUUM_ACTIONS) });
 
@@ -24,6 +24,7 @@ export const vacuumTool: Tool = {
       },
     },
   },
+  repeatable: args => typeof args.action === "string" && READ_ONLY_VACUUM_ACTIONS.has(args.action),
   execute: args => {
     const { action } = parseOrThrow(vacuumArgsSchema, args, "vacuum tool arguments");
     return runVacuumAction(action, Date.now());

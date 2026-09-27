@@ -8,6 +8,9 @@ import { findVacuum } from "../../features/tidiness/vacuum.js";
 export const VACUUM_ACTIONS = ["start", "stop", "dock", "status", "last_cleaned", "mark_cleaned", "decline", "snooze"] as const;
 export type VacuumAction = (typeof VACUUM_ACTIONS)[number];
 
+// Pure reads; every other action moves the vacuum or changes reminder state.
+export const READ_ONLY_VACUUM_ACTIONS: ReadonlySet<string> = new Set<VacuumAction>(["status", "last_cleaned"]);
+
 // HA services behind the three movement actions.
 const MOVEMENT_SERVICES = {
   start: "start",
