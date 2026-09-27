@@ -9,9 +9,7 @@ export const entityStateSchema = z.object({
   state: z.string(),
   // Attributes vary per domain; friendly_name is the one every caller reads.
   attributes: z.looseObject({ friendly_name: z.string().optional() }),
-  // When the state itself last changed (ISO 8601). Timing a vacuum run from
-  // this, rather than from when the gateway first noticed, survives a gateway
-  // restart in the middle of the run.
+  // Lets a vacuum run be timed correctly across a gateway restart.
   last_changed: z.string().optional(),
 });
 

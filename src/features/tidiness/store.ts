@@ -6,10 +6,7 @@ import { moduleLog } from "../../logger.js";
 import { parseOrThrow } from "../../util/validation.js";
 import type { NagRecord } from "./policy.js";
 
-// Everything the tidiness coach has to remember across a restart: when the
-// house was last cleaned, a run in progress, the snooze, and every nag asked.
-// Without the nag history a restart would forget a slot had been used and
-// ask again.
+// Persisted so a restart neither forgets the last clean nor re-asks a used slot.
 
 const nagRecordSchema = z.object({
   slot: z.string(),
@@ -29,8 +26,7 @@ const tidinessStateSchema = z.object({
 export type TidinessState = z.output<typeof tidinessStateSchema>;
 export type CleanSource = NonNullable<TidinessState["lastCleanedBy"]>;
 
-// Old nags are only needed for "was this slot used" and for counting "no"s
-// since the last clean; a month covers both with room to spare.
+// Covers slot reuse and counting "no"s since the last clean.
 const NAG_RETENTION_MS = 30 * 86_400_000;
 
 let state: TidinessState = { nags: [] };
@@ -42,8 +38,7 @@ export function getTidinessState(): TidinessState {
 // --- Mutations (each one persists) ----------------------------------------
 
 export function recordClean(at: number, source: CleanSource): Promise<void> {
-  // Never move backwards: a late or repeated report of an older run must not
-  // make the house look dirtier than it is.
+  // Never move backwards.
   if (state.lastCleanedAt !== undefined && at <= state.lastCleanedAt) return Promise.resolve();
   return update({ ...state, lastCleanedAt: at, lastCleanedBy: source });
 }
@@ -73,8 +68,7 @@ function stateFile(): string {
   return join(config.stateDir, "tidiness.json");
 }
 
-// Called once at startup. A missing file is a first run; a corrupt one is
-// logged and ignored, which means "never cleaned" - the quiet outcome.
+// A corrupt file is logged and ignored: "never cleaned" is the quiet outcome.
 export async function restoreTidinessState(): Promise<void> {
   let contents: string;
   try {
@@ -95,8 +89,7 @@ export function __resetTidinessState(): void {
   state = { nags: [] };
 }
 
-// Serialised, like the timers file: two overlapping writes would otherwise
-// race on the same temp file.
+// Serialised: overlapping writes would race on the temp file.
 let writeQueue: Promise<void> = Promise.resolve();
 
 function update(next: TidinessState): Promise<void> {
@@ -112,8 +105,7 @@ async function writeSnapshot(): Promise<void> {
     await fs.writeFile(tmp, JSON.stringify(state), "utf-8");
     await fs.rename(tmp, stateFile());
   } catch (err) {
-    // Best-effort, as with timers: the coach keeps working from memory, it
-    // just won't remember across a restart.
+    // Best-effort: the coach still works, but forgets on restart.
     moduleLog().warn({ err: err instanceof Error ? err.message : String(err), file: stateFile() }, "Could not persist tidiness state");
   }
 }

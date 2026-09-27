@@ -55,8 +55,7 @@ export interface LocalTime {
 }
 
 export interface TidinessConfig {
-  // Off by default: the nag speaks unprompted, so it is switched on
-  // deliberately. Vacuum control and last-cleaned tracking work either way.
+  // Off by default: the nag speaks unprompted.
   enabled: boolean;
   // Unset means "the only vacuum Home Assistant has".
   vacuumEntityId: string | undefined;
@@ -212,8 +211,7 @@ function loadTidinessConfig(problems: string[]): TidinessConfig {
   };
 }
 
-// "10:00,18:00" -> [{10, 0}, {18, 0}]. A malformed list falls back to the
-// default rather than silently dropping asks.
+// "10:00,18:00" -> sorted times; a malformed list falls back to the default.
 function parseAskTimes(raw: string, problems: string[]): LocalTime[] {
   const times: LocalTime[] = [];
   for (const part of raw.split(",")) {

@@ -1,11 +1,6 @@
 import type { ToneLevel } from "./policy.js";
 
-// What the model is told when it writes a nag, and what it is told when the
-// owner's answer comes back. The words themselves are always the model's -
-// these only set the facts and how sharp to be.
-
-// Escalation is the owner's explicit opt-in. It stays aimed at the floor and
-// the procrastination, never at the owner as a person, and never invents facts.
+// Escalation is opted into by the owner: aimed at the floor, never the person.
 const TONE_DESCRIPTIONS: Record<ToneLevel, string> = {
   1: "Light and polite: a gentle, witty nudge.",
   2: "Pointed: a dry remark that the dust has started to notice.",
@@ -30,8 +25,7 @@ export function buildNagRequest(facts: NagFacts): string {
   ].join(" ");
 }
 
-// Sent with start_conversation as extra_system_prompt: the owner's reply
-// arrives as a brand-new conversation, and this is all it knows about why.
+// Sent as extra_system_prompt: the reply arrives as a new conversation.
 export function buildAnswerContext(question: string, facts: NagFacts): string {
   return [
     `You just asked the owner, unprompted: "${question}"`,

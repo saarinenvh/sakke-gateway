@@ -10,7 +10,7 @@ export const vacuumTool: Tool = {
     type: "function",
     function: {
       name: "vacuum",
-      description: "Control the robot vacuum and cleaning reminders. 'Clean the house', 'vacuum', 'start the robot' -> start. 'Stop the vacuum' -> stop. 'Send it home' -> dock. 'How's the vacuum?' or 'when was the house last cleaned?' -> status. 'I cleaned the house' -> mark_cleaned. After you asked whether to clean: a no -> decline, 'stop reminding me' or 'leave me alone' -> snooze.",
+      description: "Control the robot vacuum and cleaning reminders. 'Clean the house', 'vacuum', 'start the robot' -> start. 'Stop the vacuum' -> stop. 'Send it home' -> dock. 'How's the vacuum?' -> status. 'When did I last clean?', 'when was the house last cleaned?' -> last_cleaned. 'I cleaned the house' -> mark_cleaned. After you asked whether to clean: a no -> decline, 'stop reminding me' or 'leave me alone' -> snooze.",
       parameters: {
         type: "object",
         properties: {

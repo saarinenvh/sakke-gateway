@@ -36,9 +36,7 @@ export interface NumberEntity {
 export interface VacuumEntity {
   entity_id: string;
   name: string;
-  // Newer integrations report battery as its own sensor on the same device
-  // rather than a vacuum attribute. Matched by the vacuum's object id prefix,
-  // since device links aren't exposed over the REST API.
+  // Matched by object-id prefix; device links aren't in the REST API.
   batterySensorId?: string;
 }
 

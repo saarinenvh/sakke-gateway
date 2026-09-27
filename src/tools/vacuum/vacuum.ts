@@ -5,10 +5,7 @@ import { findAnswerableNag, localDaysBetween } from "../../features/tidiness/pol
 import { getTidinessState, recordClean, snoozeUntil, updateNag } from "../../features/tidiness/store.js";
 import { findVacuum } from "../../features/tidiness/vacuum.js";
 
-// What the vacuum tool does. Each function returns the text the model sees
-// and then says in its own words.
-
-export const VACUUM_ACTIONS = ["start", "stop", "dock", "status", "mark_cleaned", "decline", "snooze"] as const;
+export const VACUUM_ACTIONS = ["start", "stop", "dock", "status", "last_cleaned", "mark_cleaned", "decline", "snooze"] as const;
 export type VacuumAction = (typeof VACUUM_ACTIONS)[number];
 
 // HA services behind the three movement actions.
@@ -32,6 +29,8 @@ export async function runVacuumAction(action: VacuumAction, now: number): Promis
       return moveVacuum(action, now);
     case "status":
       return describeVacuum(now);
+    case "last_cleaned":
+      return describeLastCleaned(now);
     case "mark_cleaned":
       return markCleaned(now);
     case "decline":
@@ -70,8 +69,7 @@ async function describeVacuum(now: number): Promise<string> {
   return `The vacuum is ${vacuumState.state}${batteryText}. ${lastCleaned}`;
 }
 
-// Older integrations put battery on the vacuum itself; newer ones, including
-// Xiaomi Home, give it a sensor of its own.
+// A vacuum attribute on older integrations, a separate sensor on newer ones.
 async function readBatteryPct(vacuum: VacuumEntity, attribute: unknown): Promise<number | undefined> {
   if (typeof attribute === "number") return attribute;
   if (vacuum.batterySensorId === undefined) return undefined;
@@ -90,15 +88,23 @@ export function describeLastCleaned(now: number): string {
     return "When the house was last cleaned is not known yet - only runs from now on are noticed.";
   }
 
-  const when = describeDaysAgo(localDaysBetween(lastCleanedAt, now, config.timezone));
+  const when = describeDaysAgo(lastCleanedAt, now);
   const how = lastCleanedBy === "manual" ? "by hand, as reported" : "by the vacuum";
   return `The house was last cleaned ${when}, ${how}.`;
 }
 
-function describeDaysAgo(days: number): string {
+function describeDaysAgo(cleanedAt: number, now: number): string {
+  const days = localDaysBetween(cleanedAt, now, config.timezone);
   if (days === 0) return "today";
   if (days === 1) return "yesterday";
-  return `${days} days ago`;
+
+  const date = new Date(cleanedAt).toLocaleDateString("en-GB", {
+    timeZone: config.timezone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return `${days} days ago, on ${date}`;
 }
 
 // --- Answers to a cleaning reminder -------------------------------------------

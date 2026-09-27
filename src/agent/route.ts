@@ -10,8 +10,7 @@ interface ChatCompletionBody {
   model?: string;
   messages: ChatMessage[];
   conversation_id?: string;
-  // Forwarded by the sakke_agent HA component from assist_satellite's
-  // start_conversation - see AgentOptions.extraSystemPrompt.
+  // Forwarded by sakke_agent from assist_satellite.start_conversation.
   extra_system_prompt?: string;
 }
 

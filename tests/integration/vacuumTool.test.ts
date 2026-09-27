@@ -6,7 +6,7 @@ import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fake
 import { executeTool } from "../../src/tools/registry.js";
 import { reloadConfig } from "../../src/config.js";
 import { loadEntities } from "../../src/integrations/homeAssistant/registry.js";
-import { __resetTidinessState, getTidinessState, recordNag } from "../../src/features/tidiness/store.js";
+import { __resetTidinessState, getTidinessState, recordClean, recordNag } from "../../src/features/tidiness/store.js";
 
 // The vacuum tool against a fake Home Assistant.
 
@@ -78,6 +78,13 @@ describe("status", () => {
     await loadEntities();
 
     expect(await run({ action: "status" })).toContain("battery 64%");
+  });
+
+  it("answers when the house was last cleaned, with the date once it's days ago", async () => {
+    await recordClean(Date.now() - 3 * 86_400_000, "vacuum");
+    const result = await run({ action: "last_cleaned" });
+    expect(result).toMatch(/last cleaned 3 days ago, on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d{1,2} \w+, by the vacuum/);
+    expect(result).not.toContain("battery");
   });
 
   it("reports a manual clean recorded by mark_cleaned", async () => {

@@ -6,10 +6,8 @@ import { buildAnswerContext, buildNagRequest, type NagFacts } from "./prompts.js
 import { getTidinessState, recordClean, recordNag, setCleaningSince, updateNag } from "./store.js";
 import { findVacuum } from "./vacuum.js";
 
-// The tidiness coach's scheduled check: once a minute, notice finished
-// vacuum runs, and ask about cleaning when the schedule says a nag is due and
-// nothing says to stay quiet. Every outside effect goes through CoachDeps, so
-// a tick can run in a test against a fake clock, fake HA and a fake model.
+// Scheduled check: record finished vacuum runs, and ask about cleaning when a
+// nag is due. All I/O goes through CoachDeps.
 
 export interface CoachDeps {
   now(): number;
@@ -116,8 +114,7 @@ async function askNag(decision: Extract<NagDecision, { kind: "due" }>, deps: Coa
 
   const question = await writeQuestion(facts, deps);
   if (!question) {
-    // Recorded so the slot isn't retried every minute against a model that
-    // keeps failing.
+    // Recorded, so a failing model isn't retried every tick.
     await recordNag({ slot: decision.slot, askedAt: deps.now(), delivery: "failed" });
     return { kind: "asked", slot: decision.slot, delivery: "failed" };
   }
@@ -125,8 +122,7 @@ async function askNag(decision: Extract<NagDecision, { kind: "due" }>, deps: Coa
   // Generating can take a while; the owner may have left or started talking.
   if (!(await stillEligible(decision.slot, deps))) return { kind: "skipped", reason: "no_longer_eligible" };
 
-  // Reserved before speaking: a crash or timeout mid-delivery leaves the slot
-  // "uncertain", never free to be asked a second time.
+  // Reserved before speaking, so a timeout can never lead to asking twice.
   await recordNag({ slot: decision.slot, askedAt: deps.now(), delivery: "uncertain" });
   try {
     await deps.startConversation(question, buildAnswerContext(question, facts));
@@ -166,10 +162,11 @@ async function readStateOrUndefined(deps: CoachDeps, entityId: string): Promise<
 
 // --- Scheduling ---------------------------------------------------------------
 
-const TICK_INTERVAL_MS = 60_000;
+// A run shorter than this can go unseen - fine while it stays under
+// TIDINESS_MIN_RUN_MINUTES, which such a run wouldn't meet anyway.
+const TICK_INTERVAL_MS = 5 * 60_000;
 
-// Ticks never overlap: one that is waiting on the model simply makes the
-// next one a no-op until it finishes.
+// Ticks never overlap.
 export function startTidinessCoach(deps: CoachDeps): void {
   let running = false;
   const tick = async (): Promise<void> => {

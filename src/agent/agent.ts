@@ -27,13 +27,10 @@ const MIN_SPEAKING_MS = 2000;
 const SPEAKING_MS_PER_CHARACTER = 70;
 
 export interface AgentOptions {
-  // Background for this turn from whoever started the conversation - e.g. the
-  // question the tidiness coach just asked out loud. The reply to a
-  // satellite-initiated question arrives as a brand-new conversation, and
-  // this is the only thing that tells the model what it is a reply to.
+  // Context from whoever started the conversation, e.g. the question the
+  // tidiness coach just asked; the reply arrives as a new conversation.
   extraSystemPrompt?: string;
-  // Answer in prose with no tool schema offered at all - for turns that must
-  // never act, like writing a nag that will be asked out loud.
+  // No tool schema at all: for turns that must never act.
   withholdTools?: boolean;
 }
 

@@ -1,20 +1,15 @@
 import type { LocalTime } from "../../config.js";
 
-// The pure half of the tidiness coach: when a nag is due, how sharp it should
-// be, and what a vacuum state change means. No I/O and no clock of its own -
-// every input, including "now", is passed in, so each rule is a plain test.
+// Pure rules: every input, including "now", is passed in.
 
 // --- Schedule -------------------------------------------------------------
 
-// Owner-set schedule, by whole local days since the last clean: a week of
-// peace, one ask, a day of grace, one ask, then twice a day from day 10.
+// Owner-set schedule, in whole local days since the last clean.
 const FIRST_ASK_DAY = 7;
 const GRACE_DAY = 8;
 const TWICE_DAILY_FROM_DAY = 10;
 
-// An ask goes out within this long after its time, or not at all - a nag
-// missed because nobody was home waits for the next slot rather than
-// arriving late in a burst.
+// A missed ask passes unasked rather than arriving late.
 export const SLOT_WINDOW_MINUTES = 60;
 
 export function asksForDay(daysSinceClean: number): number {
@@ -35,8 +30,7 @@ const TONE_THRESHOLDS: { fromDay: number; tone: ToneLevel }[] = [
   { fromDay: 9, tone: 2 },
 ];
 
-// Meaner the longer it has been, and one step meaner for every "no" since
-// the last clean. Only real facts move it.
+// Meaner with the days, and one step per "no" since the last clean.
 export function toneLevel(daysSinceClean: number, declines: number): ToneLevel {
   return clampTone(baseTone(daysSinceClean) + declines);
 }
@@ -81,8 +75,7 @@ export type NagDecision =
   | { kind: "due"; slot: string; daysSinceClean: number; declines: number; tone: ToneLevel };
 
 export function nextNag(input: NagInput): NagDecision {
-  // Unknown is not proof of a dirty house - nothing to nag about until a
-  // clean has been recorded at least once.
+  // Unknown is not a dirty house.
   if (input.lastCleanedAt === undefined) return { kind: "none", reason: "never_cleaned" };
   if (input.snoozedUntil !== undefined && input.now.getTime() < input.snoozedUntil) {
     return { kind: "none", reason: "snoozed" };
@@ -114,8 +107,7 @@ export function countDeclinesSince(nags: NagRecord[], since: number): number {
   return nags.filter(nag => nag.askedAt >= since && nag.answer === "no").length;
 }
 
-// The most recent spoken nag, if it was asked recently enough that an answer
-// arriving now is plausibly an answer to it.
+// An answer only counts for a nag asked moments ago.
 export const ANSWER_WINDOW_MINUTES = 15;
 
 export function findAnswerableNag(nags: NagRecord[], now: number): NagRecord | undefined {
@@ -172,14 +164,11 @@ export function observeVacuum(
 
 // --- Local calendar -------------------------------------------------------
 
-// "2026-10-04" in the given timezone.
 export function localDate(at: number, timezone: string): string {
   return new Date(at).toLocaleDateString("sv-SE", { timeZone: timezone });
 }
 
-// Calendar days, not 24-hour periods: a clean at 23:00 is "1 day ago" at
-// 08:00 the next morning. Computed on the dates themselves, so DST can't
-// shift it by an hour into the wrong day.
+// Calendar days, compared as dates so DST can't shift the count.
 export function localDaysBetween(from: number, to: number, timezone: string): number {
   const fromDay = Date.parse(localDate(from, timezone));
   const toDay = Date.parse(localDate(to, timezone));
