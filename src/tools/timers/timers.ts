@@ -1,7 +1,9 @@
 import { promises as fs } from "fs";
+import { z } from "zod";
 import { join } from "path";
 import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
+import { parseOrThrow } from "../../util/validation.js";
 
 // What happens when a timer finishes is injected, not imported. This module
 // used to import runAgent directly, which closed a cycle - timers -> agent ->
@@ -37,10 +39,23 @@ function timersFile(): string {
   return join(config.stateDir, "timers.json");
 }
 
-interface PersistedTimer {
-  id: string;
-  label: string;
-  endsAt: number;
+const persistedTimersSchema = z.array(z.object({
+  id: z.string(),
+  label: z.string(),
+  endsAt: z.number(),
+}));
+
+type PersistedTimer = z.output<typeof persistedTimersSchema>[number];
+
+// A corrupt or hand-edited file is logged and ignored rather than half-restored
+// - the same outcome as a missing file, but visible.
+function parsePersistedTimers(contents: string): PersistedTimer[] | undefined {
+  try {
+    return parseOrThrow(persistedTimersSchema, JSON.parse(contents), timersFile());
+  } catch (err) {
+    moduleLog().warn({ err: err instanceof Error ? err.message : String(err) }, "Ignoring unreadable timers file");
+    return undefined;
+  }
 }
 
 // Serialised: two writes overlapping raced on the same temp filename - the
@@ -72,12 +87,15 @@ async function writeSnapshot(): Promise<void> {
 // dropped with a log line rather than fired late: announcing a timer that
 // expired twenty minutes ago is worse than not announcing it.
 export async function restoreTimers(): Promise<void> {
-  let saved: PersistedTimer[];
+  let contents: string;
   try {
-    saved = JSON.parse(await fs.readFile(timersFile(), "utf-8")) as PersistedTimer[];
+    contents = await fs.readFile(timersFile(), "utf-8");
   } catch {
     return; // no state file yet, or unreadable - nothing to restore
   }
+
+  const saved = parsePersistedTimers(contents);
+  if (!saved) return;
 
   const now = Date.now();
   let restored = 0;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { mkdtempSync, existsSync, readFileSync } from "fs";
+import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -72,6 +72,14 @@ describe("persistence", () => {
     // Announcing a timer that expired during a restart is worse than not
     // announcing it, so it is dropped rather than fired late.
     expect(after.listTimers().map(t => t.label)).toEqual(["still going"]);
+  });
+
+  it("starts with no timers when the state file has the wrong shape", async () => {
+    writeFileSync(timersFile(), JSON.stringify({ laundry: 45 }));
+
+    const timers = await restart();
+    await expect(timers.restoreTimers()).resolves.toBeUndefined();
+    expect(timers.listTimers()).toHaveLength(0);
   });
 
   it("forgets a cancelled timer across a restart", async () => {

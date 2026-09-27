@@ -1,32 +1,23 @@
 import type { Message } from "./types.js";
 import type { ToolDefinition } from "../../tools/types.js";
+import { parseJsonResponse } from "../../util/validation.js";
 import { chatResponseSchema } from "./schemas.js";
 
 // Mirrors homeAssistant/client.ts and openai/client.ts: one place for the
 // request/response/error handling that agent.ts and continuationCheck.ts
 // otherwise each built their own copy of, against the same endpoint.
 
-// Two genuinely different failure modes: the request reached Ollama and got
-// a bad HTTP status, or it got a 200 with a body that doesn't match the
-// response contract. Callers need to tell these apart (see continuationCheck.ts),
-// so `kind` is real, not a status of 0 standing in for "not HTTP".
+// The request reached Ollama and got a bad HTTP status. A 2xx whose body
+// isn't valid JSON or doesn't match the response contract is a different
+// failure - a ValidationError, as with every other integration - and callers
+// that need to tell them apart (continuationCheck.ts) check the class.
 export class OllamaError extends Error {
-  private constructor(
-    message: string,
-    readonly kind: "http" | "invalid_response",
-    readonly status?: number,
-    readonly body?: string,
+  constructor(
+    readonly status: number,
+    readonly body: string,
   ) {
-    super(message);
+    super(`Ollama HTTP ${status}${body ? `: ${body.slice(0, 500)}` : ""}`);
     this.name = "OllamaError";
-  }
-
-  static http(status: number, body: string): OllamaError {
-    return new OllamaError(`Ollama HTTP ${status}${body ? `: ${body.slice(0, 500)}` : ""}`, "http", status, body);
-  }
-
-  static invalidResponse(issues: string): OllamaError {
-    return new OllamaError(`Ollama response failed validation: ${issues}`, "invalid_response");
   }
 }
 
@@ -50,18 +41,8 @@ export async function ollamaChat(baseUrl: string, request: OllamaChatRequest): P
     body: JSON.stringify({ ...request, stream: false }),
   });
 
-  if (!res.ok) throw OllamaError.http(res.status, await res.text().catch(() => ""));
+  if (!res.ok) throw new OllamaError(res.status, await res.text().catch(() => ""));
 
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch (err) {
-    if (err instanceof SyntaxError) throw OllamaError.invalidResponse(`body is not JSON: ${err.message}`);
-    throw err;
-  }
-
-  const parsed = chatResponseSchema.safeParse(body);
-  if (!parsed.success) throw OllamaError.invalidResponse(parsed.error.message);
-
-  return parsed.data.message;
+  const response = await parseJsonResponse(res, chatResponseSchema, `Ollama POST ${baseUrl}/api/chat`);
+  return response.message;
 }

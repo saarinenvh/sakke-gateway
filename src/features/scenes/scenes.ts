@@ -1,12 +1,14 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import { z } from "zod";
 import { getLights, getNumberEntities } from "../../integrations/homeAssistant/registry.js";
 import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
-import { getAllStates, callService, haPost } from "../../integrations/homeAssistant/client.js";
+import { getAllStates, callService, haPost, type EntityState } from "../../integrations/homeAssistant/client.js";
 import { chatCompletion } from "../../integrations/openai/client.js";
 import { readWikiDocWithFallback } from "../../tools/wiki/wiki.js";
 import { stripCodeFence } from "../../util/text.js";
+import { parseOrThrow } from "../../util/validation.js";
 import { validateScenePlan, InvalidScenePlanError, type ScenePlanIssue } from "./sceneValidator.js";
 
 export { validateScenePlan, InvalidScenePlanError };
@@ -105,12 +107,12 @@ export async function applyScene(plan: ScenePlan): Promise<ApplySceneResult> {
 
 export async function saveCurrentStateAsScene(name: string, entityIds: string[]): Promise<string> {
   const sceneId = createSceneId(name);
-  const states = await getAllStates() as { entity_id: string; state: string; attributes?: HomeAssistantLightAttributes }[];
+  const states = await getAllStates();
 
   const entities = Object.fromEntries(
     states
       .filter(state => entityIds.includes(state.entity_id))
-      .map(state => [state.entity_id, stateToSceneEntity(state)]),
+      .map(state => [state.entity_id, stateToSceneEntity(state.state, parseLightAttributes(state))]),
   );
 
   await saveScene(sceneId, name, entities);
@@ -218,15 +220,24 @@ function createSceneId(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 }
 
-interface HomeAssistantLightAttributes {
-  brightness?: number;
-  color_mode?: "color_temp" | "rgb" | "rgbw" | "rgbww" | "hs" | "xy" | "brightness";
-  color_temp_kelvin?: number;
-  color_temp?: number;
-  rgb_color?: [number, number, number];
-  hs_color?: [number, number];
-  xy_color?: [number, number];
-  effect?: string;
+// HA reports null, not a missing key, for the attributes of a light that is
+// off. color_mode stays a plain string: HA has more modes (onoff, white,
+// unknown) than the switch below handles, and those fall to its default.
+const lightAttributesSchema = z.object({
+  brightness: z.number().nullish(),
+  color_mode: z.string().nullish(),
+  color_temp_kelvin: z.number().nullish(),
+  color_temp: z.number().nullish(),
+  rgb_color: z.tuple([z.number(), z.number(), z.number()]).nullish(),
+  hs_color: z.tuple([z.number(), z.number()]).nullish(),
+  xy_color: z.tuple([z.number(), z.number()]).nullish(),
+  effect: z.string().nullish(),
+});
+
+type HomeAssistantLightAttributes = z.output<typeof lightAttributesSchema>;
+
+function parseLightAttributes(state: EntityState): HomeAssistantLightAttributes {
+  return parseOrThrow(lightAttributesSchema, state.attributes, `attributes of ${state.entity_id}`);
 }
 
 function getColorAttributes(attrs: HomeAssistantLightAttributes): Record<string, unknown> {
@@ -256,14 +267,13 @@ function getColorAttributes(attrs: HomeAssistantLightAttributes): Record<string,
   }
 }
 
-function hasEffect(effect?: string): boolean {
+function hasEffect(effect: string | null | undefined): boolean {
   return !!effect && effect !== "None" && effect !== "off";
 }
 
-function stateToSceneEntity(state: { state: string; attributes?: HomeAssistantLightAttributes }): Record<string, unknown> {
-  const attrs = state.attributes ?? {};
+function stateToSceneEntity(state: string, attrs: HomeAssistantLightAttributes): Record<string, unknown> {
   return {
-    state: state.state,
+    state,
     ...(attrs.brightness !== undefined && { brightness: attrs.brightness }),
     ...getColorAttributes(attrs),
     ...(hasEffect(attrs.effect) && { effect: attrs.effect }),

@@ -96,6 +96,7 @@ src/
 │                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it)
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
+│   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
 │   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
 └── …
