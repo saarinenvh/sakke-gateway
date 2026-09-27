@@ -1,16 +1,16 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
 
-import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "../homeControl/tool.js";
-import { webSearchTool } from "../search/tool.js";
-import { weatherTool } from "../weather/tool.js";
-import { spotifyTool } from "../spotify/tool.js";
-import { manageListTool } from "../lists/tool.js";
-import { openTvAppTool, tvRemoteCommandTool, tvSendTextTool } from "../tv/tool.js";
-import { createKnowledgeTool, getContextTool } from "../wiki/tool.js";
-import { getTasksTool, getCalendarTool } from "../reminders/tool.js";
-import { timerTool } from "../timers/tool.js";
-import { setGamingModeTool } from "../gpu/tool.js";
+import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
+import { webSearchTool } from "./search/tool.js";
+import { weatherTool } from "./weather/tool.js";
+import { spotifyTool } from "./spotify/tool.js";
+import { manageListTool } from "./lists/tool.js";
+import { openTvAppTool, tvRemoteCommandTool, tvSendTextTool } from "./tv/tool.js";
+import { createKnowledgeTool, getContextTool } from "./wiki/tool.js";
+import { getTasksTool, getCalendarTool } from "./reminders/tool.js";
+import { timerTool } from "./timers/tool.js";
+import { setGamingModeTool } from "./gpu/tool.js";
 
 // The whole tool surface, in the order the model is shown it. There used to be
 // two lists to keep in step - a 300-line array of schemas and a 400-line chain

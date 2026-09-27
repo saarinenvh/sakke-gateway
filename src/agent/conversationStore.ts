@@ -1,26 +1,10 @@
 import { tools } from "../tools/registry.js";
-import { clearSpotifySuggestion } from "../spotify/spotify.js";
-
-export interface OllamaToolCall {
-  id: string;
-  type: "function";
-  function: {
-    name: string;
-    arguments: Record<string, unknown>;
-  };
-}
-
-export interface Message {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  tool_call_id?: string;
-  tool_calls?: OllamaToolCall[];
-}
+import { clearSpotifySuggestion } from "../tools/spotify/spotify.js";
+import type { Message } from "../integrations/ollama/types.js";
 
 export interface Conversation {
   messages: Message[];
   lastActive: number;
-  chatMode: boolean;
   awaitingContinuation: boolean;
 }
 
@@ -35,7 +19,7 @@ export function getConversation(id: string): Conversation | undefined {
 /** Commits a finished turn. Stamps lastActive, so the idle window restarts here. */
 export function saveConversation(
   id: string,
-  conv: { messages: Message[]; chatMode: boolean; awaitingContinuation: boolean },
+  conv: { messages: Message[]; awaitingContinuation: boolean },
 ): void {
   conversations.set(id, { ...conv, lastActive: Date.now() });
 }
@@ -66,13 +50,15 @@ export function pruneStale(): void {
 }
 
 // A fixed num_ctx alone only raises the ceiling - a conversation left running
-// (chat mode, or just repeated follow-ups inside the 10-minute idle window)
-// grows without bound otherwise and will eventually hit it anyway. No real
+// (repeated follow-ups inside the 10-minute idle window) grows without bound
+// otherwise and will eventually hit it anyway. No real
 // tokenizer here, so this uses a ~4-chars-per-token heuristic with a safety
 // margin - approximate on purpose, trimming a turn earlier than strictly
 // necessary is harmless, but truncating mid-request (the original bug) isn't.
 const CHARS_PER_TOKEN = 4;
-const RESPONSE_RESERVE_TOKENS = 2000; // matches num_predict
+// Exported so agent.ts's num_predict is the same literal, not a second one
+// that has to be kept in sync by convention.
+export const RESPONSE_RESERVE_TOKENS = 2000;
 const SAFETY_MARGIN_TOKENS = 300; // chat template / role overhead, not reflected in raw content length
 
 // The tool schemas ride along with every request and are a meaningful share of
@@ -116,12 +102,6 @@ export function trimConversationHistory(messages: Message[], numCtx: number): vo
   }
 }
 
-const CHAT_MODE_PHRASES = new Set([
-  "let's chat", "lets chat", "let's talk", "lets talk",
-  "let's discuss", "lets discuss", "chat mode", "talk to me",
-  "i want to chat", "i want to talk",
-]);
-
 const RESET_PHRASES = new Set([
   "let's start fresh", "lets start fresh", "start fresh",
   "new conversation", "start over", "let's start over", "lets start over",
@@ -130,10 +110,6 @@ const RESET_PHRASES = new Set([
 
 function normalizePunctuation(text: string): string {
   return text.trim().toLowerCase().replace(/[!.,]+$/, "");
-}
-
-export function isChatModeRequest(text: string): boolean {
-  return CHAT_MODE_PHRASES.has(normalizePunctuation(text));
 }
 
 export function isResetRequest(text: string): boolean {

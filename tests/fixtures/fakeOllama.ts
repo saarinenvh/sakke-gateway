@@ -12,9 +12,8 @@ import type { AddressInfo } from "net";
 // Port 0, so parallel test files never collide on a fixed port.
 
 export interface OllamaToolCall {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: Record<string, unknown> };
+  id?: string;
+  function: { name: string; arguments: Record<string, unknown>; index?: number };
 }
 
 export interface ScriptedReply {
@@ -108,7 +107,7 @@ export async function startFakeOllama(): Promise<FakeOllama> {
   };
 }
 
-/** Convenience for the common single-tool-call case. */
-export function toolCall(name: string, args: Record<string, unknown> = {}): OllamaToolCall {
-  return { id: `call-${name}`, type: "function", function: { name, arguments: args } };
+/** Convenience for the common single-tool-call case. index defaults to its position within a single-call batch. */
+export function toolCall(name: string, args: Record<string, unknown> = {}, index = 0): OllamaToolCall {
+  return { id: `call-${name}`, function: { index, name, arguments: args } };
 }

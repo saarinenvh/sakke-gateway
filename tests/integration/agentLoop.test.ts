@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeOllama, toolCall, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { runAgent } from "../../src/agent/agent.js";
-import { getCurrentState } from "../../src/display/displayState.js";
+import { getCurrentState } from "../../src/features/display/displayState.js";
 import { reloadConfig } from "../../src/config.js";
 
 // The tool-calling loop against a scripted model. Everything here is a bug that

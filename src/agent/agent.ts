@@ -1,187 +1,270 @@
 import type { FastifyBaseLogger } from "fastify";
 import { tools, executeTool } from "../tools/registry.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
-import { broadcastState } from "../display/displayState.js";
-import { classifyFollowUp } from "./continuationCheck.js";
+import { broadcastState } from "../features/display/displayState.js";
+import { classifyFollowUp, type FollowUpVerdict } from "./continuationCheck.js";
 import { cleanForSpeech } from "./voiceText.js";
 import { getOllamaTarget } from "./ollamaRouter.js";
+import type { OllamaTargetConfig } from "../config.js";
+import { ollamaChat } from "../integrations/ollama/client.js";
+import type { Message, OllamaToolCall } from "../integrations/ollama/types.js";
 import {
-  type Message,
-  type OllamaToolCall,
+  type Conversation,
+  RESPONSE_RESERVE_TOKENS,
   getConversation,
   saveConversation,
   clearAwaitingContinuation,
   dropConversation,
   pruneStale,
   trimConversationHistory,
-  isChatModeRequest,
   isResetRequest,
 } from "./conversationStore.js";
 
 const MAX_ITERATIONS = 6;
+const MAIN_AGENT_TEMPERATURE = 0.7;
+
+const MIN_SPEAKING_MS = 2000;
+const SPEAKING_MS_PER_CHARACTER = 70;
+
+export interface AgentResult {
+  content: string;
+  continueConversation: boolean;
+}
+
+type IncomingTurn =
+  | { kind: "reset"; reply: string }
+  | { kind: "silence" }
+  | { kind: "proceed"; messages: Message[] };
+
+// What the tool-calling loop produced, before the turn's completion side
+// effects (speech cleanup, persistence, logging, display) have run.
+type LoopOutcome =
+  | { kind: "answered"; rawContent: string; toolsWereWithheld: boolean }
+  | { kind: "exhausted" };
+
+type ToolBatchOutcome = "executed" | "repeated";
+
+function speakingDurationMs(content: string): number {
+  return Math.max(MIN_SPEAKING_MS, content.length * SPEAKING_MS_PER_CHARACTER);
+}
 
 export async function runAgent(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
-): Promise<{ content: string; continueConversation: boolean }> {
+): Promise<AgentResult> {
   pruneStale();
 
+  const turn = await resolveIncomingTurn(userMessage, conversationId, log);
+
+  if (turn.kind === "reset") {
+    broadcastState("speaking", speakingDurationMs(turn.reply));
+    return { content: turn.reply, continueConversation: false };
+  }
+
+  if (turn.kind === "silence") {
+    broadcastState("idle");
+    return { content: "", continueConversation: false };
+  }
+
+  const { messages } = turn;
+
+  // Decided once per turn, not per iteration - see getOllamaTarget.
+  const target = getOllamaTarget(log);
+  trimHistoryToFit(messages, target.numCtx, conversationId, log);
+
+  log.info(
+    { conversationId, userMessage, model: target.model, baseUrl: target.baseUrl, turns: messages.length - 1 },
+    "Agent started",
+  );
+  broadcastState("thinking");
+
+  let outcome: LoopOutcome;
+  try {
+    outcome = await runToolCallingLoop(messages, target, conversationId, userMessage, log);
+  } catch (err) {
+    // Only the speaking/idle broadcasts clear "thinking" - a throw must too.
+    broadcastState("idle");
+    throw err;
+  }
+
+  return completeTurn(outcome, messages, target.model, conversationId, log);
+}
+
+// --- Turn setup -------------------------------------------------------
+
+async function resolveIncomingTurn(
+  userMessage: string,
+  conversationId: string,
+  log: FastifyBaseLogger,
+): Promise<IncomingTurn> {
   if (isResetRequest(userMessage)) {
     dropConversation(conversationId);
     log.info({ conversationId, userMessage }, "Conversation reset");
-    const reply = "Fine. Wiped. We never spoke.";
-    broadcastState("speaking", Math.max(2000, reply.length * 70));
-    return { content: reply, continueConversation: false };
+    return { kind: "reset", reply: "Fine. Wiped. We never spoke." };
   }
 
   let existing = getConversation(conversationId);
 
-  if (existing?.awaitingContinuation && !existing.chatMode) {
-    const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
-    const lastUserMessage = [...existing.messages].reverse().find(m => m.role === "user")?.content ?? "";
-    const verdict = await classifyFollowUp(lastUserMessage, lastAssistantMessage, userMessage, log);
+  if (existing?.awaitingContinuation) {
+    const verdict = await classifyContinuation(existing, userMessage, log);
 
     if (verdict === "noise") {
       log.info({ conversationId, userMessage }, "Utterance deemed noise, staying silent");
       clearAwaitingContinuation(conversationId);
-      broadcastState("idle");
-      return { content: "", continueConversation: false };
+      return { kind: "silence" };
     }
 
     if (verdict === "new_request") {
-      // A real request, just off-topic vs. the last exchange - respond to it
-      // fresh instead of dragging in irrelevant prior context (or, worse,
-      // silencing it the way "noise" does).
+      // A different topic, not noise - start fresh rather than dragging in
+      // irrelevant history or staying silent.
       log.info({ conversationId, userMessage }, "New unrelated request detected, starting fresh conversation");
       dropConversation(conversationId);
       existing = undefined;
     }
   }
 
-  // Built on a COPY of the stored history, and only committed back to the map
-  // once a response has actually been produced. This used to be
-  // `existing?.messages ?? [...]` - i.e. the very same array object held in the
-  // map - so every push below mutated stored history immediately, before
-  // anything had succeeded. A thrown Ollama call then left a dangling user
-  // message (plus any completed assistant/tool pairs) permanently in the
-  // conversation, and the next turn resumed from that corrupt state, feeding
-  // the model a history of consecutive unanswered user messages. The
-  // MAX_ITERATIONS path had the mirror problem: it never called
-  // conversations.set at all, so a brand-new conversation's turn was dropped.
-  // Copying the array is enough - the message objects themselves are never
-  // mutated in place, only appended.
+  return {
+    kind: "proceed",
+    messages: await buildMessages(existing, userMessage),
+  };
+}
+
+function classifyContinuation(
+  existing: Conversation,
+  userMessage: string,
+  log: FastifyBaseLogger,
+): Promise<FollowUpVerdict> {
+  const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
+  const lastUserMessage = [...existing.messages].reverse().find(m => m.role === "user")?.content ?? "";
+  return classifyFollowUp(lastUserMessage, lastAssistantMessage, userMessage, log);
+}
+
+async function buildMessages(existing: Conversation | undefined, userMessage: string): Promise<Message[]> {
+  // Copies the stored history rather than reusing the same array - a failed
+  // turn below must not corrupt the next one's starting point.
   const messages: Message[] = existing
     ? [...existing.messages]
     : [{ role: "system", content: await buildSystemPrompt() }];
+
   if (existing && messages[0]?.role === "system") {
     messages[0] = { ...messages[0], content: refreshClock(messages[0].content) };
   }
 
-  const chatMode = existing?.chatMode ?? isChatModeRequest(userMessage);
-
   messages.push({ role: "user", content: userMessage });
+  return messages;
+}
 
-  // Decided once per turn, not per tool-call iteration within it - see
-  // getOllamaTarget's own comment for why.
-  const target = getOllamaTarget(log);
-
+function trimHistoryToFit(messages: Message[], numCtx: number, conversationId: string, log: FastifyBaseLogger): void {
   const beforeTrim = messages.length;
-  trimConversationHistory(messages, target.numCtx);
+  trimConversationHistory(messages, numCtx);
   if (messages.length < beforeTrim) {
     log.info({ conversationId, droppedMessages: beforeTrim - messages.length }, "Trimmed old conversation history to fit num_ctx");
   }
+}
 
-  log.info({ conversationId, userMessage, model: target.model, baseUrl: target.baseUrl, turns: messages.length - 1, chatMode }, "Agent started");
-  broadcastState("thinking");
+// --- Tool-calling loop --------------------------------------------------
 
+// MAX_ITERATIONS passes, plus one extra slot reserved for the forced
+// tools-withheld pass so that pass doesn't eat into the model's own budget.
+async function runToolCallingLoop(
+  messages: Message[],
+  target: OllamaTargetConfig,
+  conversationId: string,
+  userMessage: string,
+  log: FastifyBaseLogger,
+): Promise<LoopOutcome> {
   const completedToolCalls = new Set<string>();
-  // Set when the model starts repeating itself - the next pass withholds the
-  // tool schema entirely so it has to answer from the results already in
-  // context. See the duplicate-detection branch below.
+  // True once the model repeats itself - see executeToolBatch.
   let forceFinalResponse = false;
 
-  // MAX_ITERATIONS tool-calling passes, plus one reserved slot that is only
-  // ever used for the forced tools-withheld pass - that one isn't the model
-  // looping, it's us telling it to stop, so it shouldn't consume the budget.
-  try {
-    for (let i = 0; i < MAX_ITERATIONS + 1; i++) {
-      if (i === MAX_ITERATIONS && !forceFinalResponse) break;
+  for (let i = 0; i < MAX_ITERATIONS + 1; i++) {
+    if (i === MAX_ITERATIONS && !forceFinalResponse) break;
 
-      log.info({ conversationId, iteration: i + 1, toolsWithheld: forceFinalResponse }, "Calling Ollama");
+    log.info({ conversationId, iteration: i + 1, toolsWithheld: forceFinalResponse }, "Calling Ollama");
+    const message = await callOllama(messages, target, forceFinalResponse);
 
-      const res = await fetch(`${target.baseUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: target.model,
-          messages,
-          ...(forceFinalResponse ? {} : { tools }),
-          stream: false,
-          ...(target.think !== undefined && { think: target.think }),
-          ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
-          options: { temperature: 0.7, num_predict: 2000, num_ctx: target.numCtx },
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text()}`);
-
-      const json = await res.json() as { message: Message & { tool_calls?: OllamaToolCall[] } };
-      const message = json.message;
-
-      if (message.tool_calls?.length && !forceFinalResponse) {
-        // Detect repeated identical tool calls — model is stuck in a loop
-        const callKeys = message.tool_calls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
-        const alreadyDone = callKeys.every(k => completedToolCalls.has(k));
-        if (alreadyDone) {
-          // This used to `break`, which fell straight through into the
-          // max-iterations path below - so the user heard "I got confused trying
-          // to answer that." even though the tool had already run successfully,
-          // and the log claimed a response was being forced when nothing forced
-          // one. Withhold the tool schema for one more pass instead, so the model
-          // has no option but to answer from the tool results already in context.
-          log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
-          forceFinalResponse = true;
-          continue;
-        }
-        callKeys.forEach(k => completedToolCalls.add(k));
-
-        log.info(
-          { conversationId, tools: message.tool_calls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
-          "Tool calls requested",
-        );
-
-        messages.push(message);
-
-        for (const call of message.tool_calls) {
-          const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
-          messages.push({ role: "tool", content: result, tool_call_id: call.id });
-        }
-
-        continue;
-      }
-
-      const content = cleanForSpeech(message.content, forceFinalResponse);
-
-      messages.push({ role: "assistant", content });
-      saveConversation(conversationId, { messages, chatMode, awaitingContinuation: true });
-
-      const asksQuestion = content.trimEnd().endsWith("?");
-      log.info({ conversationId, model: target.model, turns: messages.length - 1, response: content, chatMode, asksQuestion }, "Agent response");
-      const speakingMs = Math.max(2000, content.length * 70);
-      broadcastState("speaking", speakingMs);
-      return { content, continueConversation: true };
+    if (message.tool_calls?.length && !forceFinalResponse) {
+      const toolCalls = message.tool_calls;
+      const outcome = await executeToolBatch(toolCalls, message.content, messages, completedToolCalls, conversationId, log);
+      if (outcome === "repeated") forceFinalResponse = true;
+      continue;
     }
-  } catch (err) {
-    // "thinking" was broadcast before the loop, and only the speaking/idle
-    // calls ever clear it (the speaking one schedules the auto-idle timer). A
-    // throw from here used to leave the tablet display spinning on "thinking"
-    // indefinitely, with nothing to reset it until the next successful turn.
-    broadcastState("idle");
-    throw err;
+
+    return { kind: "answered", rawContent: message.content, toolsWereWithheld: forceFinalResponse };
   }
 
   log.warn({ conversationId, userMessage, model: target.model, maxIterations: MAX_ITERATIONS }, "Max tool-call iterations exhausted without a final response");
-  broadcastState("idle");
-  return { content: "I got confused trying to answer that.", continueConversation: chatMode };
+  return { kind: "exhausted" };
+}
+
+function callOllama(messages: Message[], target: OllamaTargetConfig, forceFinalResponse: boolean): Promise<Message> {
+  return ollamaChat(target.baseUrl, {
+    model: target.model,
+    messages,
+    ...(forceFinalResponse ? {} : { tools }),
+    ...(target.think !== undefined && { think: target.think }),
+    ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
+    options: { temperature: MAIN_AGENT_TEMPERATURE, num_predict: RESPONSE_RESERVE_TOKENS, num_ctx: target.numCtx },
+  });
+}
+
+// Executes one batch of tool calls. Only catches an exact repeat of the WHOLE
+// previous batch (the model stuck in a loop) - a mixed batch of new and
+// already-run calls still re-executes both; that's the separate "duplicate
+// tool-call detection" ticket (CtjMmdnP), not this refactor's job.
+async function executeToolBatch(
+  toolCalls: OllamaToolCall[],
+  assistantContent: string,
+  messages: Message[],
+  completedToolCalls: Set<string>,
+  conversationId: string,
+  log: FastifyBaseLogger,
+): Promise<ToolBatchOutcome> {
+  const callKeys = toolCalls.map(t => `${t.function.name}:${JSON.stringify(t.function.arguments)}`);
+  const wholeBatchAlreadyRan = callKeys.every(k => completedToolCalls.has(k));
+  if (wholeBatchAlreadyRan) {
+    log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
+    return "repeated";
+  }
+  callKeys.forEach(k => completedToolCalls.add(k));
+
+  log.info(
+    { conversationId, tools: toolCalls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
+    "Tool calls requested",
+  );
+
+  messages.push({ role: "assistant", content: assistantContent, tool_calls: toolCalls });
+
+  for (const call of toolCalls) {
+    const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
+    messages.push({ role: "tool", content: result, tool_call_id: call.id });
+  }
+
+  return "executed";
+}
+
+// Applies the turn's completion side effects - speech cleanup, history
+// persistence, logging, the display broadcast - for whichever way the loop
+// finished.
+function completeTurn(
+  outcome: LoopOutcome,
+  messages: Message[],
+  model: string,
+  conversationId: string,
+  log: FastifyBaseLogger,
+): AgentResult {
+  if (outcome.kind === "exhausted") {
+    broadcastState("idle");
+    return { content: "I got confused trying to answer that.", continueConversation: false };
+  }
+
+  const content = cleanForSpeech(outcome.rawContent, outcome.toolsWereWithheld);
+
+  messages.push({ role: "assistant", content });
+  saveConversation(conversationId, { messages, awaitingContinuation: true });
+
+  log.info({ conversationId, model, turns: messages.length - 1, response: content }, "Agent response");
+  broadcastState("speaking", speakingDurationMs(content));
+  return { content, continueConversation: true };
 }

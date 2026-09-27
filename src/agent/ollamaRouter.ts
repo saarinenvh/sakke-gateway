@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { getGpuStatus } from "../gpu/gpuStatus.js";
+import { getGpuStatus } from "../features/gpu/gpuStatus.js";
 import { config, type OllamaTargetConfig } from "../config.js";
 
 // Per gpu_routing_design.md: the routing check happens once per conversation
