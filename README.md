@@ -5,7 +5,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 ## Features
 
 - **Multi-turn agent** — conversation history per session, follow-up questions work naturally
-- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 17 tools, each owned by the feature it belongs to
+- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 18 tools, each owned by the feature it belongs to
 - **Follow-up classification** — a second, deliberately small model decides whether the next utterance is a continuation, an unrelated new request, or room noise. Noise gets silence: when Sakke has to guess, it fails quiet
 - **GPU routing** — inference goes to the dev PC's GPU while it's idle and falls back to the server's own Ollama otherwise. Decided once per turn, and fails closed — "busy" and "unknown" both mean the server
 - **Home control** — lights, scenes, switches, media via the Home Assistant API
@@ -16,6 +16,8 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Shopping lists** — add/remove items with automatic store-layout ordering
 - **Spotify** — search by voice and pick from three spoken options; known personal playlists play immediately
 - **Timers** — set, list and cancel voice timers; announced aloud through the satellite when they fire
+- **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
+- **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
 - **Web search** — SearXNG with Brave as the backing engine
 - **Google Tasks / Calendar** — query tasks and events by voice, via HA's todo and calendar integrations
@@ -48,12 +50,13 @@ error into something the model can react to.
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
+| `vacuum` | `tools/vacuum/` | Start / stop / dock / status, plus answers to a cleaning reminder |
 
 ## Routes
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/v1/chat/completions` | Main agent endpoint (OpenAI-compatible) |
+| POST | `/v1/chat/completions` | Main agent endpoint (OpenAI-compatible). Optional `extra_system_prompt` is added to that turn - how a satellite-initiated question's answer knows what it answers |
 | POST | `/scene` | AI-powered scene designer |
 | POST | `/scene/save` | Save current light state as a scene |
 | GET | `/reminders/morning` | Morning greeting with tasks + calendar (for HA automations) |
@@ -86,14 +89,15 @@ src/
 │   ├── registry.ts       # the one tool list, and the one try/catch
 │   ├── types.ts
 │   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
-│       timers/  tv/  wiki/  gpu/
+│       timers/  tv/  wiki/  gpu/  vacuum/
 │                         # each with feature.ts, tool.ts, prompt.ts as needed -
 │                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
 ├── features/
-│   └── scenes/  display/  gpu/  # feature modules with their own routes/logic,
+│   └── scenes/  display/  gpu/  tidiness/  # feature modules with their own routes/logic,
 │                         # but not in tools/registry.ts - nothing the model
 │                         # calls directly (gpu/ here is gpuStatus.ts + the
-│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it)
+│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
+│                         # tidiness/ is the cleaning coach's schedule, state and tick)
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
 │   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
@@ -144,6 +148,7 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
 | Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything
 runs on the server's own Ollama.

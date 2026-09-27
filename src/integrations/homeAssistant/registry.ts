@@ -1,4 +1,4 @@
-import { getAllStates, renderTemplate } from "./client.js";
+import { getAllStates, renderTemplate, type EntityState } from "./client.js";
 
 export interface LightEntity {
   entity_id: string;
@@ -33,6 +33,15 @@ export interface NumberEntity {
   name: string;
 }
 
+export interface VacuumEntity {
+  entity_id: string;
+  name: string;
+  // Newer integrations report battery as its own sensor on the same device
+  // rather than a vacuum attribute. Matched by the vacuum's object id prefix,
+  // since device links aren't exposed over the REST API.
+  batterySensorId?: string;
+}
+
 let lightsCache: LightEntity[] = [];
 let switchesCache: SwitchEntity[] = [];
 let allSwitchesCache: SwitchEntity[] = [];
@@ -40,6 +49,7 @@ let areasCache: AreaInfo[] = [];
 let scenesCache: SceneEntity[] = [];
 let scriptsCache: ScriptEntity[] = [];
 let numberEntitiesCache: NumberEntity[] = [];
+let vacuumsCache: VacuumEntity[] = [];
 
 export async function loadEntities(): Promise<void> {
   const states = await getAllStates();
@@ -154,6 +164,25 @@ export async function loadEntities(): Promise<void> {
       entity_id: s.entity_id,
       name: s.attributes.friendly_name ?? s.entity_id,
     }));
+
+  vacuumsCache = findVacuums(states);
+}
+
+function findVacuums(states: EntityState[]): VacuumEntity[] {
+  const vacuums: VacuumEntity[] = [];
+  for (const state of states) {
+    if (!state.entity_id.startsWith("vacuum.")) continue;
+    const objectId = state.entity_id.slice("vacuum.".length);
+    const batterySensor = states.find(s =>
+      s.entity_id.startsWith(`sensor.${objectId}_`) && s.attributes.device_class === "battery",
+    );
+    vacuums.push({
+      entity_id: state.entity_id,
+      name: state.attributes.friendly_name ?? state.entity_id,
+      ...(batterySensor && { batterySensorId: batterySensor.entity_id }),
+    });
+  }
+  return vacuums;
 }
 
 export function getLights(): LightEntity[] {
@@ -182,6 +211,10 @@ export function getScripts(): ScriptEntity[] {
 
 export function getNumberEntities(): NumberEntity[] {
   return numberEntitiesCache;
+}
+
+export function getVacuums(): VacuumEntity[] {
+  return vacuumsCache;
 }
 
 // Matches whatever the model supplied against the real area registry - it is

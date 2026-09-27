@@ -10,6 +10,9 @@ interface ChatCompletionBody {
   model?: string;
   messages: ChatMessage[];
   conversation_id?: string;
+  // Forwarded by the sakke_agent HA component from assist_satellite's
+  // start_conversation - see AgentOptions.extraSystemPrompt.
+  extra_system_prompt?: string;
 }
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
@@ -22,6 +25,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
           model: { type: "string" },
           messages: { type: "array" },
           conversation_id: { type: "string" },
+          extra_system_prompt: { type: "string" },
         },
       },
     },
@@ -38,7 +42,8 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       responseText = "Didn't catch that.";
     } else {
       try {
-        const result = await runAgent(text, conversationId, request.log);
+        const extraSystemPrompt = request.body.extra_system_prompt?.trim() || undefined;
+        const result = await runAgent(text, conversationId, request.log, { extraSystemPrompt });
         responseText = result.content;
         continueConversation = result.continueConversation;
       } catch (err: any) {

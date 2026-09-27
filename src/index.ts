@@ -5,6 +5,9 @@ import { setModuleLogger } from "./logger.js";
 import { restoreTimers, setTimerHandler } from "./tools/timers/timers.js";
 import { announceFinishedTimer } from "./tools/timers/timerAnnouncer.js";
 import { config } from "./config.js";
+import { restoreTidinessState } from "./features/tidiness/store.js";
+import { startTidinessCoach } from "./features/tidiness/coach.js";
+import { liveCoachDeps } from "./features/tidiness/liveDeps.js";
 
 const app = buildApp();
 
@@ -32,6 +35,9 @@ function listen(): void {
 }
 
 void restoreTimers();
+
+// State first, so the first tick knows what was already asked before a restart.
+void restoreTidinessState().then(() => startTidinessCoach(liveCoachDeps));
 
 // Starts either way - a dead HA at boot shouldn't stop the gateway coming up,
 // and refresh_home_data can reload the registry once it's back.

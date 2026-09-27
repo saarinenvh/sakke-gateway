@@ -48,6 +48,27 @@ export interface OllamaTargetConfig {
   keepAlive: string | undefined;
 }
 
+// A wall-clock time in the configured timezone, e.g. 10:00.
+export interface LocalTime {
+  hour: number;
+  minute: number;
+}
+
+export interface TidinessConfig {
+  // Off by default: the nag speaks unprompted, so it is switched on
+  // deliberately. Vacuum control and last-cleaned tracking work either way.
+  enabled: boolean;
+  // Unset means "the only vacuum Home Assistant has".
+  vacuumEntityId: string | undefined;
+  // Nags only go out while this reads "home". Unset means never.
+  presenceEntityId: string | undefined;
+  // When the day's asks go out, in order: one-ask days use the first.
+  askTimes: LocalTime[];
+  // A run shorter than this (a bump of the start button) is not a clean.
+  minRunMinutes: number;
+  snoozeHours: number;
+}
+
 export interface Config {
   port: number;
   timezone: string;
@@ -77,6 +98,7 @@ export interface Config {
   openai: { apiKey: string; lightingModel: string };
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
+  tidiness: TidinessConfig;
   // Anything missing or implausible, collected rather than thrown. index.ts
   // logs these at startup. Deliberately not fatal: this service already starts
   // with a dead Home Assistant on purpose, and a home assistant that refuses to
@@ -122,6 +144,8 @@ function loadConfig(): Config {
       }
     : null;
 
+  const tidiness = loadTidinessConfig(problems);
+
   const classifierBaseUrl = env("OLLAMA_CLASSIFIER_BASE_URL");
   if (classifierBaseUrl === undefined) {
     problems.push(
@@ -164,8 +188,45 @@ function loadConfig(): Config {
       lat: env("WEATHER_LAT") ?? "60.1583",
       lon: env("WEATHER_LON") ?? "24.7339",
     },
+    tidiness,
     problems,
   };
+}
+
+const DEFAULT_ASK_TIMES = "10:00,18:00";
+
+function loadTidinessConfig(problems: string[]): TidinessConfig {
+  const enabled = bool("TIDINESS_ENABLED") ?? false;
+  const presenceEntityId = env("TIDINESS_PRESENCE_ENTITY_ID");
+  if (enabled && presenceEntityId === undefined) {
+    problems.push("TIDINESS_PRESENCE_ENTITY_ID is not set - cleaning reminders are enabled but will never be spoken");
+  }
+
+  return {
+    enabled,
+    vacuumEntityId: env("TIDINESS_VACUUM_ENTITY_ID"),
+    presenceEntityId,
+    askTimes: parseAskTimes(env("TIDINESS_ASK_TIMES") ?? DEFAULT_ASK_TIMES, problems),
+    minRunMinutes: num("TIDINESS_MIN_RUN_MINUTES", 10),
+    snoozeHours: num("TIDINESS_SNOOZE_HOURS", 24),
+  };
+}
+
+// "10:00,18:00" -> [{10, 0}, {18, 0}]. A malformed list falls back to the
+// default rather than silently dropping asks.
+function parseAskTimes(raw: string, problems: string[]): LocalTime[] {
+  const times: LocalTime[] = [];
+  for (const part of raw.split(",")) {
+    const match = part.trim().match(/^(\d{1,2}):(\d{2})$/);
+    const hour = Number(match?.[1]);
+    const minute = Number(match?.[2]);
+    if (!match || hour > 23 || minute > 59) {
+      problems.push(`TIDINESS_ASK_TIMES "${raw}" is not a list of HH:MM times - using ${DEFAULT_ASK_TIMES}`);
+      return parseAskTimes(DEFAULT_ASK_TIMES, problems);
+    }
+    times.push({ hour, minute });
+  }
+  return times.sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
 }
 
 export const config: Config = loadConfig();

@@ -142,6 +142,6 @@ describe("registry", () => {
     // with no schema (dead code) were both silently possible.
     const { tools, toolNames } = await import("../../src/tools/registry.js");
     expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
-    expect(tools).toHaveLength(17);
+    expect(tools).toHaveLength(18);
   });
 });

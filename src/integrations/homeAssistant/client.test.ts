@@ -12,18 +12,20 @@ afterEach(() => {
 });
 
 describe("entity state reads", () => {
-  it("returns a validated state, keeping attributes but dropping unused top-level fields", async () => {
+  it("returns a validated state, keeping attributes and last_changed but dropping unused top-level fields", async () => {
     respondWith({
       entity_id: "light.ceiling",
       state: "on",
       attributes: { friendly_name: "Ceiling", brightness: 120 },
       last_changed: "2026-09-27T10:00:00Z",
+      last_reported: "2026-09-27T10:05:00Z",
     });
 
     await expect(getState("light.ceiling")).resolves.toEqual({
       entity_id: "light.ceiling",
       state: "on",
       attributes: { friendly_name: "Ceiling", brightness: 120 },
+      last_changed: "2026-09-27T10:00:00Z",
     });
   });
 

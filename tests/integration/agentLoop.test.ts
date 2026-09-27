@@ -146,3 +146,14 @@ describe("conversation control phrases", () => {
     expect(ollama.requests()).toHaveLength(0);
   });
 });
+
+describe("a turn that must not act", () => {
+  it("never offers the tool schema when tools are withheld", async () => {
+    ollama.script({ content: "Shall I vacuum, or do you enjoy the dust?" });
+
+    const result = await runAgent("write the nag", nextId(), log, { withholdTools: true });
+
+    expect(result.content).toBe("Shall I vacuum, or do you enjoy the dust?");
+    expect(ollama.requests().map(r => r.hasTools)).toEqual([false]);
+  });
+});
