@@ -16,6 +16,7 @@ export const openTvAppTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: args => openApp(args.app as string),
 };
 
@@ -34,6 +35,7 @@ export const tvRemoteCommandTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: args => sendRemoteCommand(args.command as string),
 };
 
@@ -52,5 +54,6 @@ export const tvSendTextTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: args => sendText(args.text as string),
 };

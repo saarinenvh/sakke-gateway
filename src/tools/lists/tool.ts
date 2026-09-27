@@ -22,6 +22,7 @@ export const manageListTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: async args => {
     const { action, list, items, item } = args as { action: string; list: string; items?: string[]; item?: string };
 

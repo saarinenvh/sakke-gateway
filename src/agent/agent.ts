@@ -1,5 +1,5 @@
 import type { FastifyBaseLogger } from "fastify";
-import { tools, executeTool } from "../tools/registry.js";
+import { tools, executeTool, isRepeatable } from "../tools/registry.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
 import { broadcastState } from "../features/display/displayState.js";
 import { classifyFollowUp, type FollowUpVerdict } from "./continuationCheck.js";
@@ -209,10 +209,9 @@ function callOllama(messages: Message[], target: OllamaTargetConfig, forceFinalR
   });
 }
 
-// Executes one batch of tool calls. Only catches an exact repeat of the WHOLE
-// previous batch (the model stuck in a loop) - a mixed batch of new and
-// already-run calls still re-executes both; that's the separate "duplicate
-// tool-call detection" ticket (CtjMmdnP), not this refactor's job.
+// Keys are marked completed as the batch is processed, not in bulk
+// beforehand, so a duplicate within one batch is caught the same way as one
+// across batches.
 async function executeToolBatch(
   toolCalls: OllamaToolCall[],
   assistantContent: string,
@@ -227,7 +226,6 @@ async function executeToolBatch(
     log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
     return "repeated";
   }
-  callKeys.forEach(k => completedToolCalls.add(k));
 
   log.info(
     { conversationId, tools: toolCalls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
@@ -236,7 +234,20 @@ async function executeToolBatch(
 
   messages.push({ role: "assistant", content: assistantContent, tool_calls: toolCalls });
 
-  for (const call of toolCalls) {
+  for (const [i, call] of toolCalls.entries()) {
+    const key = callKeys[i];
+
+    if (completedToolCalls.has(key) && !isRepeatable(call.function.name)) {
+      log.warn({ conversationId, tool: call.function.name }, "Skipped repeat of a non-repeatable tool call");
+      messages.push({
+        role: "tool",
+        content: `${call.function.name} already ran this turn with the same arguments - not repeating it.`,
+        tool_call_id: call.id,
+      });
+      continue;
+    }
+
+    completedToolCalls.add(key);
     const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
     messages.push({ role: "tool", content: result, tool_call_id: call.id });
   }

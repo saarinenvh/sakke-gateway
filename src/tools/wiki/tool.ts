@@ -16,6 +16,7 @@ export const getContextTool: Tool = {
       },
     },
   },
+  repeatable: true,
   // Catches for itself: a missing page is a normal answer the model should act
   // on, not a failure, and the two ways of missing are worth telling apart in
   // the log even though the model is told the same thing either way.
@@ -48,6 +49,7 @@ export const createKnowledgeTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: async (args, { log }) => {
     const { filename, isNew } = await saveNote(args.filename as string, args.content as string);
     log.info({ filename, isNew }, "Knowledge note saved");

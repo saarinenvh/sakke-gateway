@@ -100,6 +100,72 @@ describe("when the model repeats a tool call", () => {
   });
 });
 
+const SKIPPED_REPEAT = "run_routine already ran this turn with the same arguments - not repeating it.";
+
+// Finding #7 (CtjMmdnP). The loop only used to withhold tools when the WHOLE
+// batch was already done - a batch mixing a repeat with a new call executed
+// both, and two identical calls within one batch both executed too.
+describe("duplicate tool calls within or across a batch", () => {
+  it("skips a repeated non-repeatable call in a mixed batch, but still runs the new one", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [
+        toolCall("run_routine", { script_id: "good_night" }), // repeat - not repeatable
+        toolCall("get_device_state", { entity_id: "light.hall" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("good night", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(3);
+
+    const toolMessages = passes[2].messages.filter(m => m.role === "tool");
+    const [repeated, fresh] = toolMessages.slice(-2);
+    expect(repeated.content).toBe(SKIPPED_REPEAT);
+    expect(fresh.content).not.toBe(SKIPPED_REPEAT);
+  });
+
+  it("skips the second of two identical non-repeatable calls in the same batch", async () => {
+    ollama.script(
+      { toolCalls: [
+        toolCall("run_routine", { script_id: "good_night" }),
+        toolCall("run_routine", { script_id: "good_night" }),
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("good night twice", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[1].messages.filter(m => m.role === "tool");
+    expect(toolMessages).toHaveLength(2);
+    expect(toolMessages[0].content).not.toBe(SKIPPED_REPEAT);
+    expect(toolMessages[1].content).toBe(SKIPPED_REPEAT);
+  });
+
+  it("still re-executes a repeatable tool even when the call is repeated", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] },
+      { toolCalls: [
+        toolCall("get_device_state", { entity_id: "light.hall" }), // repeat - repeatable, should run again
+        toolCall("run_routine", { script_id: "morning" }), // new
+      ] },
+      { content: "Done." },
+    );
+
+    const result = await runAgent("check and run", nextId(), log);
+    expect(result.content).toBe("Done.");
+
+    const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
+    const lastTwo = toolMessages.slice(-2);
+    expect(lastTwo[0].content).not.toContain("already ran this turn");
+    expect(lastTwo[1].content).not.toContain("already ran this turn");
+  });
+});
+
 // Finding #4. messages used to be the same array object held in the
 // conversations map, so a thrown call left a dangling user turn behind and the
 // next turn resumed from it.

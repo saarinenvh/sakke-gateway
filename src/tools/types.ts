@@ -33,5 +33,10 @@ export interface ToolContext {
 // get_context, where "not found" is an answer, not an error.
 export interface Tool {
   definition: ToolDefinition;
+  // Whether calling this again with identical arguments, in the same turn, is
+  // safe - true for pure reads (get_device_state), false for anything with a
+  // side effect (run_routine). Required, not defaulted: a new tool must
+  // consciously pick a side, since the wrong default here is unsafe either way.
+  repeatable: boolean;
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<string> | string;
 }

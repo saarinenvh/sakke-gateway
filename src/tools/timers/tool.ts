@@ -19,6 +19,7 @@ export const timerTool: Tool = {
       },
     },
   },
+  repeatable: false,
   execute: args => {
     const { action, duration_minutes, label, timer_id } = args as {
       action: string;
