@@ -1,9 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { sceneRoutes } from "./scenes/route.js";
+import { sceneRoutes } from "./features/scenes/route.js";
 import { conversationRoutes } from "./agent/route.js";
-import { reminderRoutes } from "./reminders/route.js";
-import { displayRoutes } from "./display/route.js";
-import { gpuStatusRoutes } from "./gpu/route.js";
+import { reminderRoutes } from "./tools/reminders/route.js";
+import { displayRoutes } from "./features/display/route.js";
+import { gpuStatusRoutes } from "./features/gpu/route.js";
 
 // Routes that would otherwise fill the log: the health check, the tasks poll
 // wired to an HA automation, the display's SSE stream, and the PC's GPU

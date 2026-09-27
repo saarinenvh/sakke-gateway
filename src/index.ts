@@ -2,8 +2,8 @@ import "dotenv/config";
 import { buildApp } from "./app.js";
 import { loadEntities } from "./integrations/homeAssistant/registry.js";
 import { setModuleLogger } from "./logger.js";
-import { restoreTimers, setTimerHandler } from "./timers/timers.js";
-import { announceFinishedTimer } from "./timers/timerAnnouncer.js";
+import { restoreTimers, setTimerHandler } from "./tools/timers/timers.js";
+import { announceFinishedTimer } from "./tools/timers/timerAnnouncer.js";
 import { config } from "./config.js";
 
 const app = buildApp();

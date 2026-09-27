@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
+import { ollamaChat, OllamaError } from "../integrations/ollama/client.js";
 
 // Deliberately independent of OLLAMA_BASE_URL/OLLAMA_MODEL (the main agent's
 // config) rather than falling back to them - once GPU routing sends the main
@@ -53,25 +54,14 @@ Answer with exactly one word: continuation, new_request, or noise.`;
   const { baseUrl, model } = config.ollama.classifier;
 
   try {
-    const res = await fetch(`${baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-        think: false,
-        options: { temperature: 0.1, num_predict: 10 },
-      }),
+    const message = await ollamaChat(baseUrl, {
+      model,
+      messages: [{ role: "user", content: prompt }],
+      think: false,
+      options: { temperature: 0.1, num_predict: 10 },
     });
 
-    if (!res.ok) {
-      log.error({ model, baseUrl, status: res.status }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
-      return "noise";
-    }
-
-    const json = await res.json() as { message: { content: string } };
-    const raw = json.message.content
+    const raw = message.content
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .trim()
       .toLowerCase();
@@ -88,14 +78,23 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict }, "Follow-up classification");
 
     return verdict;
-  } catch (err: any) {
+  } catch (err) {
     // Deliberately still "noise" rather than "new_request": responding to
     // speech that was never aimed at Sakke is the worse failure, and staying
     // quiet is recoverable by repeating the wake word. But an unreachable
     // classifier is an outage, not an ambiguous utterance - it silences every
     // follow-up for as long as it lasts, so it gets logged as an error rather
     // than a warning that blends into the noise.
-    log.error({ model, baseUrl, err: err.message }, "Continuation check unreachable - follow-ups will be ignored until this is fixed");
+    if (err instanceof OllamaError && err.kind === "http") {
+      log.error({ model, baseUrl, status: err.status }, "Continuation check HTTP error - follow-ups will be ignored until this is fixed");
+    } else if (err instanceof OllamaError && err.kind === "invalid_response") {
+      log.error({ model, baseUrl, err: err.message }, "Continuation check got an invalid response - follow-ups will be ignored until this is fixed");
+    } else {
+      log.error(
+        { model, baseUrl, err: err instanceof Error ? err.message : String(err) },
+        "Continuation check unreachable - follow-ups will be ignored until this is fixed",
+      );
+    }
     return "noise";
   }
 }

@@ -17,7 +17,7 @@ async function restart() {
   vi.resetModules();
   const { reloadConfig } = await import("../../src/config.js");
   reloadConfig();
-  return import("../../src/timers/timers.js");
+  return import("../../src/tools/timers/timers.js");
 }
 
 beforeEach(() => {

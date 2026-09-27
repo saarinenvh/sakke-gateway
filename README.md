@@ -24,30 +24,30 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 
 ## Agent Tools
 
-Each tool lives with its feature as `<feature>/tool.ts`, exporting its schema and
-its implementation together. `tools/registry.ts` is the single list, and the only
-place that logs a call, previews the result, or turns a thrown error into
-something the model can react to.
+Each tool lives with its feature as `tools/<feature>/tool.ts`, exporting its
+schema and its implementation together. `tools/registry.ts` is the single list,
+and the only place that logs a call, previews the result, or turns a thrown
+error into something the model can react to.
 
 | Tool | Feature | Description |
 |---|---|---|
-| `control_home_assistant` | `homeControl/` | Lights, scenes, switches, media |
-| `web_search` | `search/` | Web search via local SearXNG |
-| `get_weather` | `weather/` | Current weather + 6h forecast |
-| `spotify` | `spotify/` | Suggest / play / pause / next / previous / volume |
-| `manage_list` | `lists/` | HA todo lists — read, add, complete, remove, sort by store layout |
-| `open_tv_app` | `tv/` | Launch Netflix, YouTube, Spotify or DGN on the living room TV |
-| `tv_remote_command` | `tv/` | Send home / back / mute / search to the TV |
-| `tv_send_text` | `tv/` | Type into the TV's focused input field |
-| `get_device_state` | `homeControl/` | Live state and attributes of any HA entity |
-| `run_routine` | `homeControl/` | Run a user-defined HA script by name |
-| `create_knowledge` | `wiki/` | Save a note to `sakke-knowledge/` in the vault |
-| `get_context` | `wiki/` | Load a wiki knowledge page on demand |
-| `get_tasks` | `reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `timer` | `timers/` | Set, cancel or list voice timers |
-| `refresh_home_data` | `homeControl/` | Reload areas, scenes and routines from HA |
-| `set_gaming_mode` | `gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
-| `get_calendar` | `reminders/` | Google Calendar events for the same periods |
+| `control_home_assistant` | `tools/homeControl/` | Lights, scenes, switches, media |
+| `web_search` | `tools/search/` | Web search via local SearXNG |
+| `get_weather` | `tools/weather/` | Current weather + 6h forecast |
+| `spotify` | `tools/spotify/` | Suggest / play / pause / next / previous / volume |
+| `manage_list` | `tools/lists/` | HA todo lists — read, add, complete, remove, sort by store layout |
+| `open_tv_app` | `tools/tv/` | Launch Netflix, YouTube, Spotify or DGN on the living room TV |
+| `tv_remote_command` | `tools/tv/` | Send home / back / mute / search to the TV |
+| `tv_send_text` | `tools/tv/` | Type into the TV's focused input field |
+| `get_device_state` | `tools/homeControl/` | Live state and attributes of any HA entity |
+| `run_routine` | `tools/homeControl/` | Run a user-defined HA script by name |
+| `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
+| `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
+| `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
+| `timer` | `tools/timers/` | Set, cancel or list voice timers |
+| `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
+| `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
+| `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
 
 ## Routes
 
@@ -84,13 +84,21 @@ src/
 │   └── prompts/          # persona.md, toolDiscipline.md
 ├── tools/
 │   ├── registry.ts       # the one tool list, and the one try/catch
-│   └── types.ts
-├── integrations/homeAssistant/
-│   ├── client.ts         # the only place that talks HTTP to HA
-│   └── registry.ts       # areas, scenes, scripts, entities
-├── homeControl/  lists/  spotify/  weather/  search/  reminders/
-├── timers/  tv/  wiki/  scenes/  gpu/  display/
-└── …                     # each with feature.ts, tool.ts, prompt.ts as needed
+│   ├── types.ts
+│   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
+│       timers/  tv/  wiki/  gpu/
+│                         # each with feature.ts, tool.ts, prompt.ts as needed -
+│                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
+├── features/
+│   └── scenes/  display/  gpu/  # feature modules with their own routes/logic,
+│                         # but not in tools/registry.ts - nothing the model
+│                         # calls directly (gpu/ here is gpuStatus.ts + the
+│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it)
+├── integrations/
+│   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
+│   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
+│   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
+└── …
 ```
 
 Every feature's `prompt.ts` is concatenated into the system prompt in a fixed
