@@ -26,6 +26,14 @@ const MAIN_AGENT_TEMPERATURE = 0.7;
 const MIN_SPEAKING_MS = 2000;
 const SPEAKING_MS_PER_CHARACTER = 70;
 
+export interface AgentOptions {
+  // Context from whoever started the conversation, e.g. the question the
+  // tidiness coach just asked; the reply arrives as a new conversation.
+  extraSystemPrompt?: string;
+  // No tool schema at all: for turns that must never act.
+  withholdTools?: boolean;
+}
+
 export interface AgentResult {
   content: string;
   continueConversation: boolean;
@@ -52,10 +60,11 @@ export async function runAgent(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
+  options: AgentOptions = {},
 ): Promise<AgentResult> {
   pruneStale();
 
-  const turn = await resolveIncomingTurn(userMessage, conversationId, log);
+  const turn = await resolveIncomingTurn(userMessage, conversationId, log, options.extraSystemPrompt);
 
   if (turn.kind === "reset") {
     broadcastState("speaking", speakingDurationMs(turn.reply));
@@ -81,7 +90,7 @@ export async function runAgent(
 
   let outcome: LoopOutcome;
   try {
-    outcome = await runToolCallingLoop(messages, target, conversationId, userMessage, log);
+    outcome = await runToolCallingLoop(messages, target, conversationId, userMessage, log, options.withholdTools ?? false);
   } catch (err) {
     // Only the speaking/idle broadcasts clear "thinking" - a throw must too.
     broadcastState("idle");
@@ -97,6 +106,7 @@ async function resolveIncomingTurn(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
+  extraSystemPrompt: string | undefined,
 ): Promise<IncomingTurn> {
   if (isResetRequest(userMessage)) {
     dropConversation(conversationId);
@@ -126,7 +136,7 @@ async function resolveIncomingTurn(
 
   return {
     kind: "proceed",
-    messages: await buildMessages(existing, userMessage),
+    messages: await buildMessages(existing, userMessage, extraSystemPrompt),
   };
 }
 
@@ -140,7 +150,11 @@ function classifyContinuation(
   return classifyFollowUp(lastUserMessage, lastAssistantMessage, userMessage, log);
 }
 
-async function buildMessages(existing: Conversation | undefined, userMessage: string): Promise<Message[]> {
+async function buildMessages(
+  existing: Conversation | undefined,
+  userMessage: string,
+  extraSystemPrompt: string | undefined,
+): Promise<Message[]> {
   // Copies the stored history rather than reusing the same array - a failed
   // turn below must not corrupt the next one's starting point.
   const messages: Message[] = existing
@@ -151,6 +165,8 @@ async function buildMessages(existing: Conversation | undefined, userMessage: st
     messages[0] = { ...messages[0], content: refreshClock(messages[0].content) };
   }
 
+  // Kept in the stored history, so a follow-up still knows the context.
+  if (extraSystemPrompt) messages.push({ role: "system", content: extraSystemPrompt });
   messages.push({ role: "user", content: userMessage });
   return messages;
 }
@@ -173,10 +189,11 @@ async function runToolCallingLoop(
   conversationId: string,
   userMessage: string,
   log: FastifyBaseLogger,
+  withholdTools: boolean,
 ): Promise<LoopOutcome> {
   const completedToolCalls = new Set<string>();
   // True once the model repeats itself - see executeToolBatch.
-  let forceFinalResponse = false;
+  let forceFinalResponse = withholdTools;
 
   for (let i = 0; i < MAX_ITERATIONS + 1; i++) {
     if (i === MAX_ITERATIONS && !forceFinalResponse) break;

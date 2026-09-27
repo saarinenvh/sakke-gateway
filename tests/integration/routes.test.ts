@@ -103,6 +103,25 @@ describe("POST /v1/chat/completions", () => {
     expect(body.continue_conversation).toBe(true);
   });
 
+  it("adds a forwarded extra_system_prompt to the turn, just before the user's answer", async () => {
+    ollama.script({ content: "Right away." });
+    await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        conversation_id: "routes-extra-prompt",
+        messages: [{ role: "user", content: "sure, clean it" }],
+        extra_system_prompt: "You just asked the owner whether to run the vacuum.",
+      },
+    });
+
+    const messages = ollama.requests().at(-1)?.messages ?? [];
+    expect(messages.slice(-2)).toEqual([
+      { role: "system", content: "You just asked the owner whether to run the vacuum." },
+      { role: "user", content: "sure, clean it" },
+    ]);
+  });
+
   it("uses the last user message when the client sends a whole history", async () => {
     ollama.script({ content: "The second one." });
     await app.inject({

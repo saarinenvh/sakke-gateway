@@ -11,6 +11,7 @@ import { createKnowledgeTool, getContextTool } from "./wiki/tool.js";
 import { getTasksTool, getCalendarTool } from "./reminders/tool.js";
 import { timerTool } from "./timers/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
+import { vacuumTool } from "./vacuum/tool.js";
 
 // The whole tool surface, in the order the model is shown it. There used to be
 // two lists to keep in step - a 300-line array of schemas and a 400-line chain
@@ -38,6 +39,7 @@ const ALL: Tool[] = [
   refreshHomeDataTool,
   setGamingModeTool,
   getCalendarTool,
+  vacuumTool,
 ];
 
 const byName = new Map<string, Tool>();
