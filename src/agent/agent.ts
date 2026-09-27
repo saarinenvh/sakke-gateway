@@ -211,7 +211,12 @@ function callOllama(messages: Message[], target: OllamaTargetConfig, forceFinalR
 
 // Keys are marked completed as the batch is processed, not in bulk
 // beforehand, so a duplicate within one batch is caught the same way as one
-// across batches.
+// across batches. Whether the model is "stuck" isn't decided from the keys
+// upfront - it's whether processing the batch produced any new result at
+// all. A batch that's entirely skipped repeats of non-repeatable calls means
+// zero new information reached the model, which is the actual stuck case;
+// a batch containing even one new or repeatable call is real progress, even
+// if every key in it was already seen before.
 async function executeToolBatch(
   toolCalls: OllamaToolCall[],
   assistantContent: string,
@@ -221,11 +226,6 @@ async function executeToolBatch(
   log: FastifyBaseLogger,
 ): Promise<ToolBatchOutcome> {
   const callKeys = toolCalls.map(t => toolCallKey(t.function.name, t.function.arguments));
-  const wholeBatchAlreadyRan = callKeys.every(k => completedToolCalls.has(k));
-  if (wholeBatchAlreadyRan) {
-    log.warn({ conversationId, tools: callKeys }, "Duplicate tool calls detected, retrying with tools withheld");
-    return "repeated";
-  }
 
   log.info(
     { conversationId, tools: toolCalls.map(t => `${t.function.name}(${JSON.stringify(t.function.arguments)})`) },
@@ -233,6 +233,8 @@ async function executeToolBatch(
   );
 
   messages.push({ role: "assistant", content: assistantContent, tool_calls: toolCalls });
+
+  let anyExecuted = false;
 
   for (const [i, call] of toolCalls.entries()) {
     const key = callKeys[i];
@@ -247,9 +249,15 @@ async function executeToolBatch(
       continue;
     }
 
+    anyExecuted = true;
     completedToolCalls.add(key);
     const result = await executeTool(call.function.name, call.function.arguments, log, conversationId);
     messages.push({ role: "tool", content: result, tool_call_id: call.id });
+  }
+
+  if (!anyExecuted) {
+    log.warn({ conversationId, tools: callKeys }, "Every call in this batch was a repeat, withholding tools next pass");
+    return "repeated";
   }
 
   return "executed";

@@ -69,15 +69,17 @@ describe("a normal turn", () => {
 // tool had already succeeded.
 describe("when the model repeats a tool call", () => {
   it("withholds the tool schema and gets a real answer", async () => {
+    // run_routine is not repeatable - an identical repeat here has nothing
+    // else in the batch to make progress, so it's the actual stuck case.
     ollama.script(
-      { toolCalls: [toolCall("get_weather")] },
-      { toolCalls: [toolCall("get_weather")] },   // identical - the loop detector fires
-      { content: "Cold and damp. Obviously." },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },   // identical - the loop detector fires
+      { content: "Done. Obviously." },
     );
 
-    const result = await runAgent("weather", nextId(), log);
+    const result = await runAgent("good night", nextId(), log);
 
-    expect(result.content).toBe("Cold and damp. Obviously.");
+    expect(result.content).toBe("Done. Obviously.");
     expect(result.content).not.toContain("I got confused");
 
     const passes = ollama.requests();
@@ -89,14 +91,34 @@ describe("when the model repeats a tool call", () => {
     // Withholding the schema stops the runtime parsing a tool call, not the
     // model producing one - seen live, and read out by Piper verbatim.
     ollama.script(
-      { toolCalls: [toolCall("get_weather")] },
-      { toolCalls: [toolCall("get_weather")] },
-      { content: '<tool_call>{"name": "get_weather", "arguments": {}}</tool_call>' },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { toolCalls: [toolCall("run_routine", { script_id: "good_night" })] },
+      { content: '<tool_call>{"name": "run_routine", "arguments": {}}</tool_call>' },
     );
 
-    const result = await runAgent("weather", nextId(), log);
+    const result = await runAgent("good night", nextId(), log);
     expect(result.content).not.toContain("tool_call");
     expect(result.content).toBe("That didn't work. Ask me again.");
+  });
+
+  // A batch that's entirely a repeat of a REPEATABLE tool isn't actually
+  // stuck - it should just re-execute (fresh data), not force a final
+  // answer from stale context.
+  it("re-executes a repeatable tool instead of forcing a final answer, even when the whole batch already ran", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] },
+      { toolCalls: [toolCall("get_device_state", { entity_id: "light.hall" })] }, // identical, but repeatable
+      { content: "Still off." },
+    );
+
+    const result = await runAgent("check the light again", nextId(), log);
+    expect(result.content).toBe("Still off.");
+
+    const passes = ollama.requests();
+    expect(passes).toHaveLength(3);
+    // Never withheld - the repeat re-executed normally both times instead of
+    // triggering the stuck-loop path.
+    expect(passes.map(p => p.hasTools)).toEqual([true, true, true]);
   });
 });
 
