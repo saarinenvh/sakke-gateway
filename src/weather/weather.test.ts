@@ -57,4 +57,12 @@ describe("formatWeather", () => {
     }));
     expect(out).toContain("max rain chance 5%");
   });
+
+  it("skips the null gaps Open-Meteo leaves in hourly series", () => {
+    const out = formatWeather(reading({
+      hourly: { precipitation_probability: [null, 30, null], wind_speed_10m: [null, null] },
+    }));
+    expect(out).toContain("max rain chance 30%");
+    expect(out).toContain("max wind 0 km/h");
+  });
 });

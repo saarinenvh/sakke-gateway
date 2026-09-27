@@ -1,4 +1,28 @@
+import { z } from "zod";
 import { config } from "../config.js";
+import { parseOrThrow } from "../util/validation.js";
+
+const FORECAST_HOURS = 6;
+
+// Open-Meteo leaves gaps in hourly series as null rather than dropping them.
+const hourlySeriesSchema = z.array(z.number().nullable()).optional();
+
+const weatherReadingSchema = z.object({
+  current: z.object({
+    weather_code: z.number(),
+    temperature_2m: z.number(),
+    apparent_temperature: z.number(),
+    precipitation: z.number(),
+    wind_speed_10m: z.number(),
+    wind_gusts_10m: z.number(),
+  }),
+  hourly: z.object({
+    precipitation_probability: hourlySeriesSchema,
+    wind_speed_10m: hourlySeriesSchema,
+  }),
+});
+
+export type WeatherReading = z.output<typeof weatherReadingSchema>;
 
 const WMO_CODES: Record<number, string> = {
   0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
@@ -23,23 +47,18 @@ export async function getWeather(): Promise<string> {
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
 
-  return formatWeather(await res.json());
+  return formatWeather(parseOrThrow(weatherReadingSchema, await res.json(), "Open-Meteo forecast"));
 }
 
 // Split from getWeather so the mapping and the guards can be exercised without
 // a network call - and because "fetch" and "turn it into something speakable"
 // are separate jobs.
-export function formatWeather(data: any): string {
-  const c = data.current;
-  const hourly = data.hourly;
+export function formatWeather(reading: WeatherReading): string {
+  const c = reading.current;
 
   const condition = WMO_CODES[c.weather_code] ?? `code ${c.weather_code}`;
-  // Math.max() with no arguments is -Infinity, so an absent
-  // precipitation_probability had Sakke reading out "max rain chance minus
-  // Infinity percent". Same guard the wind line below already uses.
-  const next6 = hourly.precipitation_probability?.slice(0, 6) ?? [];
-  const maxRainChance = next6.length > 0 ? Math.max(...next6) : 0;
-  const maxWindNext6 = Math.max(...(hourly.wind_speed_10m?.slice(0, 6) ?? [0]));
+  const maxRainChance = maxOverForecast(reading.hourly.precipitation_probability);
+  const maxWindNext6 = maxOverForecast(reading.hourly.wind_speed_10m);
 
   return [
     `Conditions: ${condition}`,
@@ -48,4 +67,11 @@ export function formatWeather(data: any): string {
     `Current precipitation: ${c.precipitation} mm`,
     `Next 6h: max rain chance ${maxRainChance}%, max wind ${maxWindNext6} km/h`,
   ].join("\n");
+}
+
+// Math.max() with no arguments is -Infinity, so a missing or all-null series
+// once had Sakke reading out "max rain chance minus Infinity percent".
+function maxOverForecast(series: (number | null)[] | undefined): number {
+  const values = (series ?? []).slice(0, FORECAST_HOURS).filter(value => value !== null);
+  return values.length > 0 ? Math.max(...values) : 0;
 }

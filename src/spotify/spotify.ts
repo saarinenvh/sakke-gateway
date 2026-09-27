@@ -1,6 +1,8 @@
 import { moduleLog } from "../logger.js";
 import { config } from "../config.js";
 import { getState as haGetState, callService } from "../integrations/homeAssistant/client.js";
+import { parseOrThrow } from "../util/validation.js";
+import { artistAlbumsResponseSchema, searchResponseSchema, tokenResponseSchema } from "./schemas.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
@@ -111,7 +113,7 @@ async function getAccessToken(): Promise<string> {
   });
 
   if (!res.ok) throw new Error(`Spotify auth failed: ${res.status}`);
-  const data = await res.json() as { access_token: string; expires_in: number };
+  const data = parseOrThrow(tokenResponseSchema, await res.json(), "Spotify token");
   accessToken = data.access_token;
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
   return accessToken;
@@ -137,13 +139,11 @@ async function spotifySearchMultiple(query: string, type: "track" | "artist" | "
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify search failed: ${res.status}`);
-  const data = await res.json() as any;
+  const data = parseOrThrow(searchResponseSchema, await res.json(), "Spotify search");
 
   const key = type === "playlist" ? "playlists" : type === "artist" ? "artists" : type === "album" ? "albums" : "tracks";
-  // Spotify's playlist search sometimes mixes in null entries (deleted/made-private
-  // playlists that still match the query) - filter them out before mapping.
-  const items = (data[key]?.items ?? []).filter((item: any) => item != null);
-  return items.map((item: any) => ({
+  const items = (data[key]?.items ?? []).filter(item => item !== null);
+  return items.map(item => ({
     uri: item.uri,
     name: item.name,
     artist: item.artists?.[0]?.name,
@@ -222,8 +222,8 @@ async function spotifyArtistAlbum(artistId: string): Promise<{ uri: string; name
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`Spotify albums fetch failed: ${res.status}`);
-  const data = await res.json() as any;
-  const album = data.items?.[0];
+  const data = parseOrThrow(artistAlbumsResponseSchema, await res.json(), "Spotify artist albums");
+  const album = data.items[0];
   if (!album) return null;
   return { uri: album.uri, name: album.name };
 }
