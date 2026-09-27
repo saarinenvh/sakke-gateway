@@ -42,12 +42,12 @@ let scriptsCache: ScriptEntity[] = [];
 let numberEntitiesCache: NumberEntity[] = [];
 
 export async function loadEntities(): Promise<void> {
-  const states = await getAllStates() as any[];
+  const states = await getAllStates();
 
-  const lightStates = states.filter((s: any) =>
+  const lightStates = states.filter(s =>
     s.entity_id.startsWith("light.") &&
     !s.entity_id.includes("_segment_") &&
-    !s.attributes?.entity_ids
+    !s.attributes.entity_ids
   );
 
   // One template call returns the whole area registry plus each area's
@@ -112,17 +112,17 @@ export async function loadEntities(): Promise<void> {
 
   areasCache = [...byId.values()];
 
-  lightsCache = lightStates.map((s: any) => ({
+  lightsCache = lightStates.map(s => ({
     entity_id: s.entity_id,
-    name: s.attributes?.friendly_name ?? s.entity_id,
+    name: s.attributes.friendly_name ?? s.entity_id,
     area: areaMap.get(s.entity_id)?.name || undefined,
   }));
 
   const allSwitches = states
-    .filter((s: any) => s.entity_id.startsWith("switch."))
-    .map((s: any) => ({
+    .filter(s => s.entity_id.startsWith("switch."))
+    .map(s => ({
       entity_id: s.entity_id,
-      name: s.attributes?.friendly_name ?? s.entity_id,
+      name: s.attributes.friendly_name ?? s.entity_id,
     }));
 
   allSwitchesCache = allSwitches;
@@ -133,26 +133,26 @@ export async function loadEntities(): Promise<void> {
   );
 
   scenesCache = states
-    .filter((s: any) => s.entity_id.startsWith("scene."))
-    .map((s: any) => ({
+    .filter(s => s.entity_id.startsWith("scene."))
+    .map(s => ({
       entity_id: s.entity_id,
-      name: s.attributes?.friendly_name ?? s.entity_id,
+      name: s.attributes.friendly_name ?? s.entity_id,
       scene_id: s.entity_id.replace("scene.", ""),
     }));
 
   scriptsCache = states
-    .filter((s: any) => s.entity_id.startsWith("script."))
-    .map((s: any) => ({
+    .filter(s => s.entity_id.startsWith("script."))
+    .map(s => ({
       entity_id: s.entity_id,
-      name: s.attributes?.friendly_name ?? s.entity_id,
+      name: s.attributes.friendly_name ?? s.entity_id,
       script_id: s.entity_id.replace("script.", ""),
     }));
 
   numberEntitiesCache = states
-    .filter((s: any) => s.entity_id.startsWith("number."))
-    .map((s: any) => ({
+    .filter(s => s.entity_id.startsWith("number."))
+    .map(s => ({
       entity_id: s.entity_id,
-      name: s.attributes?.friendly_name ?? s.entity_id,
+      name: s.attributes.friendly_name ?? s.entity_id,
     }));
 }
 

@@ -1,29 +1,24 @@
 import { config } from "../config.js";
 import { haGet, callServiceWithResponse } from "../integrations/homeAssistant/client.js";
+import {
+  calendarEventsSchema,
+  todoItemsResponseSchema,
+  type CalendarEvent,
+  type TodoItem,
+} from "../integrations/homeAssistant/schemas.js";
 
 // TZ, not config.timezone: the compose file, .env and .env.example all set TZ, and
 // nothing ever set config.timezone - this only ever worked because the hardcoded
 // fallback happened to be right.
-
-interface CalendarEvent {
-  summary: string;
-  start: { date?: string; dateTime?: string };
-}
-
-interface TodoItem {
-  uid?: string;
-  summary: string;
-  status: "needs_action" | "completed";
-  due?: string;
-}
 
 async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date): Promise<CalendarEvent[]> {
   const now = new Date();
   const s = start ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const e = end ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-  return haGet<CalendarEvent[]>(
-    `/api/calendars/${calendarEntityId}?start=${s.toISOString()}&end=${e.toISOString()}`
+  return haGet(
+    `/api/calendars/${calendarEntityId}?start=${s.toISOString()}&end=${e.toISOString()}`,
+    calendarEventsSchema,
   );
 }
 
@@ -77,9 +72,9 @@ export function getDateRange(period: string): { start: string; end: string } {
 }
 
 async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
-  const response = await callServiceWithResponse<Record<string, { items?: TodoItem[] }>>(
-    "todo", "get_items", { entity_id: config.ha.tasksTodo });
-  const items = response?.[config.ha.tasksTodo]?.items ?? [];
+  const response = await callServiceWithResponse(
+    "todo", "get_items", { entity_id: config.ha.tasksTodo }, todoItemsResponseSchema);
+  const items = response[config.ha.tasksTodo]?.items ?? [];
   const { start, end } = getDateRange(period);
   return items.filter(i => i.status !== "completed" && isDueInRange(i.due, start, end));
 }

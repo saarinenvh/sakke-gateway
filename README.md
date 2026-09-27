@@ -87,6 +87,7 @@ src/
 │   └── types.ts
 ├── integrations/homeAssistant/
 │   ├── client.ts         # the only place that talks HTTP to HA
+│   ├── schemas.ts        # Zod schemas for what HA sends back
 │   └── registry.ts       # areas, scenes, scripts, entities
 ├── homeControl/  lists/  spotify/  weather/  search/  reminders/
 ├── timers/  tv/  wiki/  scenes/  gpu/  display/

@@ -1,4 +1,5 @@
 import { callService, callServiceWithResponse, getAllStates } from "../integrations/homeAssistant/client.js";
+import { todoItemsResponseSchema, type TodoItem } from "../integrations/homeAssistant/schemas.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },
@@ -26,18 +27,10 @@ export function categorizeItem(name: string): number {
   return STORE_LAYOUT.length;
 }
 
-interface TodoItem {
-  uid?: string;
-  summary: string;
-  status: "needs_action" | "completed";
-  due?: string;
-  description?: string;
-}
-
 async function getItems(entityId: string): Promise<TodoItem[]> {
-  const response = await callServiceWithResponse<Record<string, { items?: TodoItem[] }>>(
-    "todo", "get_items", { entity_id: entityId });
-  return response?.[entityId]?.items ?? [];
+  const response = await callServiceWithResponse(
+    "todo", "get_items", { entity_id: entityId }, todoItemsResponseSchema);
+  return response[entityId]?.items ?? [];
 }
 
 function findItem(items: TodoItem[], query: string): TodoItem | undefined {
@@ -113,7 +106,7 @@ export async function getTodoLists(): Promise<{ entity_id: string; name: string 
   const states = await getAllStates({ timeoutMs: 5000 });
   return states
     .filter(s => s.entity_id.startsWith("todo."))
-    .map(s => ({ entity_id: s.entity_id, name: (s.attributes.friendly_name as string) ?? s.entity_id }));
+    .map(s => ({ entity_id: s.entity_id, name: s.attributes.friendly_name ?? s.entity_id }));
 }
 
 export async function sortList(entityId: string): Promise<string> {
