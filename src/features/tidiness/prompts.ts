@@ -13,16 +13,18 @@ export interface NagFacts {
   daysSinceClean: number;
   declines: number;
   tone: ToneLevel;
+  vacuumName: string | undefined;
 }
 
 export function buildNagRequest(facts: NagFacts): string {
   return [
     "You are about to ask the owner, out loud and unprompted, whether you should run the robot vacuum now.",
+    facts.vacuumName ? `The owner calls the vacuum ${facts.vacuumName}.` : "",
     `Facts: the house was last cleaned ${describeDays(facts.daysSinceClean)}.`,
     `They have said no ${describeDeclines(facts.declines)} since then.`,
     `Tone: ${TONE_DESCRIPTIONS[facts.tone]}`,
     "Write only the one short spoken question, ending in a question mark. Do not call any tools and do not start the vacuum.",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 // Sent as extra_system_prompt: the reply arrives as a new conversation.

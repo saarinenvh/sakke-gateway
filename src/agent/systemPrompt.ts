@@ -8,6 +8,7 @@ import { spotifyPrompt } from "../tools/spotify/prompt.js";
 import { weatherPrompt } from "../tools/weather/prompt.js";
 import { searchPrompt } from "../tools/search/prompt.js";
 import { wikiPrompt } from "../tools/wiki/prompt.js";
+import { vacuumPrompt } from "../tools/vacuum/prompt.js";
 
 // Composes the system prompt from per-feature fragments. Each feature owns the
 // rules for its own tools, so the two move together instead of drifting apart
@@ -22,6 +23,7 @@ const SECTIONS: PromptSection[] = [
   () => readMarkdown("persona.md"),
   () => readMarkdown("toolDiscipline.md"),
   homeControlPrompt,
+  vacuumPrompt,
   listsPrompt,
   remindersPrompt,
   spotifyPrompt,

@@ -4,7 +4,7 @@ import { moduleLog } from "../../logger.js";
 import { nextNag, observeVacuum, type NagDecision, type NoNagReason } from "./policy.js";
 import { buildAnswerContext, buildNagRequest, type NagFacts } from "./prompts.js";
 import { getTidinessState, recordClean, recordNag, setCleaningSince, updateNag } from "./store.js";
-import { findVacuum } from "./vacuum.js";
+import { findSpokenVacuumName, findVacuum } from "./vacuum.js";
 
 // Scheduled check: record finished vacuum runs, and ask about cleaning when a
 // nag is due. All I/O goes through CoachDeps.
@@ -110,7 +110,12 @@ async function findDeliveryBlocker(deps: CoachDeps): Promise<SkipReason | undefi
 }
 
 async function askNag(decision: Extract<NagDecision, { kind: "due" }>, deps: CoachDeps): Promise<TickResult> {
-  const facts: NagFacts = { daysSinceClean: decision.daysSinceClean, declines: decision.declines, tone: decision.tone };
+  const facts: NagFacts = {
+    daysSinceClean: decision.daysSinceClean,
+    declines: decision.declines,
+    tone: decision.tone,
+    vacuumName: findSpokenVacuumName(),
+  };
 
   const question = await writeQuestion(facts, deps);
   if (!question) {

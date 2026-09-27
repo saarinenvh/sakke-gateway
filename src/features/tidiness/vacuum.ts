@@ -21,3 +21,13 @@ export function findVacuum(): VacuumLookup {
   if (vacuums.length > 1) return { kind: "ambiguous", names: vacuums.map(v => v.name) };
   return { kind: "found", vacuum: vacuums[0] };
 }
+
+// The name the owner gives it in HA ("James"), or none if HA only has the id.
+export function spokenVacuumName(vacuum: VacuumEntity): string | undefined {
+  return vacuum.name === vacuum.entity_id ? undefined : vacuum.name;
+}
+
+export function findSpokenVacuumName(): string | undefined {
+  const lookup = findVacuum();
+  return lookup.kind === "found" ? spokenVacuumName(lookup.vacuum) : undefined;
+}

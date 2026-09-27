@@ -3,7 +3,7 @@ import { callService, getState } from "../../integrations/homeAssistant/client.j
 import type { VacuumEntity } from "../../integrations/homeAssistant/registry.js";
 import { findAnswerableNag, localDaysBetween } from "../../features/tidiness/policy.js";
 import { getTidinessState, recordClean, snoozeUntil, updateNag } from "../../features/tidiness/store.js";
-import { findVacuum } from "../../features/tidiness/vacuum.js";
+import { findVacuum, spokenVacuumName } from "../../features/tidiness/vacuum.js";
 
 export const VACUUM_ACTIONS = ["start", "stop", "dock", "status", "last_cleaned", "mark_cleaned", "decline", "snooze"] as const;
 export type VacuumAction = (typeof VACUUM_ACTIONS)[number];
@@ -19,10 +19,10 @@ const MOVEMENT_SERVICES = {
 } as const satisfies Partial<Record<VacuumAction, string>>;
 
 const MOVEMENT_REPLIES = {
-  start: "The vacuum has started cleaning.",
-  stop: "The vacuum has stopped.",
-  dock: "The vacuum is heading back to its dock.",
-} as const satisfies Record<keyof typeof MOVEMENT_SERVICES, string>;
+  start: subject => `${subject} has started cleaning.`,
+  stop: subject => `${subject} has stopped.`,
+  dock: subject => `${subject} is heading back to the dock.`,
+} as const satisfies Record<keyof typeof MOVEMENT_SERVICES, (subject: string) => string>;
 
 export async function runVacuumAction(action: VacuumAction, now: number): Promise<string> {
   switch (action) {
@@ -56,7 +56,7 @@ async function moveVacuum(action: keyof typeof MOVEMENT_SERVICES, now: number): 
 
   // Starting in reply to a cleaning reminder answers it.
   if (action === "start") await answerPendingNag("yes", now);
-  return MOVEMENT_REPLIES[action];
+  return MOVEMENT_REPLIES[action](describeVacuumSubject(lookup.vacuum));
 }
 
 // --- Status -----------------------------------------------------------------
@@ -69,7 +69,12 @@ async function describeVacuum(now: number): Promise<string> {
   const vacuumState = await getState(lookup.vacuum.entity_id);
   const battery = await readBatteryPct(lookup.vacuum, vacuumState.attributes.battery_level);
   const batteryText = battery === undefined ? "" : `, battery ${battery}%`;
-  return `The vacuum is ${vacuumState.state}${batteryText}. ${lastCleaned}`;
+  return `${describeVacuumSubject(lookup.vacuum)} is ${vacuumState.state}${batteryText}. ${lastCleaned}`;
+}
+
+function describeVacuumSubject(vacuum: VacuumEntity): string {
+  const name = spokenVacuumName(vacuum);
+  return name ? `${name} (the robot vacuum)` : "The robot vacuum";
 }
 
 // A vacuum attribute on older integrations, a separate sensor on newer ones.

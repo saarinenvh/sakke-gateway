@@ -5,6 +5,7 @@ import { join } from "path";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { vacuumTool } from "../../src/tools/vacuum/tool.js";
+import { vacuumPrompt } from "../../src/tools/vacuum/prompt.js";
 import { reloadConfig } from "../../src/config.js";
 import { loadEntities } from "../../src/integrations/homeAssistant/registry.js";
 import { __resetTidinessState, getTidinessState, recordClean, recordNag } from "../../src/features/tidiness/store.js";
@@ -61,6 +62,30 @@ describe("moving the vacuum", () => {
 
     expect(await run({ action: "start" })).toContain("no robot vacuum");
     expect(ha.serviceCalls()).toEqual([]);
+  });
+});
+
+describe("the vacuum's name", () => {
+  beforeEach(async () => {
+    delete process.env.TIDINESS_VACUUM_ENTITY_ID;
+    reloadConfig();
+    ha.setState(VACUUM, "docked", { friendly_name: "James" });
+    await loadEntities();
+  });
+
+  it("uses the name the owner gave it in HA", async () => {
+    expect(await run({ action: "start" })).toContain("James");
+  });
+
+  it("tells the model the vacuum is called James", () => {
+    expect(vacuumPrompt()).toContain("it is called James");
+  });
+
+  it("stays out of the prompt when HA only knows the entity id", async () => {
+    ha.setState(VACUUM, "docked", {});
+    await loadEntities();
+    expect(vacuumPrompt()).toBe("");
+    expect(await run({ action: "start" })).toContain("The robot vacuum");
   });
 });
 
