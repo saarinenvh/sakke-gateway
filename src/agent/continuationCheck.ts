@@ -55,12 +55,16 @@ Answer with exactly one word: continuation, new_request, or noise.`;
   const { baseUrl, model } = config.ollama.classifier;
 
   try {
-    const message = await ollamaChat(baseUrl, {
-      model,
-      messages: [{ role: "user", content: prompt }],
-      think: false,
-      options: { temperature: 0.1, num_predict: 10 },
-    });
+    const message = await ollamaChat(
+      baseUrl,
+      {
+        model,
+        messages: [{ role: "user", content: prompt }],
+        think: false,
+        options: { temperature: 0.1, num_predict: 10 },
+      },
+      log,
+    );
 
     const raw = message.content
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
