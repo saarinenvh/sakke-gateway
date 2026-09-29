@@ -90,15 +90,39 @@ function parseArgs(argv: string[]): { model: string; baseUrl: string } {
 // Matches the fake FastifyBaseLogger used in tests/integration/agentLoop.test.ts,
 // but prints instead of discarding - useful to watch each call's own latency
 // live while a run is in progress, alongside the summary table at the end.
+// Also captures the model's raw response from the "Follow-up classification"
+// line, so a case can tell a genuinely recognized verdict apart from one that
+// only fell through to continuationCheck.ts's fail-closed default - see
+// isRecognizedVerdict below.
 function createLogger() {
+  let raw: string | undefined;
   const log: any = {
-    info: (obj: Record<string, unknown>, msg: string) => console.log(`  [info] ${msg}`, obj),
+    info: (obj: Record<string, unknown>, msg: string) => {
+      console.log(`  [info] ${msg}`, obj);
+      if (msg === "Follow-up classification" && typeof obj.raw === "string") raw = obj.raw;
+    },
     warn: (obj: Record<string, unknown>, msg: string) => console.warn(`  [warn] ${msg}`, obj),
     error: (obj: Record<string, unknown>, msg: string) => console.error(`  [error] ${msg}`, obj),
     debug: () => {},
     child: () => log,
   };
-  return log;
+  return { log, getRaw: () => raw };
+}
+
+// continuationCheck.ts deliberately treats any unparseable model output as
+// "noise" (its own fail-closed default, not a bug - see its comment). That
+// means a "noise" expectation here could "pass" on a model that produced
+// complete garbage rather than one that actually said the right thing. This
+// mirrors continuationCheck.ts's own matching against the raw response (also
+// true, separately, of a network/validation failure, which never reaches the
+// "Follow-up classification" log line at all and so is correctly never
+// "recognized" either) - deliberately NOT changed in continuationCheck.ts
+// itself, since its fail-closed behavior is intentional production logic
+// outside this ticket's scope; the eval only needs its own copy to score
+// accuracy honestly.
+function isRecognizedVerdict(raw: string | undefined): boolean {
+  if (raw === undefined) return false;
+  return raw.includes("new_request") || raw.includes("new request") || raw.includes("continuation") || raw.includes("noise");
 }
 
 interface CaseResult {
@@ -112,22 +136,18 @@ interface CaseResult {
 
 async function runCase(testCase: ClassifierCase): Promise<CaseResult> {
   const startedAt = Date.now();
+  const { log, getRaw } = createLogger();
   // classifyFollowUp never throws - an unreachable/erroring model already
   // fails closed to "noise" internally (see continuationCheck.ts), so a wrong
   // verdict here is real evidence of a bad call, not a crash to catch.
-  const actual = await classifyFollowUp(
-    testCase.lastUserMessage,
-    testCase.lastAssistantMessage,
-    testCase.newUtterance,
-    createLogger(),
-  );
+  const actual = await classifyFollowUp(testCase.lastUserMessage, testCase.lastAssistantMessage, testCase.newUtterance, log);
 
   return {
     source: testCase.source,
     newUtterance: testCase.newUtterance,
     expected: testCase.expected,
     actual,
-    pass: actual === testCase.expected,
+    pass: isRecognizedVerdict(getRaw()) && actual === testCase.expected,
     durationMs: Date.now() - startedAt,
   };
 }
