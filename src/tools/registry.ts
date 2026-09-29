@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
+import { INFERENCE_PROFILES, type InferenceProfile, type InferenceProfileName } from "../inference/profiles.js";
 
 import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
 import { webSearchTool } from "./search/tool.js";
@@ -12,15 +13,11 @@ import { getTasksTool, getCalendarTool } from "./reminders/tool.js";
 import { timerTool } from "./timers/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
 import { vacuumTool } from "./vacuum/tool.js";
+import { announceTool } from "./announce/tool.js";
 
-// The whole tool surface, in the order the model is shown it. There used to be
-// two lists to keep in step - a 300-line array of schemas and a 400-line chain
-// of `if (name === ...)` branches in a separate file - and adding a tool meant
-// editing both, in the right place, without forgetting the logging or the
-// try/catch. Now each feature owns its own tools and this is the only list.
-//
-// Order is preserved from that original array: it's what the model has been
-// living with, and reordering a tool list is not a free change.
+// Every tool, in the order the model is shown them. Which ones a request may
+// use is its profile's choice (inference/profiles.ts). The order is what the
+// model has been living with; reordering a tool list is not a free change.
 const ALL: Tool[] = [
   controlHomeAssistantTool,
   webSearchTool,
@@ -40,6 +37,7 @@ const ALL: Tool[] = [
   setGamingModeTool,
   getCalendarTool,
   vacuumTool,
+  announceTool,
 ];
 
 const byName = new Map<string, Tool>();
@@ -51,8 +49,38 @@ for (const tool of ALL) {
   byName.set(name, tool);
 }
 
-/** The schemas sent to Ollama. */
+// A profile naming a tool that doesn't exist would silently take that tool
+// away from every request using it.
+const unknownProfileTools = findUnknownProfileTools(INFERENCE_PROFILES, new Set(byName.keys()));
+if (unknownProfileTools.length > 0) {
+  throw new Error(`Inference profiles name unknown tools: ${unknownProfileTools.join(", ")}`);
+}
+
+/** Every registered tool's schema. */
 export const tools: ToolDefinition[] = ALL.map(t => t.definition);
+
+/** The schemas offered to the model under this profile, in registry order. */
+export function toolsForProfile(profile: InferenceProfileName): ToolDefinition[] {
+  return ALL.filter(t => isToolInProfile(profile, t.definition.function.name)).map(t => t.definition);
+}
+
+export function isToolInProfile(profile: InferenceProfileName, name: string): boolean {
+  const allowed: readonly string[] = INFERENCE_PROFILES[profile].tools;
+  return allowed.includes(name);
+}
+
+export function findUnknownProfileTools(
+  profiles: Record<string, InferenceProfile>,
+  knownToolNames: ReadonlySet<string>,
+): string[] {
+  const unknown: string[] = [];
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    for (const toolName of profile.tools) {
+      if (!knownToolNames.has(toolName)) unknown.push(`${profileName}.${toolName}`);
+    }
+  }
+  return unknown;
+}
 
 export function toolNames(): string[] {
   return [...byName.keys()];

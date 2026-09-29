@@ -5,13 +5,9 @@ import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
 import { parseOrThrow } from "../../util/validation.js";
 
-// What happens when a timer finishes is injected, not imported. This module
-// used to import runAgent directly, which closed a cycle - timers -> agent ->
-// executor (the `timer` tool) -> timers - and meant importing the scheduler
-// pulled in 19 modules including every Home Assistant and Spotify client.
-// Phrasing an announcement was never the scheduler's job anyway: it knows
-// WHEN, not what to say. index.ts wires the real handler at startup; see
-// timerAnnouncer.ts.
+// What happens when a timer finishes is injected (index.ts), not imported:
+// this module knows when, not what to say, and importing the agent would
+// close a cycle through the `timer` tool.
 export type TimerHandler = (label: string) => Promise<void>;
 
 let onTimerFired: TimerHandler = async () => {};

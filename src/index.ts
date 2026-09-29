@@ -3,7 +3,8 @@ import { buildApp } from "./app.js";
 import { loadEntities } from "./integrations/homeAssistant/registry.js";
 import { setModuleLogger } from "./logger.js";
 import { restoreTimers, setTimerHandler } from "./tools/timers/timers.js";
-import { announceFinishedTimer } from "./tools/timers/timerAnnouncer.js";
+import { announce, setWordingWriter } from "./tools/announce/announce.js";
+import { writeAnnouncementWording } from "./tools/announce/wording.js";
 import { config } from "./config.js";
 import { restoreTidinessState } from "./features/tidiness/store.js";
 import { startTidinessCoach } from "./features/tidiness/coach.js";
@@ -16,10 +17,12 @@ const app = buildApp();
 // Modules without a request logger (scenes.ts, spotify.ts) log through this.
 setModuleLogger(app.log);
 
-// Composition root: the scheduler knows when a timer fires, this decides what
-// happens when it does. Wired here so timers.ts doesn't have to import the
-// agent - see the note in that file about the import cycle.
-setTimerHandler(announceFinishedTimer);
+// Composition root: wired here so neither the timer scheduler nor announce has
+// to import the agent, which imports every tool.
+setWordingWriter(writeAnnouncementWording);
+setTimerHandler(async label => {
+  await announce(`The timer for ${label} is done.`, app.log);
+});
 
 // Anything missing or implausible in the environment, reported once, up front,
 // instead of surfacing later as an inexplicable runtime failure.

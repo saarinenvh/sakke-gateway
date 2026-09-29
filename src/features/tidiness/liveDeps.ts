@@ -14,9 +14,10 @@ export const liveCoachDeps: CoachDeps = {
   readState: entityId => getState(entityId),
   readHistory: (entityId, since, until) => getStateHistory(entityId, since, until),
 
-  // Throwaway conversation, and no tools: writing a nag must never act.
+  // Throwaway conversation, and a profile without tools: writing a nag must
+  // never act.
   writeNag: async request => {
-    const { content } = await runAgent(request, `tidiness-${Date.now()}`, moduleLog(), { withholdTools: true });
+    const { content } = await runAgent(request, `tidiness-${Date.now()}`, moduleLog(), { profile: "tidiness_nag" });
     return content;
   },
 

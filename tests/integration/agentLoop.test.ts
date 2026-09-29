@@ -18,6 +18,8 @@ const log: any = { info: () => {}, warn: () => {}, error: () => {}, debug: () =>
 let n = 0;
 const nextId = () => `test-${Date.now()}-${n++}`;
 
+const SAKKE = { profile: "sakke" } as const;
+
 beforeAll(async () => {
   ollama = await startFakeOllama();
   process.env.OLLAMA_BASE_URL = ollama.url;
@@ -46,7 +48,7 @@ describe("a normal turn", () => {
       { content: "Grey and damp. Wear a coat." },
     );
 
-    const result = await runAgent("what is the weather", nextId(), log);
+    const result = await runAgent("what is the weather", nextId(), log, SAKKE);
 
     expect(result.content).toBe("Grey and damp. Wear a coat.");
     expect(result.continueConversation).toBe(true);
@@ -59,7 +61,7 @@ describe("a normal turn", () => {
 
   it("sanitises the reply before returning it", async () => {
     ollama.script({ content: "<think>hmm</think>It is **cold**." });
-    const result = await runAgent("weather", nextId(), log);
+    const result = await runAgent("weather", nextId(), log, SAKKE);
     expect(result.content).toBe("It is cold.");
   });
 });
@@ -77,7 +79,7 @@ describe("when the model repeats a tool call", () => {
       { content: "Done. Obviously." },
     );
 
-    const result = await runAgent("good night", nextId(), log);
+    const result = await runAgent("good night", nextId(), log, SAKKE);
 
     expect(result.content).toBe("Done. Obviously.");
     expect(result.content).not.toContain("I got confused");
@@ -96,7 +98,7 @@ describe("when the model repeats a tool call", () => {
       { content: '<tool_call>{"name": "run_routine", "arguments": {}}</tool_call>' },
     );
 
-    const result = await runAgent("good night", nextId(), log);
+    const result = await runAgent("good night", nextId(), log, SAKKE);
     expect(result.content).not.toContain("tool_call");
     expect(result.content).toBe("That didn't work. Ask me again.");
   });
@@ -111,7 +113,7 @@ describe("when the model repeats a tool call", () => {
       { content: "Still off." },
     );
 
-    const result = await runAgent("check the light again", nextId(), log);
+    const result = await runAgent("check the light again", nextId(), log, SAKKE);
     expect(result.content).toBe("Still off.");
 
     const passes = ollama.requests();
@@ -138,7 +140,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("good night", nextId(), log);
+    const result = await runAgent("good night", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const passes = ollama.requests();
@@ -159,7 +161,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("good night twice", nextId(), log);
+    const result = await runAgent("good night twice", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[1].messages.filter(m => m.role === "tool");
@@ -178,7 +180,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("check and run", nextId(), log);
+    const result = await runAgent("check and run", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
@@ -200,7 +202,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("set a timer for tea, twice", nextId(), log);
+    const result = await runAgent("set a timer for tea, twice", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
@@ -224,7 +226,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("add milk twice, then check the list", nextId(), log);
+    const result = await runAgent("add milk twice, then check the list", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const passes = ollama.requests();
@@ -247,13 +249,13 @@ describe("when a turn fails", () => {
     const id = nextId();
 
     ollama.script({ content: "First answer." });
-    await runAgent("turn A", id, log);
+    await runAgent("turn A", id, log, SAKKE);
 
     ollama.script({ status: 500 });
-    await expect(runAgent("turn B", id, log)).rejects.toThrow();
+    await expect(runAgent("turn B", id, log, SAKKE)).rejects.toThrow();
 
     ollama.script({ content: "Third answer." });
-    const third = await runAgent("turn C", id, log);
+    const third = await runAgent("turn C", id, log, SAKKE);
     expect(third.content).toBe("Third answer.");
 
     const history = ollama.requests()[0].messages;
@@ -266,7 +268,7 @@ describe("when a turn fails", () => {
     // "thinking" is broadcast before the loop and only the success path cleared
     // it, so a failure left the tablet spinning until the next good turn.
     ollama.script({ status: 500 });
-    await expect(runAgent("break", nextId(), log)).rejects.toThrow();
+    await expect(runAgent("break", nextId(), log, SAKKE)).rejects.toThrow();
     expect(getCurrentState()).toBe("idle");
   });
 });
@@ -275,10 +277,10 @@ describe("conversation control phrases", () => {
   it("wipes the conversation on a reset phrase without calling the model", async () => {
     const id = nextId();
     ollama.script({ content: "Remembered." });
-    await runAgent("remember this", id, log);
+    await runAgent("remember this", id, log, SAKKE);
 
     ollama.script();  // no scripted replies: any model call would fail
-    const result = await runAgent("lets start fresh", id, log);
+    const result = await runAgent("lets start fresh", id, log, SAKKE);
 
     expect(result.content).toContain("Wiped");
     expect(result.continueConversation).toBe(false);
@@ -286,11 +288,36 @@ describe("conversation control phrases", () => {
   });
 });
 
+describe("tools outside the profile", () => {
+  it("never offers a conversation the scheduler-only announce tool", async () => {
+    ollama.script({ content: "Noted." });
+
+    await runAgent("remind me later", nextId(), log, SAKKE);
+
+    const [request] = ollama.requests();
+    expect(request.toolNames).toContain("get_weather");
+    expect(request.toolNames).not.toContain("announce");
+  });
+
+  it("refuses a made-up call to a registered tool the profile doesn't allow", async () => {
+    ollama.script(
+      { toolCalls: [toolCall("announce", { message: "hello" })] },
+      { content: "I can't do that from here." },
+    );
+
+    await runAgent("announce hello", nextId(), log, SAKKE);
+
+    const [, second] = ollama.requests();
+    const toolResult = second.messages.find(m => m.role === "tool");
+    expect(toolResult?.content).toBe("Unknown tool: announce");
+  });
+});
+
 describe("a turn that must not act", () => {
-  it("never offers the tool schema when tools are withheld", async () => {
+  it("never offers the tool schema under a profile with no tools", async () => {
     ollama.script({ content: "Shall I vacuum, or do you enjoy the dust?" });
 
-    const result = await runAgent("write the nag", nextId(), log, { withholdTools: true });
+    const result = await runAgent("write the nag", nextId(), log, { profile: "tidiness_nag" });
 
     expect(result.content).toBe("Shall I vacuum, or do you enjoy the dust?");
     expect(ollama.requests().map(r => r.hasTools)).toEqual([false]);

@@ -1,0 +1,70 @@
+import type { FastifyBaseLogger } from "fastify";
+import { config } from "../../config.js";
+import { callService } from "../../integrations/homeAssistant/client.js";
+
+// How Sakke would say a message, in its own voice. Injected at startup
+// (index.ts) rather than imported: writing it needs the agent, and the agent
+// imports every tool, this one included.
+export type WordingWriter = (message: string) => Promise<string>;
+
+// A due announcement never waits long for its wording; past this, the message
+// is spoken as it is.
+export const WORDING_TIMEOUT_MS = 10_000;
+
+// Longer than the default request timeout: the satellite has to actually
+// speak the line before Home Assistant answers.
+const SATELLITE_ANNOUNCE_TIMEOUT_MS = 15_000;
+
+export type WordingSource = "generated" | "fallback";
+
+export interface Announcement {
+  spoken: string;
+  wording: WordingSource;
+}
+
+let writeWording: WordingWriter = async () => {
+  throw new Error("no announcement wording writer configured");
+};
+
+export function setWordingWriter(writer: WordingWriter): void {
+  writeWording = writer;
+}
+
+// Speaks a message on the voice satellite. The wording is best effort; the
+// speaking is not, so a failure to reach the satellite throws.
+export async function announce(message: string, log: FastifyBaseLogger): Promise<Announcement> {
+  const announcement = await prepareAnnouncement(message, log);
+  log.info({ message, spoken: announcement.spoken, wording: announcement.wording }, "Announcing");
+  await speakOnSatellite(announcement.spoken);
+  return announcement;
+}
+
+async function prepareAnnouncement(message: string, log: FastifyBaseLogger): Promise<Announcement> {
+  try {
+    const spoken = (await withTimeout(writeWording(message), WORDING_TIMEOUT_MS)).trim();
+    if (spoken) return { spoken, wording: "generated" };
+    log.warn({ message }, "Announcement wording came back empty, speaking the message as it is");
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    log.warn({ message, err: reason }, "Announcement wording failed, speaking the message as it is");
+  }
+  return { spoken: message, wording: "fallback" };
+}
+
+async function speakOnSatellite(text: string): Promise<void> {
+  await callService(
+    "assist_satellite",
+    "announce",
+    { entity_id: config.ha.satelliteEntityId, message: text },
+    { timeoutMs: SATELLITE_ANNOUNCE_TIMEOUT_MS },
+  );
+}
+
+// The losing promise keeps running; only its result is ignored.
+function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no wording within ${timeoutMs} ms`)), timeoutMs);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
