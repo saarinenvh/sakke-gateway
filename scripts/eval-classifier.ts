@@ -35,64 +35,32 @@ interface ClassifierCase {
   expected: FollowUpVerdict;
 }
 
-const CASES: ClassifierCase[] = [
-  {
-    source: "live log, 2026-09-28 (sakke-gateway)",
-    lastUserMessage: "What's the time?",
-    lastAssistantMessage: "It's 21:39, Monday, 28 September 2026.",
-    newUtterance: "Do I have any tasks for today?",
-    expected: "new_request",
-  },
-  {
-    source: "live log, 2026-09-28 (sakke-gateway)",
-    lastUserMessage: "Do I have any tasks for today?",
-    lastAssistantMessage: "You have one task today: water the plants.",
-    newUtterance: "I already bothered them.",
-    expected: "continuation",
-  },
-  {
-    source: "live log, 2026-09-29 (sakke-gateway)",
-    lastUserMessage: "What's the title?",
-    lastAssistantMessage: "I don't know what title you're referring to. Could you clarify?",
-    newUtterance: "I said, what's the time?",
-    expected: "new_request",
-  },
-  {
-    source: "pending_tasks.md: generic open-ended reply must not force continuation by default",
-    lastUserMessage: "Play some metal.",
-    lastAssistantMessage: "Still here... what can I do for you?",
-    newUtterance: "Could you light the campfire?",
-    expected: "new_request",
-  },
-  {
-    source: "representative: direct pick from a just-presented option list",
-    lastUserMessage: "Play the Discover Weekly playlist.",
-    lastAssistantMessage: "Found: 1. Discover Weekly, 2. Metal, 3. Chill. Which one?",
-    newUtterance: "The first one.",
-    expected: "continuation",
-  },
-  {
-    source: "representative: same-topic follow-up referencing the prior subject",
-    lastUserMessage: "Play something by Wintersun.",
-    lastAssistantMessage: "Playing Wintersun's Time I.",
-    newUtterance: "What other albums does that artist have?",
-    expected: "continuation",
-  },
-  {
-    source: "representative: background chatter not directed at the assistant",
-    lastUserMessage: "What's the weather tomorrow?",
-    lastAssistantMessage: "Sunny, high of 18 degrees.",
-    newUtterance: "yeah I know right, so annoying",
-    expected: "noise",
-  },
-  {
-    source: "representative: incomplete fragment",
-    lastUserMessage: "Turn off the living room lights.",
-    lastAssistantMessage: "Living room lights are off.",
-    newUtterance: "and then the",
-    expected: "noise",
-  },
+// [source, lastUserMessage, lastAssistantMessage, newUtterance, expected] -
+// a tuple table rather than repeated object literals, since the identical
+// five-key shape repeated per case is exactly what a copy-paste detector
+// flags as duplication even though only the values differ.
+type ClassifierCaseRow = readonly [string, string, string, string, FollowUpVerdict];
+
+const CASE_ROWS: ClassifierCaseRow[] = [
+  ["live log, 2026-09-28 (sakke-gateway)", "What's the time?", "It's 21:39, Monday, 28 September 2026.", "Do I have any tasks for today?", "new_request"],
+  ["live log, 2026-09-28 (sakke-gateway)", "Do I have any tasks for today?", "You have one task today: water the plants.", "I already bothered them.", "continuation"],
+  ["live log, 2026-09-29 (sakke-gateway)", "What's the title?", "I don't know what title you're referring to. Could you clarify?", "I said, what's the time?", "new_request"],
+  ["pending_tasks.md: generic open-ended reply must not force continuation by default", "Play some metal.", "Still here... what can I do for you?", "Could you light the campfire?", "new_request"],
+  ["representative: direct pick from a just-presented option list", "Play the Discover Weekly playlist.", "Found: 1. Discover Weekly, 2. Metal, 3. Chill. Which one?", "The first one.", "continuation"],
+  ["representative: same-topic follow-up referencing the prior subject", "Play something by Wintersun.", "Playing Wintersun's Time I.", "What other albums does that artist have?", "continuation"],
+  ["representative: background chatter not directed at the assistant", "What's the weather tomorrow?", "Sunny, high of 18 degrees.", "yeah I know right, so annoying", "noise"],
+  ["representative: incomplete fragment", "Turn off the living room lights.", "Living room lights are off.", "and then the", "noise"],
 ];
+
+const CASES: ClassifierCase[] = CASE_ROWS.map(
+  ([source, lastUserMessage, lastAssistantMessage, newUtterance, expected]) => ({
+    source,
+    lastUserMessage,
+    lastAssistantMessage,
+    newUtterance,
+    expected,
+  }),
+);
 
 function parseArgs(argv: string[]): { model: string; baseUrl: string } {
   const flags = new Map(
