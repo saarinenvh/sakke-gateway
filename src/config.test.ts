@@ -12,7 +12,10 @@ const MANAGED = [
   "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET",
   "OPENAI_API_KEY", "OPENAI_LIGHTING_MODEL",
   "SEARXNG_URL", "WEATHER_LAT", "WEATHER_LON",
+  "GATEWAY_DB_HOST", "GATEWAY_DB_PORT", "GATEWAY_DB_NAME", "GATEWAY_DB_USERNAME", "GATEWAY_DB_PASSWORD",
 ];
+
+const DATABASE_ENV = { GATEWAY_DB_HOST: "db", GATEWAY_DB_USERNAME: "sakke_gateway", GATEWAY_DB_PASSWORD: "secret" };
 
 const original = Object.fromEntries(MANAGED.map(k => [k, process.env[k]]));
 
@@ -124,13 +127,37 @@ describe("problems reported at startup", () => {
   });
 
   it("reports nothing when the required values are present", () => {
-    env({ HA_TOKEN: "t", OLLAMA_CLASSIFIER_BASE_URL: "http://host.docker.internal:11434" });
+    env({ HA_TOKEN: "t", OLLAMA_CLASSIFIER_BASE_URL: "http://host.docker.internal:11434", ...DATABASE_ENV });
     expect(config.problems).toEqual([]);
   });
 
   it("treats a blank required value as missing", () => {
     env({ HA_TOKEN: "", OLLAMA_CLASSIFIER_BASE_URL: "http://x:11434" });
     expect(config.problems.some(p => p.includes("HA_TOKEN"))).toBe(true);
+  });
+});
+
+describe("gateway database", () => {
+  it("is null without GATEWAY_DB_HOST, and says scheduling is unavailable", () => {
+    expect(config.database).toBeNull();
+    expect(config.problems.some(p => p.includes("GATEWAY_DB_HOST") && p.includes("scheduling"))).toBe(true);
+  });
+
+  it("defaults the port and database name", () => {
+    env(DATABASE_ENV);
+    expect(config.database).toEqual({ host: "db", port: 3306, name: "sakke_gateway", username: "sakke_gateway", password: "secret" });
+  });
+
+  it("uses the configured port and name", () => {
+    env({ ...DATABASE_ENV, GATEWAY_DB_PORT: "3307", GATEWAY_DB_NAME: "sakke_gateway_test" });
+    expect(config.database?.port).toBe(3307);
+    expect(config.database?.name).toBe("sakke_gateway_test");
+  });
+
+  it("reports missing credentials rather than silently connecting without them", () => {
+    env({ GATEWAY_DB_HOST: "db" });
+    expect(config.database).not.toBeNull();
+    expect(config.problems.some(p => p.includes("GATEWAY_DB_PASSWORD"))).toBe(true);
   });
 });
 

@@ -148,10 +148,16 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
 | Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything
 runs on the server's own Ollama.
+
+Leaving `GATEWAY_DB_HOST` unset leaves the gateway without its database, which
+makes scheduling unavailable. With it set, the gateway connects in the
+background, retrying every 30 s while MariaDB is unreachable, and runs any
+pending schema migrations (`src/db/migrations/`) once it connects.
 
 A blank value counts as unset — that distinction matters, and getting it wrong
 once produced an HTTP 200 with a zero-byte body and a broken weather tool.
@@ -161,6 +167,25 @@ once produced an HTTP 200 with a zero-byte body and a broken weather tool.
 ```bash
 npm install
 npm run dev
+```
+
+The database is a local MariaDB 10.11, the server's version. Create the
+gateway's database and a local user once:
+
+```sql
+CREATE DATABASE sakke_gateway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sakke_gateway'@'localhost' IDENTIFIED BY '<password>';
+GRANT ALL PRIVILEGES ON sakke_gateway.* TO 'sakke_gateway'@'localhost';
+```
+
+Then set `GATEWAY_DB_HOST=127.0.0.1` and the credentials in `.env`. The
+schema is created on the first start.
+
+Talk to it the way Home Assistant does:
+
+```bash
+curl -s localhost:3100/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"set a timer for 1 minute for the pasta"}]}'
 ```
 
 ### Build & run
@@ -176,10 +201,25 @@ npm start
 npm test
 ```
 
-190 tests, ~0.8s. Unit tests sit next to the code as `*.test.ts`; integration
-tests live in `tests/`, driving the real Fastify app through `app.inject()`
-against fake Ollama and Home Assistant servers in `tests/fixtures/`. No test
-reaches the network.
+Unit tests sit next to the code as `*.test.ts`; integration tests live in
+`tests/`, driving the real Fastify app through `app.inject()` against fake
+Ollama and Home Assistant servers in `tests/fixtures/`. No test reaches the
+network.
+
+`tests/integration/database.test.ts` runs the migrations and entities against
+a real MariaDB, and is skipped unless `TEST_DB_HOST` is set. CI provides a
+throwaway `mariadb:10.11` container. Locally, use a separate test database,
+because the test drops the gateway's tables first:
+
+```sql
+CREATE DATABASE sakke_gateway_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sakke_gateway_test'@'localhost' IDENTIFIED BY '<password>';
+GRANT ALL PRIVILEGES ON sakke_gateway_test.* TO 'sakke_gateway_test'@'localhost';
+```
+
+```bash
+TEST_DB_HOST=127.0.0.1 TEST_DB_PASSWORD='<password>' npx vitest run tests/integration/database.test.ts
+```
 
 See `TEST_PLAN.md` in [sakke-workspace](https://github.com/saarinenvh/sakke-workspace)
 for what is deliberately *not* tested, and why.

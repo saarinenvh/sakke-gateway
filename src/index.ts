@@ -8,6 +8,8 @@ import { config } from "./config.js";
 import { restoreTidinessState } from "./features/tidiness/store.js";
 import { startTidinessCoach } from "./features/tidiness/coach.js";
 import { liveCoachDeps } from "./features/tidiness/liveDeps.js";
+import { createDataSource } from "./db/dataSource.js";
+import { connectDatabase, DATABASE_RETRY_DELAY_MS } from "./db/database.js";
 
 const app = buildApp();
 
@@ -35,6 +37,12 @@ function listen(): void {
 }
 
 void restoreTimers();
+
+// Not awaited: the gateway serves requests while the database is still
+// connecting, or unreachable. A missing config is already a reported problem.
+if (config.database) {
+  void connectDatabase(createDataSource(config.database), DATABASE_RETRY_DELAY_MS);
+}
 
 // State first, so the first tick knows what was already asked before a restart.
 void restoreTidinessState().then(() => startTidinessCoach(liveCoachDeps));
