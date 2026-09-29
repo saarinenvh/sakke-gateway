@@ -26,10 +26,10 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 
 ## Agent Tools
 
-Each tool lives with its feature as `tools/<feature>/tool.ts`, exporting its
-schema and its implementation together. `tools/registry.ts` is the single list,
-and the only place that logs a call, previews the result, or turns a thrown
-error into something the model can react to.
+Each tool lives in `tools/<name>/`: its definition in `tool.ts`, its executor
+next to it, and anything deeper in a service under `features/`. Which tools a
+request may use is its profile's choice. How that fits together:
+[docs/architecture/tools.md](docs/architecture/tools.md).
 
 | Tool | Feature | Description |
 |---|---|---|
@@ -51,6 +51,7 @@ error into something the model can react to.
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
 | `vacuum` | `tools/vacuum/` | Start / stop / dock / status, plus answers to a cleaning reminder |
+| `announce` | `tools/announce/` | Speak a message on the satellite in Sakke's words. In no profile: only the scheduler runs it |
 
 ## Routes
 
@@ -67,48 +68,10 @@ error into something the model can react to.
 | GET, POST | `/internal/gpu-status` | The PC pushes its GPU status here; GET reports what's currently known |
 | GET | `/health` | Healthcheck |
 
-## Layout
+## Architecture
 
-`src/` is organised by feature, not by technical layer. A feature owns its logic,
-its tool, and the fragment of the system prompt that explains it.
-
-```
-src/
-├── config.ts             # all configuration, read once, validated, problems logged at startup
-├── app.ts                # buildApp() — routes only, so tests can inject
-├── index.ts              # composition root: wiring, then listen
-├── agent/
-│   ├── agent.ts          # the tool-calling loop, and nothing else
-│   ├── conversationStore.ts  # history, pruning, context-budget trimming
-│   ├── ollamaRouter.ts   # which Ollama this turn goes to
-│   ├── continuationCheck.ts  # the follow-up classifier
-│   ├── systemPrompt.ts   # concatenates the per-feature fragments
-│   ├── voiceText.ts      # strips anything that shouldn't be spoken aloud
-│   └── prompts/          # persona.md, toolDiscipline.md
-├── tools/
-│   ├── registry.ts       # the one tool list, and the one try/catch
-│   ├── types.ts
-│   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
-│       timers/  tv/  wiki/  gpu/  vacuum/
-│                         # each with feature.ts, tool.ts, prompt.ts as needed -
-│                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
-├── features/
-│   └── scenes/  display/  gpu/  tidiness/  # feature modules with their own routes/logic,
-│                         # but not in tools/registry.ts - nothing the model
-│                         # calls directly (gpu/ here is gpuStatus.ts + the
-│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
-│                         # tidiness/ is the cleaning coach's schedule, state and tick)
-├── integrations/
-│   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
-│   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
-│   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
-│   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
-└── …
-```
-
-Every feature's `prompt.ts` is concatenated into the system prompt in a fixed
-order by `agent/systemPrompt.ts`. Adding a feature means adding a folder, not
-editing four shared files.
+How a request flows through the gateway, which module owns what, the tool
+layers and the database: [docs/architecture/](docs/architecture/README.md).
 
 ## Where a fact should live
 
@@ -124,10 +87,11 @@ Three places, and the choice is not arbitrary:
 - **Ollama** — local LLM inference, model per `OLLAMA_MODEL`; a separate, smaller `OLLAMA_CLASSIFIER_MODEL` for follow-up classification
 - **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o)
 - **Home Assistant** — smart home backend
+- **MariaDB 10.11 + TypeORM** — the gateway's own database, for scheduled jobs; see [docs/architecture/data.md](docs/architecture/data.md)
 - **Open-Meteo** — weather API
 - **SearXNG** — local web search, Brave as the backing engine
 - **Spotify Web API** — music search and playback
-- **vitest** — 190 tests in under a second
+- **vitest** — unit and integration tests; the database tests run against MariaDB
 
 ## Setup
 
