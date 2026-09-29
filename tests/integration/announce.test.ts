@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
-import { announce, setWordingWriter, WORDING_TIMEOUT_MS } from "../../src/tools/announce/announce.js";
+import { announce, setWordingWriter, WORDING_TIMEOUT_MS } from "../../src/features/announcements/announcer.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { config, reloadConfig } from "../../src/config.js";
 

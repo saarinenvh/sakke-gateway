@@ -1,9 +1,5 @@
-import { z } from "zod";
 import type { Tool } from "../types.js";
-import { parseOrThrow } from "../../util/validation.js";
-import { announce } from "./announce.js";
-
-const announceArgsSchema = z.object({ message: z.string().trim().min(1) });
+import { executeAnnounce } from "./announce.js";
 
 export const announceTool: Tool = {
   definition: {
@@ -22,9 +18,5 @@ export const announceTool: Tool = {
   },
   // Speaking the same thing twice is never what was asked for.
   repeatable: () => false,
-  execute: async (args, ctx) => {
-    const { message } = parseOrThrow(announceArgsSchema, args, "announce tool arguments");
-    const { wording } = await announce(message, ctx.log);
-    return wording === "generated" ? "Announced." : "Announced, with the message as written.";
-  },
+  execute: executeAnnounce,
 };

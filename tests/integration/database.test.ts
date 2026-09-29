@@ -1,13 +1,16 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { DataSource } from "typeorm";
 import type { DatabaseConfig } from "../../src/config.js";
 import { createDataSource } from "../../src/db/dataSource.js";
 import { connectDatabase } from "../../src/db/database.js";
-import { ScheduledJob } from "../../src/db/entities/ScheduledJob.js";
+import { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
+import { JobRepository } from "../../src/features/scheduling/jobRepository.js";
 
 // Runs against a real MariaDB only when TEST_DB_HOST is set: the CI service
 // container, or a local throwaway database. It drops the gateway's tables
-// first, so it must never point at a database holding real data.
+// first, so it must never point at a database holding real data. Every test
+// that needs the database lives in this one file: test files run in
+// parallel, and two of them dropping the same tables would race.
 const testDatabase: DatabaseConfig | null = process.env.TEST_DB_HOST
   ? {
       host: process.env.TEST_DB_HOST,
@@ -86,5 +89,59 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
 
     expect(await appliedMigrationNames(dataSource)).toEqual(["CreateScheduledJob1790682762782"]);
     expect(await dataSource.getRepository(ScheduledJob).countBy({ id: "x7k2p" })).toBe(1);
+  });
+
+  describe("JobRepository", () => {
+    let jobs: JobRepository;
+
+    const job = (id: string, minutesFromNow: number): ScheduledJob => ({
+      id,
+      runAt: new Date(Date.UTC(2026, 8, 29, 9, minutesFromNow)),
+      source: "in",
+      tool: "announce",
+      args: { message: `job ${id}` },
+      label: `job ${id}`,
+      status: "pending",
+      createdAt: new Date(Date.UTC(2026, 8, 29, 9, 0)),
+      finishedAt: null,
+      result: null,
+    });
+
+    beforeEach(async () => {
+      await dataSource.query("DELETE FROM scheduled_job");
+      jobs = new JobRepository(dataSource);
+    });
+
+    it("lists pending jobs soonest first, leaving finished ones out", async () => {
+      await jobs.insert(job("late", 30));
+      await jobs.insert(job("soon", 5));
+      await jobs.insert(job("done", 1));
+      await jobs.finish("done", "done", "Announced.", new Date());
+
+      expect((await jobs.listPending()).map(pending => pending.id)).toEqual(["soon", "late"]);
+    });
+
+    it("refuses a second job with the same id", async () => {
+      await jobs.insert(job("same", 5));
+      await expect(jobs.insert(job("same", 10))).rejects.toThrow();
+    });
+
+    it("finishes only a pending job, so a cancelled one can't be marked done", async () => {
+      await jobs.insert(job("gone", 5));
+
+      expect(await jobs.finish("gone", "cancelled", null, new Date())).toBe(true);
+      expect(await jobs.finish("gone", "done", "Announced.", new Date())).toBe(false);
+      expect((await dataSource.getRepository(ScheduledJob).findOneByOrFail({ id: "gone" })).status).toBe("cancelled");
+    });
+
+    it("leaves existing jobs alone on a repeated import", async () => {
+      await jobs.insert(job("kept", 5));
+      await jobs.finish("kept", "done", "Announced.", new Date());
+
+      await jobs.insertIgnoringExisting([job("kept", 5), job("new", 10)]);
+
+      const stored = await dataSource.getRepository(ScheduledJob).find({ order: { id: "ASC" } });
+      expect(stored.map(row => [row.id, row.status])).toEqual([["kept", "done"], ["new", "pending"]]);
+    });
   });
 });

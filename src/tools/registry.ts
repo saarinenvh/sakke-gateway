@@ -100,28 +100,53 @@ function preview(result: string): string {
   return result.length > 300 ? `${result.slice(0, 300)}…` : result;
 }
 
-export async function executeTool(
+export type ToolRun =
+  | { kind: "ok"; result: string }
+  | { kind: "failed"; error: string }
+  | { kind: "unknown" };
+
+// Runs a tool and reports how it went. Never throws: a tool that throws past
+// here would take down whatever called it - a conversation turn, or a
+// scheduled job.
+export async function runTool(
   name: string,
   args: Record<string, unknown>,
   log: FastifyBaseLogger,
   conversationId: string,
-): Promise<string> {
+): Promise<ToolRun> {
   const tool = byName.get(name);
   if (!tool) {
     log.warn({ conversationId, tool: name }, "Unknown tool requested");
-    return `Unknown tool: ${name}`;
+    return { kind: "unknown" };
   }
 
   log.info({ conversationId, tool: name, args }, "Tool call");
   try {
     const result = await tool.execute(args, { log, conversationId });
     log.info({ conversationId, tool: name, result: preview(result) }, "Tool result");
-    return result;
-  } catch (err: any) {
-    // Never rethrow. A tool result is a message in the conversation; a thrown
-    // error here takes down the whole turn instead of giving the model
-    // something it can tell the user about or work around.
-    log.error({ conversationId, tool: name, err: err.message }, "Tool failed");
-    return `${name} failed: ${err.message}`;
+    return { kind: "ok", result };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    log.error({ conversationId, tool: name, err: error }, "Tool failed");
+    return { kind: "failed", error };
+  }
+}
+
+// The same, as the text the model sees: a failure is something it can tell
+// the owner about or work around.
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  log: FastifyBaseLogger,
+  conversationId: string,
+): Promise<string> {
+  const run = await runTool(name, args, log, conversationId);
+  switch (run.kind) {
+    case "ok":
+      return run.result;
+    case "failed":
+      return `${name} failed: ${run.error}`;
+    case "unknown":
+      return `Unknown tool: ${name}`;
   }
 }

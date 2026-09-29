@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import type { DatabaseConfig } from "../config.js";
-import { ScheduledJob } from "./entities/ScheduledJob.js";
+import { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
 import { CreateScheduledJob1790682762782 } from "./migrations/1790682762782-CreateScheduledJob.js";
 
 // MariaDB drops connections idle longer than its wait_timeout (8 h by
