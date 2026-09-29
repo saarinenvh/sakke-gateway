@@ -170,7 +170,10 @@ describe("inference profiles", () => {
 
   it("names every profile tool that doesn't exist, with its profile", async () => {
     const { findUnknownProfileTools } = await import("../../src/tools/registry.js");
-    const profiles = { sakke: { tools: ["get_weather", "teleport"] }, quiet: { tools: [] } };
+    const profiles = {
+      sakke: { tools: ["get_weather", "teleport"], contextOwner: "gateway" },
+      quiet: { tools: [], contextOwner: "caller" },
+    } as const;
     expect(findUnknownProfileTools(profiles, new Set(["get_weather"]))).toEqual(["sakke.teleport"]);
   });
 });

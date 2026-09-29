@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "../../config.js";
 import { callService } from "../../integrations/homeAssistant/client.js";
+import { showSpeakingWhile } from "../display/displayState.js";
 
 // How Sakke would say a message, in its own voice. Injected at startup
 // (index.ts) rather than imported: writing it needs the agent, and the agent
@@ -52,12 +53,12 @@ async function prepareAnnouncement(message: string, log: FastifyBaseLogger): Pro
 }
 
 async function speakOnSatellite(text: string): Promise<void> {
-  await callService(
+  await showSpeakingWhile(text, () => callService(
     "assist_satellite",
     "announce",
     { entity_id: config.ha.satelliteEntityId, message: text },
     { timeoutMs: SATELLITE_ANNOUNCE_TIMEOUT_MS },
-  );
+  ));
 }
 
 // The losing promise keeps running; only its result is ignored.

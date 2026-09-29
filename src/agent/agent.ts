@@ -1,8 +1,8 @@
 import type { FastifyBaseLogger } from "fastify";
 import { executeTool, isRepeatable, isToolInProfile, toolsForProfile } from "../tools/registry.js";
-import type { InferenceProfileName } from "../inference/profiles.js";
+import { INFERENCE_PROFILES, type InferenceProfileName } from "../inference/profiles.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
-import { broadcastState } from "../features/display/displayState.js";
+import { broadcastState, speakingDurationMs, type SakkeState } from "../features/display/displayState.js";
 import { classifyFollowUp, type FollowUpVerdict } from "./continuationCheck.js";
 import { cleanForSpeech } from "./voiceText.js";
 import { getOllamaTarget } from "./ollamaRouter.js";
@@ -24,9 +24,6 @@ import {
 
 const MAX_ITERATIONS = 6;
 const MAIN_AGENT_TEMPERATURE = 0.7;
-
-const MIN_SPEAKING_MS = 2000;
-const SPEAKING_MS_PER_CHARACTER = 70;
 
 export interface AgentOptions {
   // Which tools the model is offered and may call.
@@ -54,8 +51,21 @@ type LoopOutcome =
 
 type ToolBatchOutcome = "executed" | "repeated";
 
-function speakingDurationMs(content: string): number {
-  return Math.max(MIN_SPEAKING_MS, content.length * SPEAKING_MS_PER_CHARACTER);
+// What a turn does beyond answering: keep the conversation, and show it on
+// the display. Only a live conversation does either; a request whose context
+// its caller owns leaves no trace, even if it finishes after the caller gave up
+// waiting for it.
+interface TurnEffects {
+  live: boolean;
+  broadcast(state: SakkeState, autoIdleAfterMs?: number): void;
+  save: typeof saveConversation;
+}
+
+const LIVE_TURN: TurnEffects = { live: true, broadcast: broadcastState, save: saveConversation };
+const CALLER_OWNED_TURN: TurnEffects = { live: false, broadcast: () => {}, save: () => {} };
+
+function turnEffects(profile: InferenceProfileName): TurnEffects {
+  return INFERENCE_PROFILES[profile].contextOwner === "gateway" ? LIVE_TURN : CALLER_OWNED_TURN;
 }
 
 export async function runAgent(
@@ -64,17 +74,20 @@ export async function runAgent(
   log: FastifyBaseLogger,
   options: AgentOptions,
 ): Promise<AgentResult> {
-  pruneStale();
+  const effects = turnEffects(options.profile);
+  if (effects.live) pruneStale();
 
-  const turn = await resolveIncomingTurn(userMessage, conversationId, log, options.extraSystemPrompt);
+  const turn = effects.live
+    ? await resolveIncomingTurn(userMessage, conversationId, log, options.extraSystemPrompt)
+    : { kind: "proceed" as const, messages: await buildMessages(undefined, userMessage, options.extraSystemPrompt) };
 
   if (turn.kind === "reset") {
-    broadcastState("speaking", speakingDurationMs(turn.reply));
+    effects.broadcast("speaking", speakingDurationMs(turn.reply));
     return { content: turn.reply, continueConversation: false };
   }
 
   if (turn.kind === "silence") {
-    broadcastState("idle");
+    effects.broadcast("idle");
     return { content: "", continueConversation: false };
   }
 
@@ -88,18 +101,18 @@ export async function runAgent(
     { conversationId, userMessage, model: target.model, baseUrl: target.baseUrl, turns: messages.length - 1 },
     "Agent started",
   );
-  broadcastState("thinking");
+  effects.broadcast("thinking");
 
   let outcome: LoopOutcome;
   try {
     outcome = await runToolCallingLoop(messages, target, conversationId, userMessage, log, options.profile);
   } catch (err) {
     // Only the speaking/idle broadcasts clear "thinking" - a throw must too.
-    broadcastState("idle");
+    effects.broadcast("idle");
     throw err;
   }
 
-  return completeTurn(outcome, messages, target.model, conversationId, log);
+  return completeTurn(outcome, messages, target.model, conversationId, effects, log);
 }
 
 // --- Turn setup -------------------------------------------------------
@@ -336,19 +349,20 @@ function completeTurn(
   messages: Message[],
   model: string,
   conversationId: string,
+  effects: TurnEffects,
   log: FastifyBaseLogger,
 ): AgentResult {
   if (outcome.kind === "exhausted") {
-    broadcastState("idle");
+    effects.broadcast("idle");
     return { content: "I got confused trying to answer that.", continueConversation: false };
   }
 
   const content = cleanForSpeech(outcome.rawContent, outcome.toolsWereWithheld);
 
   messages.push({ role: "assistant", content });
-  saveConversation(conversationId, { messages, awaitingContinuation: true });
+  effects.save(conversationId, { messages, awaitingContinuation: true });
 
   log.info({ conversationId, model, turns: messages.length - 1, response: content }, "Agent response");
-  broadcastState("speaking", speakingDurationMs(content));
-  return { content, continueConversation: true };
+  effects.broadcast("speaking", speakingDurationMs(content));
+  return { content, continueConversation: effects.live };
 }

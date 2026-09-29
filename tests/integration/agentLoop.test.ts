@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeOllama, toolCall, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { runAgent } from "../../src/agent/agent.js";
-import { getCurrentState } from "../../src/features/display/displayState.js";
+import { broadcastState, getCurrentState } from "../../src/features/display/displayState.js";
+import { getConversation } from "../../src/agent/conversationStore.js";
 import { reloadConfig } from "../../src/config.js";
 
 // The tool-calling loop against a scripted model. Everything here is a bug that
@@ -321,5 +322,44 @@ describe("a turn that must not act", () => {
 
     expect(result.content).toBe("Shall I vacuum, or do you enjoy the dust?");
     expect(ollama.requests().map(r => r.hasTools)).toEqual([false]);
+  });
+});
+
+describe("whose context a request is", () => {
+  it("keeps a live conversation and shows it on the display", async () => {
+    broadcastState("idle");
+    ollama.script({ content: "Grey and damp." });
+    const id = nextId();
+
+    const result = await runAgent("what is the weather", id, log, SAKKE);
+
+    expect(getConversation(id)).toBeDefined();
+    expect(getCurrentState()).toBe("speaking");
+    expect(result.continueConversation).toBe(true);
+  });
+
+  it("leaves no trace of a request its caller owns: no history, no display", async () => {
+    broadcastState("idle");
+    ollama.script({ content: "Time's up on the pasta, sir." });
+    const id = nextId();
+
+    const result = await runAgent("Tell the owner this now: Time's up: the pasta.", id, log, { profile: "announcement" });
+
+    expect(result.content).toBe("Time's up on the pasta, sir.");
+    expect(getConversation(id)).toBeUndefined();
+    expect(getCurrentState()).toBe("idle");
+    expect(result.continueConversation).toBe(false);
+  });
+
+  it("never treats a caller-owned request as a reply to an earlier one", async () => {
+    ollama.script({ content: "First line." }, { content: "Second line." });
+    const id = nextId();
+
+    await runAgent("say the first thing", id, log, { profile: "announcement" });
+    await runAgent("say the second thing", id, log, { profile: "announcement" });
+
+    // Each starts from the system prompt alone: nothing carried over.
+    const [, second] = ollama.requests();
+    expect(second.messages.map(m => m.role)).toEqual(["system", "user"]);
   });
 });

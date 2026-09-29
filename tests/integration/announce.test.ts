@@ -3,6 +3,7 @@ import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fake
 import { announce, setWordingWriter, WORDING_TIMEOUT_MS } from "../../src/features/announcements/announcer.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { config, reloadConfig } from "../../src/config.js";
+import { broadcastState, getCurrentState } from "../../src/features/display/displayState.js";
 
 // announce against a fake Home Assistant. The wording writer is replaced per
 // test; in production index.ts wires in the agent.
@@ -116,6 +117,33 @@ describe("announce", () => {
     } finally {
       config.ha.baseUrl = satellite;
     }
+  });
+
+  it("shows Sakke speaking when the satellite speaks, not while the wording is written", async () => {
+    broadcastState("idle");
+    let stateWhileWording: string | undefined;
+    setWordingWriter(async message => {
+      stateWhileWording = getCurrentState();
+      return message;
+    });
+
+    await announce("the pasta is done", log);
+
+    expect(stateWhileWording).toBe("idle");
+    expect(getCurrentState()).toBe("speaking");
+  });
+
+  it("puts the display back to idle when the satellite can't be reached", async () => {
+    broadcastState("idle");
+    setWordingWriter(async message => message);
+    const satellite = config.ha.baseUrl;
+    config.ha.baseUrl = "http://127.0.0.1:1";
+    try {
+      await expect(announce("the pasta is done", log)).rejects.toThrow();
+    } finally {
+      config.ha.baseUrl = satellite;
+    }
+    expect(getCurrentState()).toBe("idle");
   });
 });
 

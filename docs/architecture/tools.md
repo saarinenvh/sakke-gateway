@@ -59,16 +59,16 @@ and the registry's `runScheduledCall` checks it again when the job runs.
 
 ## Request profiles
 
-A profile says what one kind of request may do. For now that is its tool
-allowlist, in `inference/profiles.ts`. The inference scheduler (see
+A profile says what one kind of request may do: which tools it gets, and who
+owns its context. They live in `inference/profiles.ts`. The inference scheduler (see
 sakke-workspace's `docs/roadmap/inference-scheduler/`) will add priority,
 classification and model limits to the same profiles.
 
-| Profile | Used by | Tools |
-| --- | --- | --- |
-| `sakke` | conversations (`/v1/chat/completions`) | every tool except `announce` |
-| `announcement` | wording an announcement | none |
-| `tidiness_nag` | the tidiness coach's question | none |
+| Profile | Used by | Tools | Context owner |
+| --- | --- | --- | --- |
+| `sakke` | conversations (`/v1/chat/completions`) | every tool except `announce` | gateway |
+| `announcement` | wording an announcement | none | caller |
+| `tidiness_nag` | the tidiness coach's question | none | caller |
 
 - **Named after the caller or the act**, not the kind of work. The bot's
   profiles will be named the same way (e.g. `telegram`, `sakariheitaja`) when it
@@ -79,6 +79,13 @@ classification and model limits to the same profiles.
   tool is registered. The model can't grant itself a tool by naming it.
 - **The registry refuses to start** if a profile names a tool that doesn't
   exist, since that would silently take the tool away.
+- **The context owner decides what a turn leaves behind.** A `gateway` request
+  is a live conversation: `runAgent` keeps its history, classifies follow-ups,
+  and shows it on the display. A `caller` request is one piece of text a
+  feature asked for: it starts from the system prompt alone, stores nothing and
+  doesn't touch the display, even if it finishes after the caller stopped
+  waiting. The caller shows Sakke speaking itself, when the satellite actually
+  speaks (`showSpeakingWhile` in `features/display/`).
 - **`announce` is in no profile.** Sakke already speaks its reply in a
   conversation; announcing is for speech at a scheduled time, run by the
   scheduler through `runTool` without a model or a profile.
