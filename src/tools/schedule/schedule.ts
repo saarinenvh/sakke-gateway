@@ -7,13 +7,17 @@ import type { ScheduledJob } from "../../features/scheduling/ScheduledJob.entity
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
 
+// A year out is the furthest anything is scheduled; it also keeps the due time
+// inside the range a Date can hold.
+const MAX_DELAY_MINUTES = 366 * 24 * 60;
+
 export const SCHEDULING_UNAVAILABLE = "Scheduling isn't available right now.";
 
 // run isn't offered to the model yet: announce is the only schedulable tool
 // until Phase 3. Without it, the job announces its label.
 const setSchema = z.object({
   action: z.literal("set"),
-  when: z.object({ in_minutes: z.coerce.number().positive() }),
+  when: z.object({ in_minutes: z.coerce.number().positive().max(MAX_DELAY_MINUTES) }),
   label: z.string().trim().min(1),
   run: z.object({
     tool: z.string().trim().min(1),

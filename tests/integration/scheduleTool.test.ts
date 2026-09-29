@@ -84,8 +84,10 @@ describe("setting", () => {
     expect(store.all()).toEqual([]);
   });
 
-  it("refuses a missing or negative duration as invalid", async () => {
+  it("refuses a missing, negative or absurdly long duration as invalid", async () => {
     expect(await setTimer(-5, "never")).toMatch(/^schedule failed/);
+    expect(await setTimer(1e20, "never")).toMatch(/^schedule failed/);
+    expect(await setTimer(367 * 24 * 60, "never")).toMatch(/^schedule failed/);
     expect(await schedule({ action: "set", label: "never" })).toMatch(/^schedule failed/);
     expect(store.all()).toEqual([]);
   });
