@@ -1,5 +1,8 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
+import { INFERENCE_PROFILES, type InferenceProfile, type InferenceProfileName } from "../inference/profiles.js";
+import type { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
+import type { JobOutcome } from "../features/scheduling/scheduler.js";
 
 import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
 import { webSearchTool } from "./search/tool.js";
@@ -9,18 +12,14 @@ import { manageListTool } from "./lists/tool.js";
 import { openTvAppTool, tvRemoteCommandTool, tvSendTextTool } from "./tv/tool.js";
 import { createKnowledgeTool, getContextTool } from "./wiki/tool.js";
 import { getTasksTool, getCalendarTool } from "./reminders/tool.js";
-import { timerTool } from "./timers/tool.js";
+import { scheduleTool } from "./schedule/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
 import { vacuumTool } from "./vacuum/tool.js";
+import { announceTool } from "./announce/tool.js";
 
-// The whole tool surface, in the order the model is shown it. There used to be
-// two lists to keep in step - a 300-line array of schemas and a 400-line chain
-// of `if (name === ...)` branches in a separate file - and adding a tool meant
-// editing both, in the right place, without forgetting the logging or the
-// try/catch. Now each feature owns its own tools and this is the only list.
-//
-// Order is preserved from that original array: it's what the model has been
-// living with, and reordering a tool list is not a free change.
+// Every tool, in the order the model is shown them. Which ones a request may
+// use is its profile's choice (inference/profiles.ts). The order is what the
+// model has been living with; reordering a tool list is not a free change.
 const ALL: Tool[] = [
   controlHomeAssistantTool,
   webSearchTool,
@@ -35,11 +34,12 @@ const ALL: Tool[] = [
   createKnowledgeTool,
   getContextTool,
   getTasksTool,
-  timerTool,
+  scheduleTool,
   refreshHomeDataTool,
   setGamingModeTool,
   getCalendarTool,
   vacuumTool,
+  announceTool,
 ];
 
 const byName = new Map<string, Tool>();
@@ -51,8 +51,38 @@ for (const tool of ALL) {
   byName.set(name, tool);
 }
 
-/** The schemas sent to Ollama. */
+// A profile naming a tool that doesn't exist would silently take that tool
+// away from every request using it.
+const unknownProfileTools = findUnknownProfileTools(INFERENCE_PROFILES, new Set(byName.keys()));
+if (unknownProfileTools.length > 0) {
+  throw new Error(`Inference profiles name unknown tools: ${unknownProfileTools.join(", ")}`);
+}
+
+/** Every registered tool's schema. */
 export const tools: ToolDefinition[] = ALL.map(t => t.definition);
+
+/** The schemas offered to the model under this profile, in registry order. */
+export function toolsForProfile(profile: InferenceProfileName): ToolDefinition[] {
+  return ALL.filter(t => isToolInProfile(profile, t.definition.function.name)).map(t => t.definition);
+}
+
+export function isToolInProfile(profile: InferenceProfileName, name: string): boolean {
+  const allowed: readonly string[] = INFERENCE_PROFILES[profile].tools;
+  return allowed.includes(name);
+}
+
+export function findUnknownProfileTools(
+  profiles: Record<string, InferenceProfile>,
+  knownToolNames: ReadonlySet<string>,
+): string[] {
+  const unknown: string[] = [];
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    for (const toolName of profile.tools) {
+      if (!knownToolNames.has(toolName)) unknown.push(`${profileName}.${toolName}`);
+    }
+  }
+  return unknown;
+}
 
 export function toolNames(): string[] {
   return [...byName.keys()];
@@ -65,6 +95,28 @@ export function isRepeatable(name: string, args: Record<string, unknown>): boole
   return byName.get(name)?.repeatable(args) ?? false;
 }
 
+// Unknown names are never schedulable.
+export function isSchedulable(name: string, args: Record<string, unknown>): boolean {
+  return byName.get(name)?.schedulable?.(args) ?? false;
+}
+
+// Runs a scheduled job's stored call. Checked again here, not only when the job
+// was scheduled: a tool can stop being schedulable between the two.
+export async function runScheduledCall(job: ScheduledJob, log: FastifyBaseLogger): Promise<JobOutcome> {
+  if (!isSchedulable(job.tool, job.args)) {
+    return { status: "failed", result: `${job.tool} can't be run by the scheduler` };
+  }
+  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`);
+  switch (run.kind) {
+    case "ok":
+      return { status: "done", result: run.result };
+    case "failed":
+      return { status: "failed", result: run.error };
+    case "unknown":
+      return { status: "failed", result: `unknown tool: ${job.tool}` };
+  }
+}
+
 // Results go into the conversation, so they're logged in full only up to a
 // point - get_context returns whole wiki pages and web_search returns a page
 // of extracts.
@@ -72,28 +124,53 @@ function preview(result: string): string {
   return result.length > 300 ? `${result.slice(0, 300)}…` : result;
 }
 
-export async function executeTool(
+export type ToolRun =
+  | { kind: "ok"; result: string }
+  | { kind: "failed"; error: string }
+  | { kind: "unknown" };
+
+// Runs a tool and reports how it went. Never throws: a tool that throws past
+// here would take down whatever called it - a conversation turn, or a
+// scheduled job.
+export async function runTool(
   name: string,
   args: Record<string, unknown>,
   log: FastifyBaseLogger,
   conversationId: string,
-): Promise<string> {
+): Promise<ToolRun> {
   const tool = byName.get(name);
   if (!tool) {
     log.warn({ conversationId, tool: name }, "Unknown tool requested");
-    return `Unknown tool: ${name}`;
+    return { kind: "unknown" };
   }
 
   log.info({ conversationId, tool: name, args }, "Tool call");
   try {
     const result = await tool.execute(args, { log, conversationId });
     log.info({ conversationId, tool: name, result: preview(result) }, "Tool result");
-    return result;
-  } catch (err: any) {
-    // Never rethrow. A tool result is a message in the conversation; a thrown
-    // error here takes down the whole turn instead of giving the model
-    // something it can tell the user about or work around.
-    log.error({ conversationId, tool: name, err: err.message }, "Tool failed");
-    return `${name} failed: ${err.message}`;
+    return { kind: "ok", result };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    log.error({ conversationId, tool: name, err: error }, "Tool failed");
+    return { kind: "failed", error };
+  }
+}
+
+// The same, as the text the model sees: a failure is something it can tell
+// the owner about or work around.
+export async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  log: FastifyBaseLogger,
+  conversationId: string,
+): Promise<string> {
+  const run = await runTool(name, args, log, conversationId);
+  switch (run.kind) {
+    case "ok":
+      return run.result;
+    case "failed":
+      return `${name} failed: ${run.error}`;
+    case "unknown":
+      return `Unknown tool: ${name}`;
   }
 }

@@ -68,6 +68,17 @@ export interface TidinessConfig {
   snoozeHours: number;
 }
 
+// The gateway's own database on the MariaDB server. Null when GATEWAY_DB_HOST
+// is unset: the gateway still runs, but anything that needs the database, such
+// as scheduling, reports itself unavailable.
+export interface DatabaseConfig {
+  host: string;
+  port: number;
+  name: string;
+  username: string;
+  password: string;
+}
+
 export interface Config {
   port: number;
   timezone: string;
@@ -98,6 +109,7 @@ export interface Config {
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
   tidiness: TidinessConfig;
+  database: DatabaseConfig | null;
   // Anything missing or implausible, collected rather than thrown. index.ts
   // logs these at startup. Deliberately not fatal: this service already starts
   // with a dead Home Assistant on purpose, and a home assistant that refuses to
@@ -144,6 +156,7 @@ function loadConfig(): Config {
     : null;
 
   const tidiness = loadTidinessConfig(problems);
+  const database = loadDatabaseConfig(problems);
 
   const classifierBaseUrl = env("OLLAMA_CLASSIFIER_BASE_URL");
   if (classifierBaseUrl === undefined) {
@@ -188,7 +201,33 @@ function loadConfig(): Config {
       lon: env("WEATHER_LON") ?? "24.7339",
     },
     tidiness,
+    database,
     problems,
+  };
+}
+
+const DEFAULT_DATABASE_PORT = 3306;
+const DEFAULT_DATABASE_NAME = "sakke_gateway";
+
+function loadDatabaseConfig(problems: string[]): DatabaseConfig | null {
+  const host = env("GATEWAY_DB_HOST");
+  if (host === undefined) {
+    problems.push("GATEWAY_DB_HOST is not set - scheduling is unavailable");
+    return null;
+  }
+
+  const username = env("GATEWAY_DB_USERNAME");
+  const password = env("GATEWAY_DB_PASSWORD");
+  if (username === undefined || password === undefined) {
+    problems.push("GATEWAY_DB_USERNAME or GATEWAY_DB_PASSWORD is not set - the database will reject the connection");
+  }
+
+  return {
+    host,
+    port: num("GATEWAY_DB_PORT", DEFAULT_DATABASE_PORT),
+    name: env("GATEWAY_DB_NAME") ?? DEFAULT_DATABASE_NAME,
+    username: username ?? "",
+    password: password ?? "",
   };
 }
 

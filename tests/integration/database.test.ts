@@ -1,0 +1,147 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { DataSource } from "typeorm";
+import type { DatabaseConfig } from "../../src/config.js";
+import { createDataSource } from "../../src/db/dataSource.js";
+import { connectDatabase } from "../../src/db/database.js";
+import { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
+import { JobRepository } from "../../src/features/scheduling/jobRepository.js";
+
+// Runs against a real MariaDB only when TEST_DB_HOST is set: the CI service
+// container, or a local throwaway database. It drops the gateway's tables
+// first, so it must never point at a database holding real data. Every test
+// that needs the database lives in this one file: test files run in
+// parallel, and two of them dropping the same tables would race.
+const testDatabase: DatabaseConfig | null = process.env.TEST_DB_HOST
+  ? {
+      host: process.env.TEST_DB_HOST,
+      port: Number(process.env.TEST_DB_PORT ?? 3306),
+      name: process.env.TEST_DB_NAME ?? "sakke_gateway_test",
+      username: process.env.TEST_DB_USERNAME ?? "sakke_gateway_test",
+      password: process.env.TEST_DB_PASSWORD ?? "",
+    }
+  : null;
+
+const NO_RETRY_DELAY_MS = 0;
+
+async function dropGatewayTables(database: DatabaseConfig): Promise<void> {
+  const admin = new DataSource({
+    type: "mariadb",
+    host: database.host,
+    port: database.port,
+    username: database.username,
+    password: database.password,
+    database: database.name,
+  });
+  await admin.initialize();
+  await admin.query("DROP TABLE IF EXISTS scheduled_job, migrations");
+  await admin.destroy();
+}
+
+async function appliedMigrationNames(dataSource: DataSource): Promise<string[]> {
+  const rows: { name: string }[] = await dataSource.query("SELECT name FROM migrations ORDER BY id");
+  return rows.map(row => row.name);
+}
+
+describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
+  // Non-null inside this block: skipIf has already excluded the null case.
+  const database = testDatabase as DatabaseConfig;
+  let dataSource: DataSource;
+
+  beforeAll(async () => {
+    await dropGatewayTables(database);
+    dataSource = await connectDatabase(createDataSource(database), NO_RETRY_DELAY_MS);
+  });
+
+  afterAll(async () => {
+    if (dataSource?.isInitialized) await dataSource.destroy();
+  });
+
+  it("runs the first migration on an empty database", async () => {
+    expect(await appliedMigrationNames(dataSource)).toEqual(["CreateScheduledJob1790682762782"]);
+  });
+
+  it("round-trips a job: the stored call, a Finnish label, and a millisecond UTC time", async () => {
+    const runAt = new Date("2026-10-25T01:30:00.123Z");
+    const repository = dataSource.getRepository(ScheduledJob);
+    await repository.save(repository.create({
+      id: "x7k2p",
+      runAt,
+      source: "at",
+      tool: "announce",
+      args: { message: "Ota jauheliha pois jääkaapista", nested: { minutes: 10 } },
+      label: "jauheliha pois jääkaapista",
+      status: "pending",
+      createdAt: new Date("2026-09-29T12:00:00.000Z"),
+      finishedAt: null,
+      result: null,
+    }));
+
+    const stored = await repository.findOneByOrFail({ id: "x7k2p" });
+    expect(stored.runAt.toISOString()).toBe(runAt.toISOString());
+    expect(stored.args).toEqual({ message: "Ota jauheliha pois jääkaapista", nested: { minutes: 10 } });
+    expect(stored.label).toBe("jauheliha pois jääkaapista");
+    expect(stored.finishedAt).toBeNull();
+  });
+
+  it("does not run a migration again on the next start, and keeps the data", async () => {
+    await dataSource.destroy();
+    dataSource = await connectDatabase(createDataSource(database), NO_RETRY_DELAY_MS);
+
+    expect(await appliedMigrationNames(dataSource)).toEqual(["CreateScheduledJob1790682762782"]);
+    expect(await dataSource.getRepository(ScheduledJob).countBy({ id: "x7k2p" })).toBe(1);
+  });
+
+  describe("JobRepository", () => {
+    let jobs: JobRepository;
+
+    const job = (id: string, minutesFromNow: number): ScheduledJob => ({
+      id,
+      runAt: new Date(Date.UTC(2026, 8, 29, 9, minutesFromNow)),
+      source: "in",
+      tool: "announce",
+      args: { message: `job ${id}` },
+      label: `job ${id}`,
+      status: "pending",
+      createdAt: new Date(Date.UTC(2026, 8, 29, 9, 0)),
+      finishedAt: null,
+      result: null,
+    });
+
+    beforeEach(async () => {
+      await dataSource.query("DELETE FROM scheduled_job");
+      jobs = new JobRepository(dataSource);
+    });
+
+    it("lists pending jobs soonest first, leaving finished ones out", async () => {
+      await jobs.insert(job("late", 30));
+      await jobs.insert(job("soon", 5));
+      await jobs.insert(job("done", 1));
+      await jobs.finish("done", "done", "Announced.", new Date());
+
+      expect((await jobs.listPending()).map(pending => pending.id)).toEqual(["soon", "late"]);
+    });
+
+    it("refuses a second job with the same id", async () => {
+      await jobs.insert(job("same", 5));
+      await expect(jobs.insert(job("same", 10))).rejects.toThrow();
+    });
+
+    it("finishes only a pending job, so a cancelled one can't be marked done", async () => {
+      await jobs.insert(job("gone", 5));
+
+      expect(await jobs.finish("gone", "cancelled", null, new Date())).toBe(true);
+      expect(await jobs.finish("gone", "done", "Announced.", new Date())).toBe(false);
+      expect((await dataSource.getRepository(ScheduledJob).findOneByOrFail({ id: "gone" })).status).toBe("cancelled");
+    });
+
+    it("leaves existing jobs alone on a repeated import", async () => {
+      await jobs.insert(job("kept", 5));
+      await jobs.finish("kept", "done", "Announced.", new Date());
+
+      await jobs.insertIgnoringExisting([job("kept", 5), job("new", 10)]);
+
+      const stored = await dataSource.getRepository(ScheduledJob).find({ order: { id: "ASC" } });
+      expect(stored.map(row => [row.id, row.status])).toEqual([["kept", "done"], ["new", "pending"]]);
+    });
+  });
+});

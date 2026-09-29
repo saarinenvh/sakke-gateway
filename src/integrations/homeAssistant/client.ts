@@ -5,17 +5,8 @@ import { entityStateSchema, entityStatesSchema, stateHistorySchema, todoItemsSch
 
 export type { EntityState };
 
-// One Home Assistant client.
-//
-// There used to be eight: registry, dispatcher, lists, reminders, scenes,
-// spotify, timerAnnouncer and executor each built their own fetch, with their
-// own headers, their own timeout (5s, 8s, 10s, 15s, or none) and their own idea
-// of what an error looks like - some threw `HA API ${status}`, some included
-// the body, some threw nothing at all because they never checked res.ok.
-//
-// A disproportionate share of the code review's findings lived in that
-// duplication: the area-id bug, the due-date bug, the list rewrite, and most of
-// the missing timeouts.
+// The one Home Assistant client: every call gets the same headers, a timeout,
+// and the same error for a non-2xx answer.
 
 // Generous enough for a service call that wakes a TV, short enough that a
 // conversation turn can't hang on it. Callers that genuinely need longer pass
