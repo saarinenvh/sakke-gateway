@@ -199,7 +199,7 @@ async function runToolCallingLoop(
     if (i === MAX_ITERATIONS && !forceFinalResponse) break;
 
     log.info({ conversationId, iteration: i + 1, toolsWithheld: forceFinalResponse }, "Calling Ollama");
-    const message = await callOllama(messages, target, forceFinalResponse);
+    const message = await callOllama(messages, target, forceFinalResponse, log);
 
     if (message.tool_calls?.length && !forceFinalResponse) {
       const toolCalls = message.tool_calls;
@@ -215,15 +215,24 @@ async function runToolCallingLoop(
   return { kind: "exhausted" };
 }
 
-function callOllama(messages: Message[], target: OllamaTargetConfig, forceFinalResponse: boolean): Promise<Message> {
-  return ollamaChat(target.baseUrl, {
-    model: target.model,
-    messages,
-    ...(forceFinalResponse ? {} : { tools }),
-    ...(target.think !== undefined && { think: target.think }),
-    ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
-    options: { temperature: MAIN_AGENT_TEMPERATURE, num_predict: RESPONSE_RESERVE_TOKENS, num_ctx: target.numCtx },
-  });
+function callOllama(
+  messages: Message[],
+  target: OllamaTargetConfig,
+  forceFinalResponse: boolean,
+  log: FastifyBaseLogger,
+): Promise<Message> {
+  return ollamaChat(
+    target.baseUrl,
+    {
+      model: target.model,
+      messages,
+      ...(forceFinalResponse ? {} : { tools }),
+      ...(target.think !== undefined && { think: target.think }),
+      ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
+      options: { temperature: MAIN_AGENT_TEMPERATURE, num_predict: RESPONSE_RESERVE_TOKENS, num_ctx: target.numCtx },
+    },
+    log,
+  );
 }
 
 // Keys are marked completed as the batch is processed, not in bulk

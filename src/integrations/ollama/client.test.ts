@@ -29,6 +29,15 @@ const REQUEST: OllamaChatRequest = {
   options: {},
 };
 
+// Matches the fake logger pattern in tests/integration/agentLoop.test.ts.
+// Records calls so tests can assert on what was logged, not just that
+// logging didn't throw.
+function createLogger() {
+  const infoCalls: Record<string, unknown>[] = [];
+  const log: any = { info: (obj: Record<string, unknown>) => infoCalls.push(obj), warn: () => {}, error: () => {}, debug: () => {} };
+  return { log, infoCalls };
+}
+
 async function expectRejection(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
@@ -45,7 +54,8 @@ describe("ollamaChat", () => {
       res.end(JSON.stringify({ message: { role: "assistant", content: "hi there" } }));
     });
 
-    const message = await ollamaChat(server.url, REQUEST);
+    const { log } = createLogger();
+    const message = await ollamaChat(server.url, REQUEST, log);
     expect(message).toEqual({ role: "assistant", content: "hi there" });
   });
 
@@ -55,7 +65,8 @@ describe("ollamaChat", () => {
       res.end("model not found");
     });
 
-    const err = await expectRejection(ollamaChat(server.url, REQUEST));
+    const { log } = createLogger();
+    const err = await expectRejection(ollamaChat(server.url, REQUEST, log));
     expect(err).toBeInstanceOf(OllamaError);
     expect(err).toMatchObject({ status: 500, body: "model not found" });
   });
@@ -69,7 +80,8 @@ describe("ollamaChat", () => {
       res.end("not json");
     });
 
-    const err = await expectRejection(ollamaChat(server.url, REQUEST));
+    const { log } = createLogger();
+    const err = await expectRejection(ollamaChat(server.url, REQUEST, log));
     expect(err).toBeInstanceOf(ValidationError);
   });
 
@@ -79,7 +91,50 @@ describe("ollamaChat", () => {
       res.end(JSON.stringify({ message: { role: "assistant" } })); // missing content
     });
 
-    const err = await expectRejection(ollamaChat(server.url, REQUEST));
+    const { log } = createLogger();
+    const err = await expectRejection(ollamaChat(server.url, REQUEST, log));
     expect(err).toBeInstanceOf(ValidationError);
+  });
+
+  describe("latency logging", () => {
+    it("logs baseUrl, model, status, and a duration on success", async () => {
+      server = await startServer((req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ message: { role: "assistant", content: "hi there" } }));
+      });
+
+      const { log, infoCalls } = createLogger();
+      await ollamaChat(server.url, REQUEST, log);
+
+      expect(infoCalls).toHaveLength(1);
+      expect(infoCalls[0]).toMatchObject({ baseUrl: server.url, model: REQUEST.model, status: 200 });
+      expect(infoCalls[0].durationMs).toEqual(expect.any(Number));
+      expect(infoCalls[0].durationMs as number).toBeGreaterThanOrEqual(0);
+    });
+
+    it("still logs a duration when the request throws an OllamaError", async () => {
+      server = await startServer((req, res) => {
+        res.writeHead(500);
+        res.end("model not found");
+      });
+
+      const { log, infoCalls } = createLogger();
+      await expectRejection(ollamaChat(server.url, REQUEST, log));
+
+      expect(infoCalls).toHaveLength(1);
+      expect(infoCalls[0]).toMatchObject({ status: 500 });
+      expect(infoCalls[0].durationMs).toEqual(expect.any(Number));
+    });
+
+    it("logs status as network_error when the request never reaches the server", async () => {
+      // Nothing is listening on this port - fetch itself rejects before a
+      // response (and therefore an HTTP status) ever exists.
+      const { log, infoCalls } = createLogger();
+      await expectRejection(ollamaChat("http://127.0.0.1:1", REQUEST, log));
+
+      expect(infoCalls).toHaveLength(1);
+      expect(infoCalls[0]).toMatchObject({ status: "network_error" });
+      expect(infoCalls[0].durationMs).toEqual(expect.any(Number));
+    });
   });
 });
