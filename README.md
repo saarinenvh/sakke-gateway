@@ -166,20 +166,30 @@ once produced an HTTP 200 with a zero-byte body and a broken weather tool.
 
 ```bash
 npm install
+npm run dev:env   # once per checkout: copies .env.example to .env
 npm run dev
 ```
 
+`.env.example` holds working values for the dev machine (WSL): the Windows
+host's Ollama at `172.31.0.1:11434`, `STATE_DIR=./data`, and the local MariaDB
+with a dev-only password. None of them is a production value. `npm run dev:env`
+keeps an existing `.env`; `npm run dev:env -- --force` replaces it.
+
+`npm run dev` compiles with `tsc` and runs the result, the same way the image
+does, so TypeORM gets the decorator metadata it needs. It doesn't watch for
+changes; run it again after editing. Without a Home Assistant token the gateway
+still starts and logs the missing `HA_TOKEN`.
+
 The database is a local MariaDB 10.11, the server's version. Create the
-gateway's database and a local user once:
+gateway's database and its dev user once (`sudo mysql`):
 
 ```sql
 CREATE DATABASE sakke_gateway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'sakke_gateway'@'localhost' IDENTIFIED BY '<password>';
+CREATE USER 'sakke_gateway'@'localhost' IDENTIFIED BY 'sakke-gateway-dev';
 GRANT ALL PRIVILEGES ON sakke_gateway.* TO 'sakke_gateway'@'localhost';
 ```
 
-Then set `GATEWAY_DB_HOST=127.0.0.1` and the credentials in `.env`. The
-schema is created on the first start.
+The schema is created on the first start.
 
 Talk to it the way Home Assistant does:
 
@@ -213,12 +223,12 @@ because the test drops the gateway's tables first:
 
 ```sql
 CREATE DATABASE sakke_gateway_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'sakke_gateway_test'@'localhost' IDENTIFIED BY '<password>';
+CREATE USER 'sakke_gateway_test'@'localhost' IDENTIFIED BY 'sakke-gateway-test';
 GRANT ALL PRIVILEGES ON sakke_gateway_test.* TO 'sakke_gateway_test'@'localhost';
 ```
 
 ```bash
-TEST_DB_HOST=127.0.0.1 TEST_DB_PASSWORD='<password>' npx vitest run tests/integration/database.test.ts
+TEST_DB_HOST=127.0.0.1 TEST_DB_PASSWORD=sakke-gateway-test npx vitest run tests/integration/database.test.ts
 ```
 
 See `TEST_PLAN.md` in [sakke-workspace](https://github.com/saarinenvh/sakke-workspace)
