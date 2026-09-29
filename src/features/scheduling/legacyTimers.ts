@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { FastifyBaseLogger } from "fastify";
 import { parseOrThrow } from "../../util/validation.js";
 import type { ScheduledJob } from "./ScheduledJob.entity.js";
-import type { JobStore } from "./scheduler.js";
+import { defaultAnnouncement, type JobStore } from "./scheduler.js";
 
 // Where the file-based timer scheduler kept its timers, in the state dir.
 export const LEGACY_TIMERS_FILE = "timers.json";
@@ -16,10 +16,6 @@ const legacyTimersSchema = z.array(z.object({
 }));
 
 type LegacyTimer = z.output<typeof legacyTimersSchema>[number];
-
-export function timerFinishedMessage(label: string): string {
-  return `The timer for ${label} is done.`;
-}
 
 // Moves timers saved by the file-based scheduler into the database, once.
 // Old ids are kept and existing ones ignored, and the file is deleted only
@@ -70,8 +66,7 @@ function toJob(timer: LegacyTimer, now: Date): ScheduledJob {
     id: timer.id,
     runAt: new Date(timer.endsAt),
     source: "in",
-    tool: "announce",
-    args: { message: timerFinishedMessage(timer.label) },
+    ...defaultAnnouncement(timer.label),
     label: timer.label,
     status: "pending",
     createdAt: now,

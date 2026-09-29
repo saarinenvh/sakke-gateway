@@ -171,8 +171,8 @@ describe("the conversation store", () => {
 
       expect(getConversation("old")).toBeUndefined();
       expect(getConversation("fresh")).toBeDefined();
-      // Pruning has to clear the suggestion too - timers.ts mints a fresh
-      // conversation id per timer, so these accumulate for the process lifetime.
+      // Pruning has to clear the suggestion too - announcements and scheduled
+      // jobs each get a fresh conversation id, so these would accumulate.
       expect(clearSpotifySuggestion).toHaveBeenCalledWith("old");
     } finally {
       vi.useRealTimers();

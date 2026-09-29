@@ -194,9 +194,9 @@ describe("duplicate tool calls within or across a batch", () => {
   // regenerating the same call) used to bypass the dedup key entirely.
   it("recognizes a repeated call even when its argument keys are in a different order", async () => {
     ollama.script(
-      { toolCalls: [toolCall("timer", { action: "set", duration_minutes: 5, label: "tea" })] },
+      { toolCalls: [toolCall("schedule", { action: "set", when: { in_minutes: 5 }, label: "tea" })] },
       { toolCalls: [
-        toolCall("timer", { duration_minutes: 5, label: "tea", action: "set" }), // same call, keys reordered
+        toolCall("schedule", { label: "tea", when: { in_minutes: 5 }, action: "set" }), // same call, keys reordered
         toolCall("get_device_state", { entity_id: "light.hall" }), // new
       ] },
       { content: "Done." },
@@ -207,7 +207,7 @@ describe("duplicate tool calls within or across a batch", () => {
 
     const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
     const [repeated, fresh] = toolMessages.slice(-2);
-    expect(repeated.content).toBe("timer already ran this turn with the same arguments - not repeating it.");
+    expect(repeated.content).toBe("schedule already ran this turn with the same arguments - not repeating it.");
     expect(fresh.content).not.toContain("already ran this turn");
   });
 

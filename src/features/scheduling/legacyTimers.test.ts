@@ -32,7 +32,7 @@ describe("importing timers.json", () => {
       runAt: new Date(savedTimers[0].endsAt),
       source: "in",
       tool: "announce",
-      args: { message: "The timer for food in the oven is done." },
+      args: { message: "Time's up: food in the oven." },
       label: "food in the oven",
       status: "pending",
     });

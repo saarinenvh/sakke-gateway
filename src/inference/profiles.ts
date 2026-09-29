@@ -24,7 +24,7 @@ export const INFERENCE_PROFILES = {
       "create_knowledge",
       "get_context",
       "get_tasks",
-      "timer",
+      "schedule",
       "refresh_home_data",
       "set_gaming_mode",
       "get_calendar",

@@ -5,7 +5,6 @@ What the gateway stores, where, and who may change it.
 | Data | Where | Survives a restart |
 | --- | --- | --- |
 | Scheduled jobs and their history | gateway database, `scheduled_job` | yes |
-| File-based timers (until the schedule tool replaces them) | `timers.json` in `STATE_DIR` | yes |
 | Tidiness coach state | `tidiness.json` in `STATE_DIR` | yes |
 | Conversations | memory (`agent/conversationStore.ts`) | no, by design |
 | GPU status, display state | memory | no; reported again |

@@ -24,9 +24,23 @@ export interface JobRequest {
   label: string;
 }
 
+// What a job does when it was given only a label: Sakke announces it.
+export function defaultAnnouncement(label: string): { tool: string; args: Record<string, unknown> } {
+  return { tool: "announce", args: { message: `Time's up: ${label}.` } };
+}
+
+// Whether a tool call may run unattended. Injected for the same reason as the
+// runner.
+export type SchedulabilityCheck = (tool: string, args: Record<string, unknown>) => boolean;
+
+export type ScheduleResult =
+  | { kind: "scheduled"; job: ScheduledJob }
+  | { kind: "not_schedulable"; tool: string };
+
 export interface SchedulerDeps {
   store: JobStore;
   runJob: JobRunner;
+  isSchedulable: SchedulabilityCheck;
   now: () => Date;
   log: FastifyBaseLogger;
 }
@@ -62,9 +76,13 @@ export class Scheduler {
     this.deps.log.info({ armed: this.armed.size, dropped }, "Scheduler started");
   }
 
-  // Stored before it is armed: a job the caller has been told about survives a
-  // restart.
-  async schedule(request: JobRequest): Promise<ScheduledJob> {
+  // Only a call that may run unattended is accepted. It is stored before it is
+  // armed: a job the caller has been told about survives a restart.
+  async schedule(request: JobRequest): Promise<ScheduleResult> {
+    if (!this.deps.isSchedulable(request.tool, request.args)) {
+      return { kind: "not_schedulable", tool: request.tool };
+    }
+
     const job: ScheduledJob = {
       id: createJobId(),
       ...request,
@@ -76,7 +94,7 @@ export class Scheduler {
     await this.deps.store.insert(job);
     this.arm(job);
     this.deps.log.info({ jobId: job.id, tool: job.tool, runAt: job.runAt.toISOString(), label: job.label }, "Job scheduled");
-    return job;
+    return { kind: "scheduled", job };
   }
 
   // By id, or by a label containing the text. The cancellation is committed
@@ -184,4 +202,9 @@ export async function startScheduler(deps: SchedulerDeps): Promise<Scheduler> {
   await scheduler.start();
   active = scheduler;
   return scheduler;
+}
+
+export function stopScheduler(): void {
+  active?.stop();
+  active = undefined;
 }

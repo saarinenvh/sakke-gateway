@@ -52,6 +52,11 @@ arguments may run twice in one turn: true for reads, false for anything with a
 side effect. The agent loop skips a repeat of a non-repeatable call and tells
 the model it already ran.
 
+`schedulable(args)` says whether the scheduler may run the call later, with
+nobody there to see it. It's optional and missing means no, so a tool has to
+opt in; today only `announce` does. The scheduler checks it when a job is set,
+and the registry's `runScheduledCall` checks it again when the job runs.
+
 ## Request profiles
 
 A profile says what one kind of request may do. For now that is its tool
@@ -88,5 +93,7 @@ a new tool can't be registered and silently never offered.
 2. Put anything beyond a single call into a service under `features/`.
 3. Add it to `ALL` in `tools/registry.ts`, and to the profiles that should
    have it (usually `sakke`).
-4. If the model needs guidance, a `prompt.ts`, added to the system prompt's
+4. If it may run from the scheduler, give it `schedulable`, and allow only the
+   actions that make sense unattended.
+5. If the model needs guidance, a `prompt.ts`, added to the system prompt's
    sections.

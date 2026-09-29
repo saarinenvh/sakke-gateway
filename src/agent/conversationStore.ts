@@ -31,12 +31,9 @@ export function clearAwaitingContinuation(id: string): void {
   if (existing) conversations.set(id, { ...existing, awaitingContinuation: false });
 }
 
-// Forgetting a conversation means forgetting everything keyed by its id. The
-// Spotify suggestion map was keyed by the same id but only ever cleared on an
-// explicit reset or a new_request verdict, so timed-out conversations left
-// entries behind for the lifetime of the process - and timers.ts mints a fresh
-// conversation id per timer. Bundling the two here is what stops a fourth
-// call site forgetting again.
+// Forgetting a conversation means forgetting everything keyed by its id,
+// including the Spotify suggestion. Every announcement and scheduled job gets
+// a fresh id, so anything left behind would pile up for the process lifetime.
 export function dropConversation(id: string): void {
   conversations.delete(id);
   clearSpotifySuggestion(id);

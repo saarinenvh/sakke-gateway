@@ -15,7 +15,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **AI scene designer** — describe a mood, get a full lighting scene (OpenAI gpt-4o). Reads its room layout and lighting notes from the wiki, so a lamp can move without a redeploy
 - **Shopping lists** — add/remove items with automatic store-layout ordering
 - **Spotify** — search by voice and pick from three spoken options; known personal playlists play immediately
-- **Timers** — set, list and cancel voice timers; announced aloud through the satellite when they fire
+- **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
@@ -46,7 +46,7 @@ request may use is its profile's choice. How that fits together:
 | `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
 | `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
 | `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `timer` | `tools/timers/` | Set, cancel or list voice timers |
+| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, stored in the gateway database |
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |

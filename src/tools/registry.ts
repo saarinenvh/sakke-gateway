@@ -1,6 +1,8 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
 import { INFERENCE_PROFILES, type InferenceProfile, type InferenceProfileName } from "../inference/profiles.js";
+import type { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
+import type { JobOutcome } from "../features/scheduling/scheduler.js";
 
 import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
 import { webSearchTool } from "./search/tool.js";
@@ -10,7 +12,7 @@ import { manageListTool } from "./lists/tool.js";
 import { openTvAppTool, tvRemoteCommandTool, tvSendTextTool } from "./tv/tool.js";
 import { createKnowledgeTool, getContextTool } from "./wiki/tool.js";
 import { getTasksTool, getCalendarTool } from "./reminders/tool.js";
-import { timerTool } from "./timers/tool.js";
+import { scheduleTool } from "./schedule/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
 import { vacuumTool } from "./vacuum/tool.js";
 import { announceTool } from "./announce/tool.js";
@@ -32,7 +34,7 @@ const ALL: Tool[] = [
   createKnowledgeTool,
   getContextTool,
   getTasksTool,
-  timerTool,
+  scheduleTool,
   refreshHomeDataTool,
   setGamingModeTool,
   getCalendarTool,
@@ -91,6 +93,28 @@ export function toolNames(): string[] {
 // never the safe assumption.
 export function isRepeatable(name: string, args: Record<string, unknown>): boolean {
   return byName.get(name)?.repeatable(args) ?? false;
+}
+
+// Unknown names are never schedulable.
+export function isSchedulable(name: string, args: Record<string, unknown>): boolean {
+  return byName.get(name)?.schedulable?.(args) ?? false;
+}
+
+// Runs a scheduled job's stored call. Checked again here, not only when the job
+// was scheduled: a tool can stop being schedulable between the two.
+export async function runScheduledCall(job: ScheduledJob, log: FastifyBaseLogger): Promise<JobOutcome> {
+  if (!isSchedulable(job.tool, job.args)) {
+    return { status: "failed", result: `${job.tool} can't be run by the scheduler` };
+  }
+  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`);
+  switch (run.kind) {
+    case "ok":
+      return { status: "done", result: run.result };
+    case "failed":
+      return { status: "failed", result: run.error };
+    case "unknown":
+      return { status: "failed", result: `unknown tool: ${job.tool}` };
+  }
 }
 
 // Results go into the conversation, so they're logged in full only up to a

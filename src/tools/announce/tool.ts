@@ -18,5 +18,6 @@ export const announceTool: Tool = {
   },
   // Speaking the same thing twice is never what was asked for.
   repeatable: () => false,
+  schedulable: () => true,
   execute: executeAnnounce,
 };

@@ -86,7 +86,7 @@ src/
 │   ├── registry.ts       # the one tool list, and the one try/catch
 │   ├── types.ts
 │   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
-│       timers/  tv/  wiki/  gpu/  vacuum/  announce/
+│       schedule/  tv/  wiki/  gpu/  vacuum/  announce/
 │                         # each with feature.ts, tool.ts, prompt.ts as needed -
 │                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
 ├── features/
@@ -118,8 +118,8 @@ and the database.
   owns the data. See [tools.md](tools.md).
 - **Features don't import tools or the agent.** Where a feature needs the
   agent (announcement wording) or the tool registry (running a scheduled
-  call), `index.ts` injects it at startup: `setWordingWriter`,
-  `setTimerHandler`, the scheduler's `JobRunner`. The agent imports every
+  call), `index.ts` injects it at startup: `setWordingWriter`, and the
+  scheduler's `JobRunner` and schedulability check. The agent imports every
   tool, so a direct import would close a cycle.
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
@@ -129,12 +129,13 @@ and the database.
 
 `index.ts`, in order:
 
-1. Wires what can't be imported: the announcement wording writer, the timer
-   handler.
+1. Wires what can't be imported: the announcement wording writer.
 2. Logs every configuration problem, without refusing to start.
-3. Restores the file-based timers and the tidiness coach's state.
-4. Starts connecting to the database in the background; it retries every 30 s
-   and runs pending migrations once connected.
+3. Starts connecting to the database in the background; it retries every 30 s
+   and runs pending migrations once connected. Then it imports any timers left
+   in `timers.json` and starts the scheduler, which arms every pending job.
+   Until then, scheduling reports itself unavailable.
+4. Restores the tidiness coach's state and starts it.
 5. Loads the Home Assistant entity registry, and listens whether or not that
    worked.
 

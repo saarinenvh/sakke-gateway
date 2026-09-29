@@ -40,5 +40,9 @@ export interface Tool {
   // list_add). Required, not defaulted: a new tool must consciously pick a
   // side, since the wrong default here is unsafe either way.
   repeatable(args: Record<string, unknown>): boolean;
+  // Whether this call may be run later by the scheduler, with nobody there to
+  // see it. Optional, and missing means no: unlike repeatable there is a safe
+  // default, and a tool has to opt in to running unattended.
+  schedulable?(args: Record<string, unknown>): boolean;
   execute(args: Record<string, unknown>, ctx: ToolContext): Promise<string> | string;
 }
