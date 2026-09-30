@@ -47,6 +47,27 @@ export function recentExchanges(messages: Message[], count = CLASSIFIER_HISTORY_
   return exchanges.slice(-count);
 }
 
+// Short answers the model can misread as noise, trusted only right after the
+// assistant asked something. Compared lowercased and without punctuation.
+const SHORT_ANSWERS: ReadonlySet<string> = new Set([
+  "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please", "yes please", "sure thing", "of course",
+  "do it", "yes do it", "yeah do it", "go ahead", "go for it",
+  "no", "nope", "nah", "no thanks", "no thank you", "not now", "no need", "never mind",
+]);
+
+/** A short yes/no-style answer right after the assistant asked a question. */
+export function isShortAnswerToQuestion(lastAssistantMessage: string, newUtterance: string): boolean {
+  return lastAssistantMessage.trim().endsWith("?") && SHORT_ANSWERS.has(normalizeUtterance(newUtterance));
+}
+
+function normalizeUtterance(utterance: string): string {
+  return utterance
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function truncateReply(reply: string): string {
   return reply.length > MAX_REPLY_CHARS ? `${reply.slice(0, MAX_REPLY_CHARS)}...` : reply;
 }
@@ -65,6 +86,14 @@ export async function classifyFollowUp(
   newUtterance: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
+  // Decided without the model: the prompt can't be tuned to catch these
+  // without breaking other verdicts.
+  const lastExchange = exchanges[exchanges.length - 1];
+  if (lastExchange && isShortAnswerToQuestion(lastExchange.assistant, newUtterance)) {
+    log.info({ exchanges, newUtterance, verdict: "continuation", decidedBy: "short-answer rule" }, "Follow-up classification");
+    return "continuation";
+  }
+
   // The user's messages supply the topic to compare against; the assistant's
   // line alone lets an open-ended reply "continue" into anything.
   // Addressee is decided before topic: judged by topic first, the model

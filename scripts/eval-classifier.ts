@@ -177,18 +177,20 @@ function parseArgs(argv: string[]): EvalOptions {
 function createLogger() {
   let raw: string | undefined;
   let complexity: number | undefined;
+  let decidedByRule = false;
   const log: any = {
     info: (obj: Record<string, unknown>, msg: string) => {
       if (msg !== "Follow-up classification") return;
       if (typeof obj.raw === "string") raw = obj.raw;
       if (typeof obj.complexity === "number") complexity = obj.complexity;
+      if (typeof obj.decidedBy === "string") decidedByRule = true;
     },
     warn: (obj: Record<string, unknown>, msg: string) => console.warn(`  [warn] ${msg}`, obj),
     error: (obj: Record<string, unknown>, msg: string) => console.error(`  [error] ${msg}`, obj),
     debug: () => {},
     child: () => log,
   };
-  return { log, getRaw: () => raw, getComplexity: () => complexity };
+  return { log, getRaw: () => raw, getComplexity: () => complexity, wasDecidedByRule: () => decidedByRule };
 }
 
 // classifyFollowUp maps unparseable output and failed calls to "noise", so
@@ -255,13 +257,14 @@ async function evaluateCases(runs: number, exchangeCount: number): Promise<CaseR
 
 async function runCase(testCase: ClassifierCase, exchangeCount: number): Promise<RunOutcome> {
   const startedAt = Date.now();
-  const { log, getRaw, getComplexity } = createLogger();
+  const { log, getRaw, getComplexity, wasDecidedByRule } = createLogger();
   const actual = await classifyFollowUp(testCase.exchanges.slice(-exchangeCount), testCase.newUtterance, log);
 
   return {
     actual,
     complexity: getComplexity(),
-    pass: isRecognizedVerdict(getRaw()) && actual === testCase.expected,
+    // A rule-decided verdict never reaches the model, so there's no raw reply to check.
+    pass: (wasDecidedByRule() || isRecognizedVerdict(getRaw())) && actual === testCase.expected,
     durationMs: Date.now() - startedAt,
   };
 }
