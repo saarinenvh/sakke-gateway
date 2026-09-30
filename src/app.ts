@@ -16,8 +16,8 @@ export interface BuildAppOptions {
 }
 
 // Builds the HTTP surface and nothing else. index.ts owns the side effects -
-// wiring the timer handler, reporting config problems, loading the entity
-// registry, listening - so that tests can exercise the routes through
+// wiring, reporting config problems, connecting the database, loading the
+// entity registry, listening - so that tests can exercise the routes through
 // app.inject() without starting a server or touching any of that.
 export function buildApp({ logger = true }: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({

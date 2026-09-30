@@ -137,11 +137,43 @@ describe("error handling", () => {
 
 describe("registry", () => {
   it("offers every tool it can execute, and can execute every tool it offers", async () => {
-    // The old split between definitions.ts and executor.ts let these drift: a
-    // schema with no branch (the model calls it, nothing happens) or a branch
-    // with no schema (dead code) were both silently possible.
+    // A schema with no implementation, or the reverse, would otherwise be
+    // silently possible.
     const { tools, toolNames } = await import("../../src/tools/registry.js");
     expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(19);
+  });
+});
+
+describe("inference profiles", () => {
+  // Tools only the scheduler runs, never offered in a conversation.
+  const SCHEDULER_ONLY = ["announce"];
+
+  it("offers Sakke every tool except the scheduler-only ones", async () => {
+    // A new tool left off the sakke profile would be registered but never offered.
+    const { toolNames, toolsForProfile } = await import("../../src/tools/registry.js");
+    const offered = toolsForProfile("sakke").map(t => t.function.name);
+    expect(offered.sort()).toEqual(toolNames().filter(name => !SCHEDULER_ONLY.includes(name)).sort());
+  });
+
+  it("offers an announcement and the tidiness nag no tools at all", async () => {
+    const { toolsForProfile } = await import("../../src/tools/registry.js");
+    expect(toolsForProfile("announcement")).toEqual([]);
+    expect(toolsForProfile("tidiness_nag")).toEqual([]);
+  });
+
+  it("keeps the registry's order, which is what the model is used to", async () => {
+    const { tools, toolsForProfile } = await import("../../src/tools/registry.js");
+    const registryOrder = tools.map(t => t.function.name).filter(name => !SCHEDULER_ONLY.includes(name));
+    expect(toolsForProfile("sakke").map(t => t.function.name)).toEqual(registryOrder);
+  });
+
+  it("names every profile tool that doesn't exist, with its profile", async () => {
+    const { findUnknownProfileTools } = await import("../../src/tools/registry.js");
+    const profiles = {
+      sakke: { tools: ["get_weather", "teleport"], contextOwner: "gateway" },
+      quiet: { tools: [], contextOwner: "caller" },
+    } as const;
+    expect(findUnknownProfileTools(profiles, new Set(["get_weather"]))).toEqual(["sakke.teleport"]);
   });
 });

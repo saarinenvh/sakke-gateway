@@ -42,7 +42,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     } else {
       try {
         const extraSystemPrompt = request.body.extra_system_prompt?.trim() || undefined;
-        const result = await runAgent(text, conversationId, request.log, { extraSystemPrompt });
+        const result = await runAgent(text, conversationId, request.log, { profile: "sakke", extraSystemPrompt });
         responseText = result.content;
         continueConversation = result.continueConversation;
       } catch (err: any) {

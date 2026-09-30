@@ -15,7 +15,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **AI scene designer** — describe a mood, get a full lighting scene (OpenAI gpt-4o). Reads its room layout and lighting notes from the wiki, so a lamp can move without a redeploy
 - **Shopping lists** — add/remove items with automatic store-layout ordering
 - **Spotify** — search by voice and pick from three spoken options; known personal playlists play immediately
-- **Timers** — set, list and cancel voice timers; announced aloud through the satellite when they fire
+- **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
@@ -26,10 +26,10 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 
 ## Agent Tools
 
-Each tool lives with its feature as `tools/<feature>/tool.ts`, exporting its
-schema and its implementation together. `tools/registry.ts` is the single list,
-and the only place that logs a call, previews the result, or turns a thrown
-error into something the model can react to.
+Each tool lives in `tools/<name>/`: its definition in `tool.ts`, its executor
+next to it, and anything deeper in a service under `features/`. Which tools a
+request may use is its profile's choice. How that fits together:
+[docs/architecture/tools.md](docs/architecture/tools.md).
 
 | Tool | Feature | Description |
 |---|---|---|
@@ -46,11 +46,12 @@ error into something the model can react to.
 | `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
 | `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
 | `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `timer` | `tools/timers/` | Set, cancel or list voice timers |
+| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, stored in the gateway database |
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
 | `vacuum` | `tools/vacuum/` | Start / stop / dock / status, plus answers to a cleaning reminder |
+| `announce` | `tools/announce/` | Speak a message on the satellite in Sakke's words. In no profile: only the scheduler runs it |
 
 ## Routes
 
@@ -67,48 +68,10 @@ error into something the model can react to.
 | GET, POST | `/internal/gpu-status` | The PC pushes its GPU status here; GET reports what's currently known |
 | GET | `/health` | Healthcheck |
 
-## Layout
+## Architecture
 
-`src/` is organised by feature, not by technical layer. A feature owns its logic,
-its tool, and the fragment of the system prompt that explains it.
-
-```
-src/
-├── config.ts             # all configuration, read once, validated, problems logged at startup
-├── app.ts                # buildApp() — routes only, so tests can inject
-├── index.ts              # composition root: wiring, then listen
-├── agent/
-│   ├── agent.ts          # the tool-calling loop, and nothing else
-│   ├── conversationStore.ts  # history, pruning, context-budget trimming
-│   ├── ollamaRouter.ts   # which Ollama this turn goes to
-│   ├── continuationCheck.ts  # the follow-up classifier
-│   ├── systemPrompt.ts   # concatenates the per-feature fragments
-│   ├── voiceText.ts      # strips anything that shouldn't be spoken aloud
-│   └── prompts/          # persona.md, toolDiscipline.md
-├── tools/
-│   ├── registry.ts       # the one tool list, and the one try/catch
-│   ├── types.ts
-│   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
-│       timers/  tv/  wiki/  gpu/  vacuum/
-│                         # each with feature.ts, tool.ts, prompt.ts as needed -
-│                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
-├── features/
-│   └── scenes/  display/  gpu/  tidiness/  # feature modules with their own routes/logic,
-│                         # but not in tools/registry.ts - nothing the model
-│                         # calls directly (gpu/ here is gpuStatus.ts + the
-│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
-│                         # tidiness/ is the cleaning coach's schedule, state and tick)
-├── integrations/
-│   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
-│   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
-│   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
-│   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
-└── …
-```
-
-Every feature's `prompt.ts` is concatenated into the system prompt in a fixed
-order by `agent/systemPrompt.ts`. Adding a feature means adding a folder, not
-editing four shared files.
+How a request flows through the gateway, which module owns what, the tool
+layers and the database: [docs/architecture/](docs/architecture/README.md).
 
 ## Where a fact should live
 
@@ -124,10 +87,11 @@ Three places, and the choice is not arbitrary:
 - **Ollama** — local LLM inference, model per `OLLAMA_MODEL`; a separate, smaller `OLLAMA_CLASSIFIER_MODEL` for follow-up classification
 - **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o)
 - **Home Assistant** — smart home backend
+- **MariaDB 10.11 + TypeORM** — the gateway's own database, for scheduled jobs; see [docs/architecture/data.md](docs/architecture/data.md)
 - **Open-Meteo** — weather API
 - **SearXNG** — local web search, Brave as the backing engine
 - **Spotify Web API** — music search and playback
-- **vitest** — 190 tests in under a second
+- **vitest** — unit and integration tests; the database tests run against MariaDB
 
 ## Setup
 
@@ -148,10 +112,16 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
 | Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything
 runs on the server's own Ollama.
+
+Leaving `GATEWAY_DB_HOST` unset leaves the gateway without its database, which
+makes scheduling unavailable. With it set, the gateway connects in the
+background, retrying every 30 s while MariaDB is unreachable, and runs any
+pending schema migrations (`src/db/migrations/`) once it connects.
 
 A blank value counts as unset — that distinction matters, and getting it wrong
 once produced an HTTP 200 with a zero-byte body and a broken weather tool.
@@ -160,7 +130,36 @@ once produced an HTTP 200 with a zero-byte body and a broken weather tool.
 
 ```bash
 npm install
+npm run dev:env   # once per checkout: copies .env.example to .env
 npm run dev
+```
+
+`.env.example` holds working values for the dev machine (WSL): the Windows
+host's Ollama at `172.31.0.1:11434`, `STATE_DIR=./data`, and the local MariaDB
+with a dev-only password. None of them is a production value. `npm run dev:env`
+keeps an existing `.env`; `npm run dev:env -- --force` replaces it.
+
+`npm run dev` compiles with `tsc` and runs the result, the same way the image
+does, so TypeORM gets the decorator metadata it needs. It doesn't watch for
+changes; run it again after editing. Without a Home Assistant token the gateway
+still starts and logs the missing `HA_TOKEN`.
+
+The database is a local MariaDB 10.11, the server's version. Create the
+gateway's database and its dev user once (`sudo mysql`):
+
+```sql
+CREATE DATABASE sakke_gateway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sakke_gateway'@'localhost' IDENTIFIED BY 'sakke-gateway-dev';
+GRANT ALL PRIVILEGES ON sakke_gateway.* TO 'sakke_gateway'@'localhost';
+```
+
+The schema is created on the first start.
+
+Talk to it the way Home Assistant does:
+
+```bash
+curl -s localhost:3100/v1/chat/completions -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"set a timer for 1 minute for the pasta"}]}'
 ```
 
 ### Build & run
@@ -176,10 +175,25 @@ npm start
 npm test
 ```
 
-190 tests, ~0.8s. Unit tests sit next to the code as `*.test.ts`; integration
-tests live in `tests/`, driving the real Fastify app through `app.inject()`
-against fake Ollama and Home Assistant servers in `tests/fixtures/`. No test
-reaches the network.
+Unit tests sit next to the code as `*.test.ts`; integration tests live in
+`tests/`, driving the real Fastify app through `app.inject()` against fake
+Ollama and Home Assistant servers in `tests/fixtures/`. No test reaches the
+network.
+
+`tests/integration/database.test.ts` runs the migrations and entities against
+a real MariaDB, and is skipped unless `TEST_DB_HOST` is set. CI provides a
+throwaway `mariadb:10.11` container. Locally, use a separate test database,
+because the test drops the gateway's tables first:
+
+```sql
+CREATE DATABASE sakke_gateway_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sakke_gateway_test'@'localhost' IDENTIFIED BY 'sakke-gateway-test';
+GRANT ALL PRIVILEGES ON sakke_gateway_test.* TO 'sakke_gateway_test'@'localhost';
+```
+
+```bash
+TEST_DB_HOST=127.0.0.1 TEST_DB_PASSWORD=sakke-gateway-test npx vitest run tests/integration/database.test.ts
+```
 
 See `TEST_PLAN.md` in [sakke-workspace](https://github.com/saarinenvh/sakke-workspace)
 for what is deliberately *not* tested, and why.

@@ -29,6 +29,8 @@ export interface RecordedRequest {
   model: string;
   /** Whether the tool schema was sent - the tools-withheld pass omits it. */
   hasTools: boolean;
+  /** Names of the tools offered, in order. */
+  toolNames: string[];
   messages: { role: string; content: string }[];
   think?: boolean;
   numCtx?: number;
@@ -74,6 +76,7 @@ export async function startFakeOllama(): Promise<FakeOllama> {
       recorded.push({
         model: body.model,
         hasTools: "tools" in body,
+        toolNames: (body.tools ?? []).map((tool: { function: { name: string } }) => tool.function.name),
         messages: body.messages,
         think: body.think,
         numCtx: body.options?.num_ctx,

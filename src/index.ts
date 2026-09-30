@@ -1,23 +1,29 @@
 import "dotenv/config";
+import type { DataSource } from "typeorm";
 import { buildApp } from "./app.js";
 import { loadEntities } from "./integrations/homeAssistant/registry.js";
 import { setModuleLogger } from "./logger.js";
-import { restoreTimers, setTimerHandler } from "./tools/timers/timers.js";
-import { announceFinishedTimer } from "./tools/timers/timerAnnouncer.js";
+import { setWordingWriter } from "./features/announcements/announcer.js";
+import { writeAnnouncementWording } from "./features/announcements/wording.js";
 import { config } from "./config.js";
 import { restoreTidinessState } from "./features/tidiness/store.js";
 import { startTidinessCoach } from "./features/tidiness/coach.js";
 import { liveCoachDeps } from "./features/tidiness/liveDeps.js";
+import { createDataSource } from "./db/dataSource.js";
+import { connectDatabase, DATABASE_RETRY_DELAY_MS } from "./db/database.js";
+import { JobRepository } from "./features/scheduling/jobRepository.js";
+import { importLegacyTimers } from "./features/scheduling/legacyTimers.js";
+import { startScheduler } from "./features/scheduling/scheduler.js";
+import { isSchedulable, runScheduledCall } from "./tools/registry.js";
 
 const app = buildApp();
 
 // Modules without a request logger (scenes.ts, spotify.ts) log through this.
 setModuleLogger(app.log);
 
-// Composition root: the scheduler knows when a timer fires, this decides what
-// happens when it does. Wired here so timers.ts doesn't have to import the
-// agent - see the note in that file about the import cycle.
-setTimerHandler(announceFinishedTimer);
+// Composition root: wired here so neither announce nor the scheduler has to
+// import the agent or the tool registry, which imports every tool.
+setWordingWriter(writeAnnouncementWording);
 
 // Anything missing or implausible in the environment, reported once, up front,
 // instead of surfacing later as an inexplicable runtime failure.
@@ -34,7 +40,28 @@ function listen(): void {
   });
 }
 
-void restoreTimers();
+// Once the database is connected: move any timers left in timers.json into
+// it, then arm every pending job. Until then scheduling reports itself
+// unavailable.
+async function startScheduling(dataSource: DataSource): Promise<void> {
+  const jobs = new JobRepository(dataSource);
+  await importLegacyTimers(jobs, config.stateDir, new Date(), app.log);
+  await startScheduler({
+    store: jobs,
+    runJob: job => runScheduledCall(job, app.log),
+    isSchedulable,
+    now: () => new Date(),
+    log: app.log,
+  });
+}
+
+// Not awaited: the gateway serves requests while the database is still
+// connecting, or unreachable. A missing config is already a reported problem.
+if (config.database) {
+  void connectDatabase(createDataSource(config.database), DATABASE_RETRY_DELAY_MS)
+    .then(startScheduling)
+    .catch(err => app.log.error({ err: err instanceof Error ? err.message : String(err) }, "Scheduling failed to start, unavailable until restart"));
+}
 
 // State first, so the first tick knows what was already asked before a restart.
 void restoreTidinessState().then(() => startTidinessCoach(liveCoachDeps));
