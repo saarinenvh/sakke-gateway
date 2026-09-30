@@ -79,12 +79,11 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
 
 1. Is the new speech meant for the assistant? It is if any of these apply:
    - It is a request or question the assistant could act on, on ANY topic - also one completely unrelated to the conversation above.
-   - It answers (yes, no, or just the missing detail), confirms, declines, picks from, or corrects what the assistant just said or asked.
+   - It answers, confirms, picks from, or corrects what the assistant just said or asked.
    - It is a short command adjusting what the assistant just did (e.g. "turn it up", "next", "stop").
    - It updates the assistant on the subject it just talked about (e.g. saying something is already done).
-   Speech that starts by addressing a person by name or as family (e.g. "Mom, ...", "Hey Lisa, ...") is meant for that person, even when it is about the same topic - unless the name is Sakke, the assistant's own name.
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
-2. If it is meant for the assistant: continuation if it builds on the conversation above - the same specific topic or task, or it can only be understood with the conversation (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. An answer to a question the assistant just asked is always continuation. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
+2. If it is meant for the assistant: continuation if it builds on the conversation above - the same specific topic or task, or it can only be understood with the conversation (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
 If unsure whether it is meant for the assistant, answer noise.
 
