@@ -36,7 +36,9 @@ type ClassifierCaseRow = readonly [string, string, string, string, FollowUpVerdi
 
 const CASE_ROWS: ClassifierCaseRow[] = [
   ["live log, 2026-09-28 (sakke-gateway)", "What's the time?", "It's 21:39, Monday, 28 September 2026.", "Do I have any tasks for today?", "new_request"],
-  ["live log, 2026-09-28 (sakke-gateway)", "Do I have any tasks for today?", "You have one task today: water the plants.", "I already bothered them.", "continuation"],
+  // Probably "I already watered them", misheard by Whisper. As text it doesn't
+  // follow from the reply, and the classifier only sees text.
+  ["live log, 2026-09-28 (sakke-gateway), mis-transcribed", "Do I have any tasks for today?", "You have one task today: water the plants.", "I already bothered them.", "noise"],
   ["live log, 2026-09-29 (sakke-gateway)", "What's the title?", "I don't know what title you're referring to. Could you clarify?", "I said, what's the time?", "new_request"],
   ["live log, 2026-09-30 (sakke-gateway)", "What's the weather like?", "Clear sky, 12.3°C. Wind at 7.2 km/h, gusting to 16.6 km/h. No rain in the next six hours.", "Is it good weather for disc golf?", "continuation"],
   ["pending_tasks.md: generic open-ended reply must not force continuation by default", "Play some metal.", "Still here... what can I do for you?", "Could you light the campfire?", "new_request"],
