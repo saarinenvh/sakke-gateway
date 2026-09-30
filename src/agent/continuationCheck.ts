@@ -37,7 +37,9 @@ export async function classifyFollowUp(
   // assistant's line alone lets an open-ended reply "continue" into anything.
   // Addressee is decided before topic: judged by topic first, the model
   // treated any on-topic chatter or fragment as continuation.
-  const prompt = `Here is the most recent exchange between a voice assistant and a user:
+  const prompt = `The assistant is a smart-home voice assistant: lights and lighting scenes, music, TV, timers, shopping lists and tasks, weather, and web search.
+
+Here is the most recent exchange between the assistant and a user:
 User said: "${lastUserMessage}"
 Assistant replied: "${lastAssistantMessage}"
 New speech picked up by the microphone: "${newUtterance}"
@@ -50,7 +52,7 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
    - It is a short command adjusting what the assistant just did (e.g. "turn it up", "next", "stop").
    - It updates the assistant on the subject it just talked about (e.g. saying something is already done).
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
-2. If it is meant for the assistant: continuation if it is about the same specific topic or task as the exchange above, new_request if it is a different topic. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
+2. If it is meant for the assistant: continuation if it builds on the exchange above - the same specific topic or task, or it can only be understood with the exchange (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
 If unsure whether it is meant for the assistant, answer noise.
 
