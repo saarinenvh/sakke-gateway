@@ -42,6 +42,8 @@ export interface FakeOllama {
   script(...replies: ScriptedReply[]): void;
   /** Every agent request so far, in order. Classifier calls are excluded. */
   requests(): RecordedRequest[];
+  /** Every follow-up classifier request so far, in order. */
+  classifierRequests(): RecordedRequest[];
   /** What the follow-up classifier should answer. Defaults to continuation. */
   setClassifierVerdict(verdict: "continuation" | "new_request" | "noise"): void;
   close(): Promise<void>;
@@ -50,6 +52,7 @@ export interface FakeOllama {
 export async function startFakeOllama(): Promise<FakeOllama> {
   let queue: ScriptedReply[] = [];
   const recorded: RecordedRequest[] = [];
+  const recordedClassifier: RecordedRequest[] = [];
   let classifierVerdict: "continuation" | "new_request" | "noise" = "continuation";
 
   const server = http.createServer((req, res) => {
@@ -69,18 +72,21 @@ export async function startFakeOllama(): Promise<FakeOllama> {
         typeof body.messages[0].content === "string" &&
         body.messages[0].content.includes("Classify the new speech");
 
-      if (isClassifier) {
-        return json({ message: { role: "assistant", content: classifierVerdict } });
-      }
-
-      recorded.push({
+      const request: RecordedRequest = {
         model: body.model,
         hasTools: "tools" in body,
         toolNames: (body.tools ?? []).map((tool: { function: { name: string } }) => tool.function.name),
         messages: body.messages,
         think: body.think,
         numCtx: body.options?.num_ctx,
-      });
+      };
+
+      if (isClassifier) {
+        recordedClassifier.push(request);
+        return json({ message: { role: "assistant", content: classifierVerdict } });
+      }
+
+      recorded.push(request);
 
       const next = queue.shift();
       if (!next) {
@@ -103,8 +109,9 @@ export async function startFakeOllama(): Promise<FakeOllama> {
 
   return {
     url: `http://127.0.0.1:${port}`,
-    script: (...replies) => { queue = replies; recorded.length = 0; },
+    script: (...replies) => { queue = replies; recorded.length = 0; recordedClassifier.length = 0; },
     requests: () => recorded,
+    classifierRequests: () => recordedClassifier,
     setClassifierVerdict: v => { classifierVerdict = v; },
     close: () => new Promise<void>(resolve => server.close(() => resolve())),
   };

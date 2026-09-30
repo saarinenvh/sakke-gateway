@@ -325,6 +325,22 @@ describe("a turn that must not act", () => {
   });
 });
 
+// Ollama restarts a loaded model whenever a request asks for a different
+// context size, so a mismatch here reloaded the shared model twice per
+// follow-up turn: once for the classifier, once more for the reply.
+describe("a follow-up turn", () => {
+  it("classifies with the same context size as the main agent", async () => {
+    ollama.script({ content: "Clear sky, 12 degrees." }, { content: "Decent golf weather." });
+    const id = nextId();
+
+    await runAgent("what is the weather", id, log, SAKKE);
+    await runAgent("is it good for golf?", id, log, SAKKE);
+
+    const [classifierRequest] = ollama.classifierRequests();
+    expect(classifierRequest.numCtx).toBe(ollama.requests()[0].numCtx);
+  });
+});
+
 describe("whose context a request is", () => {
   it("keeps a live conversation and shows it on the display", async () => {
     broadcastState("idle");

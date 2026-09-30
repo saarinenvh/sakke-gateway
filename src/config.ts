@@ -91,7 +91,7 @@ export interface Config {
     pc: OllamaTargetConfig | null;
     // Deliberately independent of the main agent's model so classification
     // stays fast even when the agent is routed to something bigger.
-    classifier: { baseUrl: string; model: string };
+    classifier: { baseUrl: string; model: string; numCtx: number };
   };
   ha: {
     baseUrl: string;
@@ -177,6 +177,9 @@ function loadConfig(): Config {
       classifier: {
         baseUrl: classifierBaseUrl ?? "http://host.docker.internal:11434",
         model: env("OLLAMA_CLASSIFIER_MODEL") ?? "qwen3:4b-instruct-2507-q8_0",
+        // The classifier usually shares the server's loaded model, and Ollama
+        // reloads a model whenever a request asks for a different context size.
+        numCtx: serverTarget.numCtx,
       },
     },
     ha: {
