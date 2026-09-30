@@ -45,14 +45,14 @@ New speech picked up by the microphone: "${newUtterance}"
 The microphone also picks up speech that is not meant for the assistant. Decide in this order:
 
 1. Is the new speech meant for the assistant? It is if any of these apply:
-   - It is a request or question to the assistant, on ANY topic - also one completely unrelated to the exchange above. Do not judge whether the assistant is able to do it.
+   - It is a request or question the assistant could act on, on ANY topic - also one completely unrelated to the exchange above.
    - It answers, confirms, picks from, or corrects what the assistant just said or asked.
    - It is a short command adjusting what the assistant just did (e.g. "turn it up", "next", "stop").
    - It updates the assistant on the subject it just talked about (e.g. saying something is already done).
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
-2. If it is meant for the assistant: continuation if it is about the same specific topic or task as the exchange above, or refers back to something in it (e.g. "that", "it", "the same one"); new_request if it is a different topic. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
+2. If it is meant for the assistant: continuation if it is about the same specific topic or task as the exchange above, new_request if it is a different topic. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
-A clear request or question to the assistant is never noise. Otherwise, if unsure whether it is meant for the assistant, answer noise.
+If unsure whether it is meant for the assistant, answer noise.
 
 Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
 
