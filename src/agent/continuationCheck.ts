@@ -33,22 +33,21 @@ export async function classifyFollowUp(
   newUtterance: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
-  // Passing only the assistant's last line let a generic, open-ended reply
-  // (e.g. "What can I do for you?") trivially "continue" into literally
-  // anything - a genuine topic switch (Spotify chat -> "light the campfire")
-  // got classified continuation just because it technically answered an
-  // open question, dragging irrelevant history into an unrelated request.
-  // Including the user's last message gives the classifier the actual topic
-  // to compare against, not just whatever the assistant happened to ask.
+  // The user's last message supplies the topic to compare against; the
+  // assistant's line alone lets an open-ended reply "continue" into anything.
+  // Addressee is decided before topic: judged by topic first, the model
+  // treated any on-topic chatter or fragment as continuation.
   const prompt = `Here is the most recent exchange between a voice assistant and a user:
 User said: "${lastUserMessage}"
 Assistant replied: "${lastAssistantMessage}"
 New speech picked up by the microphone: "${newUtterance}"
 
-Classify the new speech into exactly one of these three categories:
-- continuation: about the SAME specific topic or task as the exchange above (e.g. picking an option, confirming, correcting a detail, directly answering a specific question the assistant asked).
-- new_request: a clear, coherent request or comment on a DIFFERENT topic than the exchange above. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does NOT make the next thing continuation by default - if it's a different topic, it's new_request even though it technically answers that open question.
-- noise: not actually directed at the assistant at all - talking to someone else, background chatter, an incomplete fragment, or anything ambiguous.
+The microphone also picks up speech that is not meant for the assistant. Decide in this order:
+
+1. Is the new speech meant for the assistant? Only if it is a complete request or question for the assistant, or it answers, confirms, picks from, corrects or adjusts what the assistant just said or did, or tells the assistant something it needs to know about that. Otherwise it is noise: talking to someone else, one side of a phone call, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
+2. If it is meant for the assistant: continuation if it is about the same specific topic or task as the exchange above, new_request if it is a different topic. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
+
+If unsure whether it is meant for the assistant, answer noise.
 
 Answer with exactly one word: continuation, new_request, or noise.`;
 
