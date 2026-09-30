@@ -55,10 +55,11 @@ function truncateReply(reply: string): string {
 // response, continue_conversation stays open for a while) need 3-way
 // classification, not 2-way - collapsing "off-topic but a real request" and
 // "not directed at Sakke at all" into a single "unrelated" bucket meant a
-// genuine new request got silenced the same as background chatter. Ambiguous
-// speech leans towards answering: ignoring a real request is worse than the
-// occasional reply to chatter, which the follow-up window rarely picks up.
-// Unparseable output and classifier failures still mean silence.
+// genuine new request got silenced the same as background chatter.
+// Ignoring a real request is the worse error, so the prompt spells out what
+// counts as meant for the assistant. Its "if unsure, noise" tie-break stays
+// anyway: without it this model never answers noise at all. The eval
+// (scripts/eval-classifier.ts) reports silenced requests separately.
 export async function classifyFollowUp(
   exchanges: Exchange[],
   newUtterance: string,
