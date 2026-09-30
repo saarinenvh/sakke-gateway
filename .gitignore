@@ -1,4 +1,5 @@
 node_modules/
 dist/
+.eval-dist/
 .env
 data/
