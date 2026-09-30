@@ -67,9 +67,7 @@ export async function classifyFollowUp(
   // The user's messages supply the topic to compare against; the assistant's
   // line alone lets an open-ended reply "continue" into anything.
   // Addressee is decided before topic: judged by topic first, the model
-  // treated any on-topic chatter or fragment as continuation. The answer
-  // starts with that decision so the model can't skip it; only the category
-  // word is parsed.
+  // treated any on-topic chatter or fragment as continuation.
   const prompt = `The assistant is a smart-home voice assistant: lights and lighting scenes, music, TV, timers, shopping lists and tasks, weather, and web search.
 
 Here is the recent conversation between the assistant and a user, oldest first:
@@ -86,9 +84,11 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
 2. If it is meant for the assistant: continuation if it builds on the conversation above - the same specific topic or task, or it can only be understood with the conversation (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
+If unsure whether it is meant for the assistant, answer noise.
+
 Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
 
-Answer in exactly this form: <meant for the assistant: yes or no> <category> <complexity>, for example: yes continuation 20`;
+Answer in exactly this form: <category> <complexity>, for example: continuation 20`;
 
   const { baseUrl, model, numCtx } = config.ollama.classifier;
 
