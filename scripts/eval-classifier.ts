@@ -73,6 +73,50 @@ const CASE_ROWS: ClassifierCaseRow[] = [
   ["representative: returns to the music after a detour", "What's the weather like?", "Cloudy, 9 degrees, light rain this evening.", "skip this song", "continuation", { user: "Play something by Wintersun.", assistant: "Playing Wintersun's Time I." }],
   ["representative: asks about an earlier timer", "Turn on the kitchen lights.", "Kitchen lights are on.", "how long is left on it?", "continuation", { user: "Set a timer for the pasta.", assistant: "Timer set for ten minutes." }],
   ["representative: chatter about an earlier topic, to another person", "Turn off the living room lights.", "Living room lights are off.", "we should totally see them live next summer", "noise", { user: "Play something by Wintersun.", assistant: "Playing Wintersun's Time I." }],
+
+  // Owner-written synthetic set, 2026-09-30: written after the prompt was
+  // tuned, as a check on cases it was never shaped against.
+  // Continuation: short answers, task updates, references, and adjustments.
+  ["synthetic: acknowledgement accepting a pending offer", "It's too dark in here.", "Would you like me to turn on the living room lights?", "okay", "continuation"],
+  ["synthetic: rejects a pending offer", "What's the weather tomorrow?", "Rain is expected. Would you like the hourly forecast?", "no thanks", "continuation"],
+  ["synthetic: supplies a missing room", "Turn on the lights.", "Which room?", "the kitchen", "continuation"],
+  ["synthetic: supplies a missing shopping item", "Add something to my shopping list.", "What should I add?", "eggs", "continuation"],
+  ["synthetic: clear completion update", "What tasks do I have today?", "Water the plants and take out the recycling.", "I already watered the plants.", "continuation"],
+  ["synthetic: corrects the reported task state", "Have I finished my tasks?", "Taking out the recycling is still pending.", "That's done too.", "continuation"],
+  ["synthetic: asks about the artist just played", "Play some Massive Attack.", "Playing Mezzanine by Massive Attack.", "Where is that group from?", "continuation"],
+  ["synthetic: asks about a specific album without a pronoun", "Play an album by Daft Punk.", "Playing Discovery by Daft Punk.", "When was Discovery released?", "continuation"],
+  ["synthetic: requests explanation of previous recommendation", "Should I cycle to work?", "The bus would be a better choice because heavy rain is expected.", "Why the bus?", "continuation"],
+  ["synthetic: modifies a running timer", "Set a timer for twenty minutes.", "Your twenty-minute timer is running.", "Make it thirty instead.", "continuation"],
+  ["synthetic: stops an ongoing action", "Play my workout playlist.", "Playing your workout playlist.", "stop", "continuation"],
+  ["synthetic: extends the current lighting action", "Turn off the kitchen lights.", "The kitchen lights are off.", "The hallway too.", "continuation"],
+
+  // New requests: standalone goals, topic changes, and generic replies.
+  ["synthetic: standalone timer after a weather question", "Will it rain today?", "Rain is expected this afternoon.", "Remind me to call the dentist tomorrow morning.", "new_request"],
+  ["synthetic: unrelated request instead of answering a pending question", "Play some music.", "Which playlist would you like?", "What's the capital of Finland?", "new_request"],
+  ["synthetic: fresh request after a generic greeting", "Hello.", "Hi! How can I help?", "Turn on the porch lights.", "new_request"],
+  ["synthetic: fresh request after a generic recovery response", "Can you hear me?", "I'm here. What would you like me to do?", "Add bananas to my shopping list.", "new_request"],
+  ["synthetic: new lighting task after a music action", "Pause the music.", "The music is paused.", "Dim the bedroom lights to twenty percent.", "new_request"],
+  ["synthetic: new music task after a lighting action", "Turn on the kitchen lights.", "The kitchen lights are on.", "Play a jazz playlist.", "new_request"],
+  ["synthetic: unrelated factual question after shopping", "Add bread to my shopping list.", "Added bread to your shopping list.", "Why do leaves change color in autumn?", "new_request"],
+  ["synthetic: independent TV command after a timer", "Set a timer for five minutes.", "Your five-minute timer is running.", "Turn off the TV.", "new_request"],
+  ["synthetic: standalone shopping request after weather", "What's the temperature outside?", "It's eight degrees.", "Add coffee and oat milk to my shopping list.", "new_request"],
+  ["synthetic: multi-step routine after unrelated factual answer", "What is the tallest mountain in the world?", "Mount Everest.", "Set a fifteen-minute timer, turn on the kitchen lights, and play quiet music.", "new_request"],
+  ["synthetic: planning request after a completed device action", "Turn off the TV.", "The TV is off.", "Plan three vegetarian dinners with overlapping ingredients and make a shopping list.", "new_request"],
+  ["synthetic: explicit topic switch", "What's the weather tomorrow?", "Sunny with a high of seventeen degrees.", "Different question: how do solar panels work?", "new_request"],
+
+  // Noise: acknowledgements, human-directed speech, reactions, and fragments.
+  ["synthetic: acknowledgement with no pending offer", "Turn on the living room lights.", "The living room lights are on.", "okay", "noise"],
+  ["synthetic: short noun without a pending question or related task", "Turn off the TV.", "The TV is off.", "eggs", "noise"],
+  ["synthetic: same-topic command explicitly addressed to a person", "Turn on the kitchen lights.", "The kitchen lights are on.", "Maya, turn off the hallway lights on your way out.", "noise"],
+  ["synthetic: same-topic question explicitly addressed to a person", "What's on my shopping list?", "Milk and bread.", "Dad, did you buy the milk?", "noise"],
+  ["synthetic: overheard phone call with explicit human addressee", "What's the weather?", "Sunny and fourteen degrees.", "Hi Alex, I'm on the bus. I'll call you when I get home.", "noise"],
+  ["synthetic: personal reaction to the current music", "Play some jazz.", "Playing a jazz playlist.", "My dad used to listen to this kind of music.", "noise"],
+  ["synthetic: personal reaction to the weather report", "Will it rain this afternoon?", "Heavy rain is expected after three.", "Ugh, typical.", "noise"],
+  ["synthetic: unfinished request missing the action target", "What's the time?", "It's half past four.", "Could you put the", "noise"],
+  ["synthetic: unfinished conditional", "What's the weather tomorrow?", "Rain is expected in the morning.", "If tomorrow is", "noise"],
+  ["synthetic: hesitation while an answer is pending", "Set a timer.", "For how long?", "uhh", "noise"],
+  ["synthetic: social remark after a completed task", "Turn off the bedroom lights.", "The bedroom lights are off.", "What a long day.", "noise"],
+  ["synthetic: task update explicitly addressed to another person", "What tasks do I have today?", "Water the plants.", "Sam, I already watered the plants, so you don't need to.", "noise"],
 ];
 
 const CASES: ClassifierCase[] = CASE_ROWS.map(
