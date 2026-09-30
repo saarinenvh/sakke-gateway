@@ -84,6 +84,8 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
 2. If it is meant for the assistant: continuation if it builds on the conversation above - the same specific topic or task, or it can only be understood with the conversation (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
+If unsure whether it is meant for the assistant, answer noise.
+
 Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
 
 Answer in exactly this form: <category> <complexity>, for example: continuation 20`;
