@@ -70,7 +70,7 @@ export async function startFakeOllama(): Promise<FakeOllama> {
       const isClassifier =
         body.messages?.length === 1 &&
         typeof body.messages[0].content === "string" &&
-        body.messages[0].content.includes("Classify the new speech");
+        body.messages[0].content.includes("New speech picked up by the microphone");
 
       const request: RecordedRequest = {
         model: body.model,
