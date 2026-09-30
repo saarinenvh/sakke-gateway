@@ -76,7 +76,9 @@ Here is the recent conversation between the assistant and a user, oldest first:
 ${formatExchanges(exchanges)}
 New speech picked up by the microphone: "${newUtterance}"
 
-The microphone also picks up speech that is not meant for the assistant. Decide in this order:
+How the new speech was picked up: after each reply, the microphone stays open for a few seconds WITHOUT a wake word, so the user can answer. During that time it hears everything said in the room, not only speech meant for the assistant. People at home talk to each other, take phone calls, react out loud to what they just heard, mumble, or start a sentence and stop. That is noise: speech the assistant must ignore, even when it is about the same topic.
+
+Decide in this order:
 
 1. Is the new speech meant for the assistant? It is if any of these apply:
    - It is a request or question the assistant could act on, on ANY topic - also one completely unrelated to the conversation above.
