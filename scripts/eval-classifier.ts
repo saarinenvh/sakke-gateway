@@ -229,6 +229,12 @@ function printResults(results: CaseResult[]): void {
     console.log(`  ${verdict.padEnd(12)} ${formatRatio(countPasses(ofVerdict), ofVerdict.length)}`);
   }
 
+  const silencedRequests = results
+    .filter(result => result.testCase.expected !== "noise")
+    .flatMap(result => result.outcomes)
+    .filter(outcome => outcome.actual === "noise").length;
+  console.log(`Real requests silenced as noise (worst error): ${silencedRequests}`);
+
   const stableCases = results.filter(result => result.outcomes.every(outcome => outcome.pass)).length;
   console.log(`Cases passing every run: ${stableCases}/${results.length}`);
 

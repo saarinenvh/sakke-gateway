@@ -23,10 +23,10 @@ export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 // response, continue_conversation stays open for a while) need 3-way
 // classification, not 2-way - collapsing "off-topic but a real request" and
 // "not directed at Sakke at all" into a single "unrelated" bucket meant a
-// genuine new request got silenced the same as background chatter. Silence
-// is still the fail-closed default for anything ambiguous or noise-like -
-// staying quiet is recoverable (just repeat yourself), responding to speech
-// never meant for Sakke is not.
+// genuine new request got silenced the same as background chatter. Ambiguous
+// speech leans towards answering: ignoring a real request is worse than the
+// occasional reply to chatter, which the follow-up window rarely picks up.
+// Unparseable output and classifier failures still mean silence.
 export async function classifyFollowUp(
   lastUserMessage: string,
   lastAssistantMessage: string,
@@ -54,7 +54,7 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
 2. If it is meant for the assistant: continuation if it builds on the exchange above - the same specific topic or task, or it can only be understood with the exchange (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
-If unsure whether it is meant for the assistant, answer noise.
+If unsure whether it is meant for the assistant, treat it as meant for the assistant. Ignoring a real request is worse than answering chatter.
 
 Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
 
