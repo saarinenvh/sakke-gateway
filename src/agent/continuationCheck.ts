@@ -52,7 +52,7 @@ Classify the new speech into exactly one of these three categories:
 
 Answer with exactly one word: continuation, new_request, or noise.`;
 
-  const { baseUrl, model } = config.ollama.classifier;
+  const { baseUrl, model, numCtx } = config.ollama.classifier;
 
   try {
     const message = await ollamaChat(
@@ -61,7 +61,7 @@ Answer with exactly one word: continuation, new_request, or noise.`;
         model,
         messages: [{ role: "user", content: prompt }],
         think: false,
-        options: { temperature: 0.1, num_predict: 10 },
+        options: { temperature: 0.1, num_predict: 10, num_ctx: numCtx },
       },
       log,
     );
