@@ -13,14 +13,8 @@
 // pulled - this hits the network for real, unlike the rest of this repo's
 // fully-hermetic tests, which is why it's a script rather than a vitest case.
 //
-// Run via tsc + node, not ts-node: this codebase's internal imports use a
-// `.js` extension pointing at sibling `.ts` files (e.g. `./continuationCheck.js`).
-// tsc itself resolves that fine, but ts-node's CJS runtime hook does not - it
-// asks Node to require() a literal `./continuationCheck.js` that never
-// exists, failing with MODULE_NOT_FOUND (confirmed pre-existing and
-// repo-wide: `npm run dev`, i.e. plain `ts-node src/index.ts`, fails the
-// same way). Compiling first sidesteps this entirely, the same way the real
-// app actually runs (`npm run build && npm start`, never ts-node).
+// Compiled with tsc and run with node rather than ts-node: ts-node's CJS hook
+// can't resolve this codebase's `.js`-suffixed imports of `.ts` files.
 import "dotenv/config";
 import { classifyFollowUp, type FollowUpVerdict } from "../src/agent/continuationCheck.js";
 import { reloadConfig } from "../src/config.js";
@@ -87,13 +81,8 @@ function parseArgs(argv: string[]): { model: string; baseUrl: string } {
   return { model, baseUrl };
 }
 
-// Matches the fake FastifyBaseLogger used in tests/integration/agentLoop.test.ts,
-// but prints instead of discarding - useful to watch each call's own latency
-// live while a run is in progress, alongside the summary table at the end.
-// Also captures the model's raw response from the "Follow-up classification"
-// line, so a case can tell a genuinely recognized verdict apart from one that
-// only fell through to continuationCheck.ts's fail-closed default - see
-// isRecognizedVerdict below.
+// Prints each call as it happens, and captures the model's raw response so
+// isRecognizedVerdict can tell a real verdict from the fail-closed default.
 function createLogger() {
   let raw: string | undefined;
   const log: any = {
@@ -109,17 +98,8 @@ function createLogger() {
   return { log, getRaw: () => raw };
 }
 
-// continuationCheck.ts deliberately treats any unparseable model output as
-// "noise" (its own fail-closed default, not a bug - see its comment). That
-// means a "noise" expectation here could "pass" on a model that produced
-// complete garbage rather than one that actually said the right thing. This
-// mirrors continuationCheck.ts's own matching against the raw response (also
-// true, separately, of a network/validation failure, which never reaches the
-// "Follow-up classification" log line at all and so is correctly never
-// "recognized" either) - deliberately NOT changed in continuationCheck.ts
-// itself, since its fail-closed behavior is intentional production logic
-// outside this ticket's scope; the eval only needs its own copy to score
-// accuracy honestly.
+// classifyFollowUp maps unparseable output and failed calls to "noise", so
+// without this a garbage reply would pass every noise case.
 function isRecognizedVerdict(raw: string | undefined): boolean {
   if (raw === undefined) return false;
   return raw.includes("new_request") || raw.includes("new request") || raw.includes("continuation") || raw.includes("noise");
@@ -152,6 +132,13 @@ async function runCase(testCase: ClassifierCase): Promise<CaseResult> {
   };
 }
 
+// The first request pays for loading the model; keep that out of the latency figures.
+async function warmUpModel(): Promise<void> {
+  const [firstCase] = CASES;
+  const { log } = createLogger();
+  await classifyFollowUp(firstCase.lastUserMessage, firstCase.lastAssistantMessage, firstCase.newUtterance, log);
+}
+
 async function main(): Promise<void> {
   const { model, baseUrl } = parseArgs(process.argv.slice(2));
 
@@ -159,7 +146,10 @@ async function main(): Promise<void> {
   process.env.OLLAMA_CLASSIFIER_BASE_URL = baseUrl;
   reloadConfig();
 
-  console.log(`Evaluating classifier model "${model}" at ${baseUrl} against ${CASES.length} cases...\n`);
+  console.log(`Warming up "${model}" at ${baseUrl}...`);
+  await warmUpModel();
+
+  console.log(`\nEvaluating classifier model "${model}" at ${baseUrl} against ${CASES.length} cases...\n`);
 
   // Sequential, not parallel: production calls the classifier one turn at a
   // time against a single Ollama instance, so this measures the same
