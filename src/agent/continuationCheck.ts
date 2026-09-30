@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
 import { ollamaChat, OllamaError } from "../integrations/ollama/client.js";
 import { ValidationError } from "../util/validation.js";
+import type { Message } from "../integrations/ollama/types.js";
 
 // Deliberately independent of OLLAMA_BASE_URL/OLLAMA_MODEL (the main agent's
 // config) rather than falling back to them - once GPU routing sends the main
@@ -19,6 +20,37 @@ import { ValidationError } from "../util/validation.js";
 
 export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 
+export interface Exchange {
+  user: string;
+  assistant: string;
+}
+
+// Two, not just the last: a follow-up can refer back past a one-off question
+// in between. Most conversations are a single command, so often only one exists.
+export const CLASSIFIER_HISTORY_EXCHANGES = 2;
+
+// Long replies (search results, lists) would crowd out the new speech itself.
+const MAX_REPLY_CHARS = 300;
+
+/** The last finished user/assistant exchanges, oldest first, without tool traffic. */
+export function recentExchanges(messages: Message[], count = CLASSIFIER_HISTORY_EXCHANGES): Exchange[] {
+  const exchanges: Exchange[] = [];
+  let pendingUser: string | undefined;
+  for (const message of messages) {
+    if (message.role === "user") {
+      pendingUser = message.content;
+    } else if (message.role === "assistant" && message.content && !message.tool_calls?.length && pendingUser !== undefined) {
+      exchanges.push({ user: pendingUser, assistant: truncateReply(message.content) });
+      pendingUser = undefined;
+    }
+  }
+  return exchanges.slice(-count);
+}
+
+function truncateReply(reply: string): string {
+  return reply.length > MAX_REPLY_CHARS ? `${reply.slice(0, MAX_REPLY_CHARS)}...` : reply;
+}
+
 // Utterances picked up during the no-wake-word follow-up window (after any
 // response, continue_conversation stays open for a while) need 3-way
 // classification, not 2-way - collapsing "off-topic but a real request" and
@@ -28,31 +60,29 @@ export type FollowUpVerdict = "continuation" | "new_request" | "noise";
 // occasional reply to chatter, which the follow-up window rarely picks up.
 // Unparseable output and classifier failures still mean silence.
 export async function classifyFollowUp(
-  lastUserMessage: string,
-  lastAssistantMessage: string,
+  exchanges: Exchange[],
   newUtterance: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
-  // The user's last message supplies the topic to compare against; the
-  // assistant's line alone lets an open-ended reply "continue" into anything.
+  // The user's messages supply the topic to compare against; the assistant's
+  // line alone lets an open-ended reply "continue" into anything.
   // Addressee is decided before topic: judged by topic first, the model
   // treated any on-topic chatter or fragment as continuation.
   const prompt = `The assistant is a smart-home voice assistant: lights and lighting scenes, music, TV, timers, shopping lists and tasks, weather, and web search.
 
-Here is the most recent exchange between the assistant and a user:
-User said: "${lastUserMessage}"
-Assistant replied: "${lastAssistantMessage}"
+Here is the recent conversation between the assistant and a user, oldest first:
+${formatExchanges(exchanges)}
 New speech picked up by the microphone: "${newUtterance}"
 
 The microphone also picks up speech that is not meant for the assistant. Decide in this order:
 
 1. Is the new speech meant for the assistant? It is if any of these apply:
-   - It is a request or question the assistant could act on, on ANY topic - also one completely unrelated to the exchange above.
+   - It is a request or question the assistant could act on, on ANY topic - also one completely unrelated to the conversation above.
    - It answers, confirms, picks from, or corrects what the assistant just said or asked.
    - It is a short command adjusting what the assistant just did (e.g. "turn it up", "next", "stop").
    - It updates the assistant on the subject it just talked about (e.g. saying something is already done).
    Otherwise it is noise: talking to someone else, one side of a phone call or a conversation with another person, background chatter, a reaction or remark that asks the assistant for nothing (even on the same topic), a hesitation sound, an incomplete fragment, or "okay"/"yeah" when the assistant asked nothing.
-2. If it is meant for the assistant: continuation if it builds on the exchange above - the same specific topic or task, or it can only be understood with the exchange (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
+2. If it is meant for the assistant: continuation if it builds on the conversation above - the same specific topic or task, or it can only be understood with the conversation (it refers to something mentioned there); new_request if it is a different topic that makes sense on its own. A generic, open-ended assistant reply (e.g. "what can I do for you?", "still here") does not make the next thing continuation - a different topic is still new_request.
 
 Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
 
@@ -89,13 +119,12 @@ Answer in exactly this form: <category> <complexity>, for example: continuation 
     const complexity = parseComplexity(raw);
 
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict, complexity }, "Follow-up classification");
+    log.info({ model, exchanges, newUtterance, raw, verdict, complexity }, "Follow-up classification");
 
     return verdict;
   } catch (err) {
-    // Deliberately still "noise" rather than "new_request": responding to
-    // speech that was never aimed at Sakke is the worse failure, and staying
-    // quiet is recoverable by repeating the wake word. But an unreachable
+    // Still "noise": with no verdict at all, answering everything in the
+    // follow-up window blind is worse than silence. But an unreachable
     // classifier is an outage, not an ambiguous utterance - it silences every
     // follow-up for as long as it lasts, so it gets logged as an error rather
     // than a warning that blends into the noise.
@@ -111,6 +140,12 @@ Answer in exactly this form: <category> <complexity>, for example: continuation 
     }
     return "noise";
   }
+}
+
+function formatExchanges(exchanges: Exchange[]): string {
+  return exchanges
+    .map(({ user, assistant }) => `User said: "${user}"\nAssistant replied: "${assistant}"`)
+    .join("\n");
 }
 
 const MAX_COMPLEXITY = 100;

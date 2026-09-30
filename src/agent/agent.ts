@@ -3,7 +3,7 @@ import { executeTool, isRepeatable, isToolInProfile, toolsForProfile } from "../
 import { INFERENCE_PROFILES, type InferenceProfileName } from "../inference/profiles.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
 import { broadcastState, speakingDurationMs, type SakkeState } from "../features/display/displayState.js";
-import { classifyFollowUp, type FollowUpVerdict } from "./continuationCheck.js";
+import { classifyFollowUp, recentExchanges, type FollowUpVerdict } from "./continuationCheck.js";
 import { cleanForSpeech } from "./voiceText.js";
 import { getOllamaTarget } from "./ollamaRouter.js";
 import type { OllamaTargetConfig } from "../config.js";
@@ -160,9 +160,7 @@ function classifyContinuation(
   userMessage: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
-  const lastAssistantMessage = [...existing.messages].reverse().find(m => m.role === "assistant")?.content ?? "";
-  const lastUserMessage = [...existing.messages].reverse().find(m => m.role === "user")?.content ?? "";
-  return classifyFollowUp(lastUserMessage, lastAssistantMessage, userMessage, log);
+  return classifyFollowUp(recentExchanges(existing.messages), userMessage, log);
 }
 
 async function buildMessages(

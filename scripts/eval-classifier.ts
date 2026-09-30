@@ -16,24 +16,23 @@
 // Compiled with tsc and run with node rather than ts-node: ts-node's CJS hook
 // can't resolve this codebase's `.js`-suffixed imports of `.ts` files.
 import "dotenv/config";
-import { classifyFollowUp, type FollowUpVerdict } from "../src/agent/continuationCheck.js";
+import { CLASSIFIER_HISTORY_EXCHANGES, classifyFollowUp, type Exchange, type FollowUpVerdict } from "../src/agent/continuationCheck.js";
 import { reloadConfig } from "../src/config.js";
 
 interface ClassifierCase {
   // Where this case came from, so a failing case can be traced back to real
   // evidence rather than an arbitrary guess at what the model should do.
   source: string;
-  lastUserMessage: string;
-  lastAssistantMessage: string;
+  exchanges: Exchange[];
   newUtterance: string;
   expected: FollowUpVerdict;
 }
 
-// [source, lastUserMessage, lastAssistantMessage, newUtterance, expected] -
+// [source, lastUserMessage, lastAssistantMessage, newUtterance, expected, earlierExchange?] -
 // a tuple table rather than repeated object literals, since the identical
 // five-key shape repeated per case is exactly what a copy-paste detector
 // flags as duplication even though only the values differ.
-type ClassifierCaseRow = readonly [string, string, string, string, FollowUpVerdict];
+type ClassifierCaseRow = readonly [string, string, string, string, FollowUpVerdict, Exchange?];
 
 const CASE_ROWS: ClassifierCaseRow[] = [
   ["live log, 2026-09-28 (sakke-gateway)", "What's the time?", "It's 21:39, Monday, 28 September 2026.", "Do I have any tasks for today?", "new_request"],
@@ -66,13 +65,18 @@ const CASE_ROWS: ClassifierCaseRow[] = [
   // Multi-step requests, so the complexity spike has something high to rate.
   ["representative: multi-step planning request", "What's the weather like?", "Cloudy, 9 degrees, light rain this evening.", "Plan my evening: cook something with what's on my shopping list, then set a cozy scene for a movie.", "new_request"],
   ["representative: open-ended design request", "Turn off the living room lights.", "Living room lights are off.", "Design a warm autumn lighting scene for the whole house and tell me why you picked it.", "new_request"],
+
+  // The last exchange alone doesn't explain these; the one before it does.
+  ["representative: refers back past a one-off question", "What's the weather tomorrow?", "Sunny, high of 18 degrees.", "Add milk to that list too.", "continuation", { user: "Add eggs to the shopping list.", assistant: "Added eggs to the shopping list." }],
+  ["representative: returns to the music after a detour", "What's the weather like?", "Cloudy, 9 degrees, light rain this evening.", "skip this song", "continuation", { user: "Play something by Wintersun.", assistant: "Playing Wintersun's Time I." }],
+  ["representative: asks about an earlier timer", "Turn on the kitchen lights.", "Kitchen lights are on.", "how long is left on it?", "continuation", { user: "Set a timer for the pasta.", assistant: "Timer set for ten minutes." }],
+  ["representative: chatter about an earlier topic, to another person", "Turn off the living room lights.", "Living room lights are off.", "we should totally see them live next summer", "noise", { user: "Play something by Wintersun.", assistant: "Playing Wintersun's Time I." }],
 ];
 
 const CASES: ClassifierCase[] = CASE_ROWS.map(
-  ([source, lastUserMessage, lastAssistantMessage, newUtterance, expected]) => ({
+  ([source, lastUserMessage, lastAssistantMessage, newUtterance, expected, earlierExchange]) => ({
     source,
-    lastUserMessage,
-    lastAssistantMessage,
+    exchanges: [...(earlierExchange ? [earlierExchange] : []), { user: lastUserMessage, assistant: lastAssistantMessage }],
     newUtterance,
     expected,
   }),
@@ -82,6 +86,7 @@ interface EvalOptions {
   model: string;
   baseUrl: string;
   runs: number;
+  exchangeCount: number;
 }
 
 const DEFAULT_RUNS = 3;
@@ -113,7 +118,12 @@ function parseArgs(argv: string[]): EvalOptions {
     throw new Error(`--runs must be a positive integer, got "${flags.get("runs")}"`);
   }
 
-  return { model, baseUrl, runs };
+  const exchangeCount = Number(flags.get("exchanges") || CLASSIFIER_HISTORY_EXCHANGES);
+  if (!Number.isInteger(exchangeCount) || exchangeCount < 1) {
+    throw new Error(`--exchanges must be a positive integer, got "${flags.get("exchanges")}"`);
+  }
+
+  return { model, baseUrl, runs, exchangeCount };
 }
 
 // Prints only warnings and errors, and captures the model's raw response so
@@ -155,7 +165,7 @@ interface CaseResult {
 }
 
 async function main(): Promise<void> {
-  const { model, baseUrl, runs } = parseArgs(process.argv.slice(2));
+  const { model, baseUrl, runs, exchangeCount } = parseArgs(process.argv.slice(2));
 
   process.env.OLLAMA_CLASSIFIER_MODEL = model;
   process.env.OLLAMA_CLASSIFIER_BASE_URL = baseUrl;
@@ -164,8 +174,8 @@ async function main(): Promise<void> {
   console.log(`Warming up "${model}" at ${baseUrl}...`);
   await warmUpModel();
 
-  console.log(`Evaluating ${CASES.length} cases x ${runs} runs...\n`);
-  const results = await evaluateCases(runs);
+  console.log(`Evaluating ${CASES.length} cases x ${runs} runs, last ${exchangeCount} exchange(s) of history...\n`);
+  const results = await evaluateCases(runs, exchangeCount);
 
   printResults(results);
   const allPassed = results.every(result => result.outcomes.every(outcome => outcome.pass));
@@ -177,7 +187,7 @@ async function main(): Promise<void> {
 async function warmUpModel(): Promise<void> {
   const [firstCase] = CASES;
   const { log, getRaw } = createLogger();
-  await classifyFollowUp(firstCase.lastUserMessage, firstCase.lastAssistantMessage, firstCase.newUtterance, log);
+  await classifyFollowUp(firstCase.exchanges, firstCase.newUtterance, log);
   if (!isRecognizedVerdict(getRaw())) {
     throw new Error("Warm-up call got no usable verdict. Check that Ollama is reachable and the model is pulled.");
   }
@@ -185,22 +195,22 @@ async function warmUpModel(): Promise<void> {
 
 // Sequential, like production: one classifier call at a time against a single
 // Ollama, so the latency matches what a live conversation sees.
-async function evaluateCases(runs: number): Promise<CaseResult[]> {
+async function evaluateCases(runs: number, exchangeCount: number): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const testCase of CASES) {
     const outcomes: RunOutcome[] = [];
     for (let run = 0; run < runs; run++) {
-      outcomes.push(await runCase(testCase));
+      outcomes.push(await runCase(testCase, exchangeCount));
     }
     results.push({ testCase, outcomes });
   }
   return results;
 }
 
-async function runCase(testCase: ClassifierCase): Promise<RunOutcome> {
+async function runCase(testCase: ClassifierCase, exchangeCount: number): Promise<RunOutcome> {
   const startedAt = Date.now();
   const { log, getRaw, getComplexity } = createLogger();
-  const actual = await classifyFollowUp(testCase.lastUserMessage, testCase.lastAssistantMessage, testCase.newUtterance, log);
+  const actual = await classifyFollowUp(testCase.exchanges.slice(-exchangeCount), testCase.newUtterance, log);
 
   return {
     actual,
