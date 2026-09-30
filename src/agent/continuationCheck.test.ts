@@ -52,6 +52,10 @@ describe("isShortAnswerToQuestion", () => {
     expect(isShortAnswerToQuestion(question, "Yes please")).toBe(true);
   });
 
+  it("accepts an answer when the question isn't the reply's last sentence", () => {
+    expect(isShortAnswerToQuestion("The candle scene exists. Want me to activate it? Just say the word.", "yes")).toBe(true);
+  });
+
   it("ignores case, punctuation and extra spaces", () => {
     expect(isShortAnswerToQuestion(question, "  No,  thanks! ")).toBe(true);
     expect(isShortAnswerToQuestion(question, "Yeah, do it.")).toBe(true);

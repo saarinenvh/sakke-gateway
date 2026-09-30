@@ -47,17 +47,20 @@ export function recentExchanges(messages: Message[], count = CLASSIFIER_HISTORY_
   return exchanges.slice(-count);
 }
 
-// Short answers the model can misread as noise, trusted only right after the
-// assistant asked something. Compared lowercased and without punctuation.
+// Short answers the model can misread as noise, trusted only when the
+// assistant's last reply asked something. Compared lowercased and without
+// punctuation.
 const SHORT_ANSWERS: ReadonlySet<string> = new Set([
   "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please", "yes please", "sure thing", "of course",
   "do it", "yes do it", "yeah do it", "go ahead", "go for it",
   "no", "nope", "nah", "no thanks", "no thank you", "not now", "no need", "never mind",
 ]);
 
-/** A short yes/no-style answer right after the assistant asked a question. */
+/** A short yes/no-style answer to a reply that asked the user something. */
 export function isShortAnswerToQuestion(lastAssistantMessage: string, newUtterance: string): boolean {
-  return lastAssistantMessage.trim().endsWith("?") && SHORT_ANSWERS.has(normalizeUtterance(newUtterance));
+  // Anywhere, not only at the end: the persona often adds a quip after the
+  // question ("Want me to activate it? Just say the word.").
+  return lastAssistantMessage.includes("?") && SHORT_ANSWERS.has(normalizeUtterance(newUtterance));
 }
 
 function normalizeUtterance(utterance: string): string {
@@ -88,9 +91,10 @@ export async function classifyFollowUp(
 ): Promise<FollowUpVerdict> {
   // Decided without the model: the prompt can't be tuned to catch these
   // without breaking other verdicts.
-  const lastExchange = exchanges[exchanges.length - 1];
-  if (lastExchange && isShortAnswerToQuestion(lastExchange.assistant, newUtterance)) {
-    log.info({ exchanges, newUtterance, verdict: "continuation", decidedBy: "short-answer rule" }, "Follow-up classification");
+  const lastUserMessage = exchanges[exchanges.length - 1]?.user ?? "";
+  const lastAssistantMessage = exchanges[exchanges.length - 1]?.assistant ?? "";
+  if (isShortAnswerToQuestion(lastAssistantMessage, newUtterance)) {
+    log.info({ lastUserMessage, lastAssistantMessage, newUtterance, verdict: "continuation", decidedBy: "short-answer rule" }, "Follow-up classification");
     return "continuation";
   }
 
@@ -151,7 +155,7 @@ Answer in exactly this form: <category> <complexity>, for example: continuation 
     const complexity = parseComplexity(raw);
 
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ model, exchanges, newUtterance, raw, verdict, complexity }, "Follow-up classification");
+    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict, complexity }, "Follow-up classification");
 
     return verdict;
   } catch (err) {
