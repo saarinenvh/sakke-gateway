@@ -49,7 +49,9 @@ The microphone also picks up speech that is not meant for the assistant. Decide 
 
 If unsure whether it is meant for the assistant, answer noise.
 
-Answer with exactly one word: continuation, new_request, or noise.`;
+Also rate how complex the new speech would be for the assistant to handle, from 0 to 100: 0 is a trivial one-step command (turn on a light), 100 needs multi-step reasoning or planning.
+
+Answer in exactly this form: <category> <complexity>, for example: continuation 20`;
 
   const { baseUrl, model, numCtx } = config.ollama.classifier;
 
@@ -78,8 +80,11 @@ Answer with exactly one word: continuation, new_request, or noise.`;
       ? "continuation"
       : "noise";
 
+    // Spike: logged only, nothing routes on it yet (Trello vfQtPvsD).
+    const complexity = parseComplexity(raw);
+
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict }, "Follow-up classification");
+    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict, complexity }, "Follow-up classification");
 
     return verdict;
   } catch (err) {
@@ -101,4 +106,14 @@ Answer with exactly one word: continuation, new_request, or noise.`;
     }
     return "noise";
   }
+}
+
+const MAX_COMPLEXITY = 100;
+
+// Undefined rather than a guess when the model gives no usable number.
+function parseComplexity(raw: string): number | undefined {
+  const match = raw.match(/\b(\d{1,3})\b/);
+  if (!match) return undefined;
+  const complexity = Number(match[1]);
+  return complexity <= MAX_COMPLEXITY ? complexity : undefined;
 }

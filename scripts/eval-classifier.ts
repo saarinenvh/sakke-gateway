@@ -62,6 +62,10 @@ const CASE_ROWS: ClassifierCaseRow[] = [
   ["representative: speech addressed to another person", "Add milk to the shopping list.", "Added milk to the shopping list.", "Honey, can you get the door?", "noise"],
   ["representative: one side of a phone call", "What's the weather like?", "Clear sky, 12 degrees.", "Yeah, I'll be there around six, see you.", "noise"],
   ["representative: on-topic reaction to music, not a request", "Play something by Wintersun.", "Playing Wintersun's Time I.", "oh man, this album brings back memories", "noise"],
+
+  // Multi-step requests, so the complexity spike has something high to rate.
+  ["representative: multi-step planning request", "What's the weather like?", "Cloudy, 9 degrees, light rain this evening.", "Plan my evening: cook something with what's on my shopping list, then set a cozy scene for a movie.", "new_request"],
+  ["representative: open-ended design request", "Turn off the living room lights.", "Living room lights are off.", "Design a warm autumn lighting scene for the whole house and tell me why you picked it.", "new_request"],
 ];
 
 const CASES: ClassifierCase[] = CASE_ROWS.map(
@@ -116,16 +120,19 @@ function parseArgs(argv: string[]): EvalOptions {
 // isRecognizedVerdict can tell a real verdict from the fail-closed default.
 function createLogger() {
   let raw: string | undefined;
+  let complexity: number | undefined;
   const log: any = {
     info: (obj: Record<string, unknown>, msg: string) => {
-      if (msg === "Follow-up classification" && typeof obj.raw === "string") raw = obj.raw;
+      if (msg !== "Follow-up classification") return;
+      if (typeof obj.raw === "string") raw = obj.raw;
+      if (typeof obj.complexity === "number") complexity = obj.complexity;
     },
     warn: (obj: Record<string, unknown>, msg: string) => console.warn(`  [warn] ${msg}`, obj),
     error: (obj: Record<string, unknown>, msg: string) => console.error(`  [error] ${msg}`, obj),
     debug: () => {},
     child: () => log,
   };
-  return { log, getRaw: () => raw };
+  return { log, getRaw: () => raw, getComplexity: () => complexity };
 }
 
 // classifyFollowUp maps unparseable output and failed calls to "noise", so
@@ -137,6 +144,7 @@ function isRecognizedVerdict(raw: string | undefined): boolean {
 
 interface RunOutcome {
   actual: FollowUpVerdict;
+  complexity: number | undefined;
   pass: boolean;
   durationMs: number;
 }
@@ -191,11 +199,12 @@ async function evaluateCases(runs: number): Promise<CaseResult[]> {
 
 async function runCase(testCase: ClassifierCase): Promise<RunOutcome> {
   const startedAt = Date.now();
-  const { log, getRaw } = createLogger();
+  const { log, getRaw, getComplexity } = createLogger();
   const actual = await classifyFollowUp(testCase.lastUserMessage, testCase.lastAssistantMessage, testCase.newUtterance, log);
 
   return {
     actual,
+    complexity: getComplexity(),
     pass: isRecognizedVerdict(getRaw()) && actual === testCase.expected,
     durationMs: Date.now() - startedAt,
   };
@@ -209,6 +218,7 @@ function printResults(results: CaseResult[]): void {
       expected: testCase.expected,
       verdicts: summarizeVerdicts(outcomes),
       passed: `${countPasses(outcomes)}/${outcomes.length}`,
+      complexity: outcomes.map(outcome => outcome.complexity ?? "-").join(" "),
     })),
   );
 
