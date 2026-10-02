@@ -36,6 +36,7 @@ export const INFERENCE_PROFILES = {
       "set_gaming_mode",
       "get_calendar",
       "vacuum",
+      "coffee",
     ],
     contextOwner: "gateway",
   },
@@ -46,6 +47,11 @@ export const INFERENCE_PROFILES = {
   },
   // The tidiness coach asking whether to clean. Never acts.
   tidiness_nag: {
+    tools: [],
+    contextOwner: "caller",
+  },
+  // The morning wake-up's spoken good morning on the phone. Never acts.
+  morning_greeting: {
     tools: [],
     contextOwner: "caller",
   },

@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { config } from "../../config.js";
 import { callService } from "../../integrations/homeAssistant/client.js";
 import { showSpeakingWhile } from "../display/displayState.js";
+import { withTimeout } from "../../util/async.js";
 
 // How Sakke would say a message, in its own voice. Injected at startup
 // (index.ts) rather than imported: writing it needs the agent, and the agent
@@ -42,7 +43,7 @@ export async function announce(message: string, log: FastifyBaseLogger): Promise
 
 async function prepareAnnouncement(message: string, log: FastifyBaseLogger): Promise<Announcement> {
   try {
-    const spoken = (await withTimeout(writeWording(message), WORDING_TIMEOUT_MS)).trim();
+    const spoken = (await withTimeout(writeWording(message), WORDING_TIMEOUT_MS, "wording")).trim();
     if (spoken) return { spoken, wording: "generated" };
     log.warn({ message }, "Announcement wording came back empty, speaking the message as it is");
   } catch (err) {
@@ -59,13 +60,4 @@ async function speakOnSatellite(text: string): Promise<void> {
     { entity_id: config.ha.satelliteEntityId, message: text },
     { timeoutMs: SATELLITE_ANNOUNCE_TIMEOUT_MS },
   ));
-}
-
-// The losing promise keeps running; only its result is ignored.
-function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`no wording within ${timeoutMs} ms`)), timeoutMs);
-  });
-  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }

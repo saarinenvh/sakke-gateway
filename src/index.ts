@@ -15,6 +15,10 @@ import { JobRepository } from "./features/scheduling/jobRepository.js";
 import { importLegacyTimers } from "./features/scheduling/legacyTimers.js";
 import { startScheduler } from "./features/scheduling/scheduler.js";
 import { isSchedulable, runScheduledCall } from "./tools/registry.js";
+import { MorningRepository } from "./features/morning/morningRepository.js";
+import { setCoffeeAnswerStore } from "./features/morning/coffee.js";
+import { startMorningCoach } from "./features/morning/coach.js";
+import { createLiveMorningDeps } from "./features/morning/liveDeps.js";
 
 const app = buildApp();
 
@@ -55,11 +59,22 @@ async function startScheduling(dataSource: DataSource): Promise<void> {
   });
 }
 
+// The morning wake-up keeps all its state in the database, so it only starts
+// once that is connected: until then it does nothing.
+function startMorning(dataSource: DataSource): void {
+  const morning = new MorningRepository(dataSource);
+  setCoffeeAnswerStore(morning);
+  startMorningCoach(createLiveMorningDeps(morning));
+}
+
 // Not awaited: the gateway serves requests while the database is still
 // connecting, or unreachable. A missing config is already a reported problem.
 if (config.database) {
   void connectDatabase(createDataSource(config.database), DATABASE_RETRY_DELAY_MS)
-    .then(startScheduling)
+    .then(async dataSource => {
+      startMorning(dataSource);
+      await startScheduling(dataSource);
+    })
     .catch(err => app.log.error({ err: err instanceof Error ? err.message : String(err) }, "Scheduling failed to start, unavailable until restart"));
 }
 

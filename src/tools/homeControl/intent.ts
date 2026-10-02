@@ -4,10 +4,7 @@ export type SceneAction = "scene_activate" | "scene_create" | "scene_design";
 export type SwitchAction = "switch_on" | "switch_off";
 export type UnknownAction = "unknown";
 
-// Routines are HA scripts, run through the run_routine tool - deliberately
-// not actions here. There used to be hardcoded morning_routine/bedtime_routine
-// actions doing something different from the scripts of the same name that the
-// system prompt points at, for the same spoken phrase.
+// Routines are HA scripts, run through the run_routine tool, not actions here.
 export type IntentAction = LightAction | MediaAction | SceneAction | SwitchAction | UnknownAction;
 
 export interface Intent {

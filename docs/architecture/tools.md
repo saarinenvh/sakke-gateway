@@ -69,6 +69,7 @@ classification and model limits to the same profiles.
 | `sakke` | conversations (`/v1/chat/completions`) | every tool except `announce` | gateway |
 | `announcement` | wording an announcement | none | caller |
 | `tidiness_nag` | the tidiness coach's question | none | caller |
+| `morning_greeting` | the morning wake-up's good morning on the phone | none | caller |
 
 - **Named after the caller or the act**, not the kind of work. The bot's
   profiles will be named the same way (e.g. `telegram`, `sakariheitaja`) when it

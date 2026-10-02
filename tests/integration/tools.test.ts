@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { reloadConfig } from "../../src/config.js";
+import { setCoffeeAnswerStore } from "../../src/features/morning/coffee.js";
 
 // The tool layer's Home Assistant paths - TV control, device state, routines.
 // Written against executeTool(name, args, log, conversationId) deliberately:
@@ -117,6 +118,22 @@ describe("tv_send_text", () => {
   });
 });
 
+describe("coffee", () => {
+  // Runs before any store is set: the database hasn't connected yet.
+  it("says it can't record the answer before the database is connected", async () => {
+    expect(await run("coffee", { action: "set_loaded", loaded: true })).toContain("isn't available");
+  });
+
+  it("records whether the coffee maker is loaded", async () => {
+    const saved: boolean[] = [];
+    setCoffeeAnswerStore({ saveCoffeeAnswer: async loaded => { saved.push(loaded); } });
+
+    expect(await run("coffee", { action: "set_loaded", loaded: true })).toContain("starts with the morning alarm");
+    expect(await run("coffee", { action: "set_loaded", loaded: false })).toContain("stays off");
+    expect(saved).toEqual([true, false]);
+  });
+});
+
 describe("error handling", () => {
   it("returns a tool error string rather than throwing, so the loop can continue", async () => {
     // Every tool result goes back into the conversation; a thrown error would
@@ -141,7 +158,7 @@ describe("registry", () => {
     // silently possible.
     const { tools, toolNames } = await import("../../src/tools/registry.js");
     expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
-    expect(tools).toHaveLength(19);
+    expect(tools).toHaveLength(20);
   });
 });
 
@@ -156,10 +173,11 @@ describe("inference profiles", () => {
     expect(offered.sort()).toEqual(toolNames().filter(name => !SCHEDULER_ONLY.includes(name)).sort());
   });
 
-  it("offers an announcement and the tidiness nag no tools at all", async () => {
+  it("offers an announcement, the tidiness nag and the morning greeting no tools at all", async () => {
     const { toolsForProfile } = await import("../../src/tools/registry.js");
     expect(toolsForProfile("announcement")).toEqual([]);
     expect(toolsForProfile("tidiness_nag")).toEqual([]);
+    expect(toolsForProfile("morning_greeting")).toEqual([]);
   });
 
   it("keeps the registry's order, which is what the model is used to", async () => {

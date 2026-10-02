@@ -16,6 +16,7 @@ import { scheduleTool } from "./schedule/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
 import { vacuumTool } from "./vacuum/tool.js";
 import { announceTool } from "./announce/tool.js";
+import { coffeeTool } from "./coffee/tool.js";
 
 // Every tool, in the order the model is shown them. Which ones a request may
 // use is its profile's choice (inference/profiles.ts). The order is what the
@@ -40,6 +41,7 @@ const ALL: Tool[] = [
   getCalendarTool,
   vacuumTool,
   announceTool,
+  coffeeTool,
 ];
 
 const byName = new Map<string, Tool>();

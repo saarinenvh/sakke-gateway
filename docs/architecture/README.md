@@ -46,8 +46,9 @@ flowchart TD
    returned. The display is told what Sakke is doing throughout.
 
 Proactive speech takes other paths: the tidiness coach asks through
-`assist_satellite.start_conversation`, and announcements go through
-`features/announcements/`, used by timers and scheduled jobs.
+`assist_satellite.start_conversation`, announcements go through
+`features/announcements/`, used by timers and scheduled jobs, and the morning
+wake-up speaks a phone notification (`integrations/homeAssistant/phone.ts`).
 
 ## Modules
 
@@ -86,21 +87,23 @@ src/
 │   ├── registry.ts       # the one tool list, and the one try/catch
 │   ├── types.ts
 │   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
-│       schedule/  tv/  wiki/  gpu/  vacuum/  announce/
+│       schedule/  tv/  wiki/  gpu/  vacuum/  announce/  coffee/
 │                         # each with feature.ts, tool.ts, prompt.ts as needed -
 │                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
 ├── features/
-│   └── scenes/  display/  gpu/  tidiness/  announcements/  scheduling/
+│   └── scenes/  display/  gpu/  tidiness/  announcements/  scheduling/  morning/
 │                         # feature modules with their own routes/logic,
 │                         # but not in tools/registry.ts - nothing the model
 │                         # calls directly (gpu/ here is gpuStatus.ts + the
 │                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
 │                         # tidiness/ is the cleaning coach's schedule, state and tick;
-│                         # scheduling/ owns scheduled_job: entity, repository, scheduler)
+│                         # scheduling/ owns scheduled_job: entity, repository, scheduler;
+│                         # morning/ is the alarm wake-up: policy, tick, and its two tables)
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
 │   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
+│   ├── homeAssistant/phone.ts     # spoken notifications on the phone (Companion app)
 │   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
 └── …
 ```
@@ -134,7 +137,8 @@ and the database.
 3. Starts connecting to the database in the background; it retries every 30 s
    and runs pending migrations once connected. Then it imports any timers left
    in `timers.json` and starts the scheduler, which arms every pending job.
-   Until then, scheduling reports itself unavailable.
+   Until then, scheduling reports itself unavailable. The morning wake-up
+   starts at the same point, since all its state is in the database.
 4. Restores the tidiness coach's state and starts it.
 5. Loads the Home Assistant entity registry, and listens whether or not that
    worked.

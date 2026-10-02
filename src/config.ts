@@ -68,6 +68,26 @@ export interface TidinessConfig {
   snoozeHours: number;
 }
 
+export interface MorningConfig {
+  // Off by default: the wake-up acts on the home unprompted.
+  enabled: boolean;
+  // The phone's next-alarm sensor (HA Companion app).
+  alarmSensorEntityId: string | undefined;
+  // Only alarms set by this app count, so another app's reminders can't wake the house.
+  alarmPackage: string;
+  // Nothing happens unless this reads "home". Unset means never.
+  presenceEntityId: string | undefined;
+  wakeScriptEntityId: string;
+  // Unset: no coffee step.
+  coffeeSwitchEntityId: string | undefined;
+  // The phone's notify service, without the "notify." domain. Unset: no phone greeting.
+  phoneNotifyService: string | undefined;
+  // An alarm found this long after it rang still wakes the house; later, it's let go.
+  alarmGraceMinutes: number;
+  // A coffee answer counts for the next wake-up only within this window.
+  coffeeAnswerHours: number;
+}
+
 // The gateway's own database on the MariaDB server. Null when GATEWAY_DB_HOST
 // is unset: the gateway still runs, but anything that needs the database, such
 // as scheduling, reports itself unavailable.
@@ -109,6 +129,7 @@ export interface Config {
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
   tidiness: TidinessConfig;
+  morning: MorningConfig;
   database: DatabaseConfig | null;
   // Anything missing or implausible, collected rather than thrown. index.ts
   // logs these at startup. Deliberately not fatal: this service already starts
@@ -156,6 +177,7 @@ function loadConfig(): Config {
     : null;
 
   const tidiness = loadTidinessConfig(problems);
+  const morning = loadMorningConfig(problems);
   const database = loadDatabaseConfig(problems);
 
   const classifierBaseUrl = env("OLLAMA_CLASSIFIER_BASE_URL");
@@ -204,6 +226,7 @@ function loadConfig(): Config {
       lon: env("WEATHER_LON") ?? "24.7339",
     },
     tidiness,
+    morning,
     database,
     problems,
   };
@@ -250,6 +273,32 @@ function loadTidinessConfig(problems: string[]): TidinessConfig {
     askTimes: parseAskTimes(env("TIDINESS_ASK_TIMES") ?? DEFAULT_ASK_TIMES, problems),
     minRunMinutes: num("TIDINESS_MIN_RUN_MINUTES", 10),
     snoozeHours: num("TIDINESS_SNOOZE_HOURS", 24),
+  };
+}
+
+const DEFAULT_ALARM_PACKAGE = "com.google.android.deskclock";
+
+function loadMorningConfig(problems: string[]): MorningConfig {
+  const enabled = bool("MORNING_ENABLED") ?? false;
+  const alarmSensorEntityId = env("MORNING_ALARM_SENSOR");
+  const presenceEntityId = env("MORNING_PRESENCE_ENTITY_ID");
+  if (enabled && alarmSensorEntityId === undefined) {
+    problems.push("MORNING_ALARM_SENSOR is not set - the morning wake-up is enabled but no alarm will ever wake the house");
+  }
+  if (enabled && presenceEntityId === undefined) {
+    problems.push("MORNING_PRESENCE_ENTITY_ID is not set - the morning wake-up is enabled but will never run");
+  }
+
+  return {
+    enabled,
+    alarmSensorEntityId,
+    alarmPackage: env("MORNING_ALARM_PACKAGE") ?? DEFAULT_ALARM_PACKAGE,
+    presenceEntityId,
+    wakeScriptEntityId: env("MORNING_WAKE_SCRIPT") ?? "script.morning_routine",
+    coffeeSwitchEntityId: env("MORNING_COFFEE_SWITCH"),
+    phoneNotifyService: env("MORNING_PHONE_NOTIFY_SERVICE"),
+    alarmGraceMinutes: num("MORNING_ALARM_GRACE_MINUTES", 10),
+    coffeeAnswerHours: num("MORNING_COFFEE_ANSWER_HOURS", 18),
   };
 }
 

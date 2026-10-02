@@ -5,7 +5,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 ## Features
 
 - **Multi-turn agent** — conversation history per session, follow-up questions work naturally
-- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 18 tools, each owned by the feature it belongs to
+- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 20 tools, each owned by the feature it belongs to
 - **Follow-up classification** — a second, deliberately small model decides whether the next utterance is a continuation, an unrelated new request, or room noise. Noise gets silence: when Sakke has to guess, it fails quiet
 - **GPU routing** — inference goes to the dev PC's GPU while it's idle and falls back to the server's own Ollama otherwise. Decided once per turn, and fails closed — "busy" and "unknown" both mean the server
 - **Home control** — lights, scenes, switches, media via the Home Assistant API
@@ -18,6 +18,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
+- **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
 - **Web search** — SearXNG with Brave as the backing engine
 - **Google Tasks / Calendar** — query tasks and events by voice, via HA's todo and calendar integrations
@@ -51,6 +52,7 @@ request may use is its profile's choice. How that fits together:
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
 | `vacuum` | `tools/vacuum/` | Start / stop / dock / status, plus answers to a cleaning reminder |
+| `coffee` | `tools/coffee/` | Record whether the coffee maker is loaded for the morning wake-up |
 | `announce` | `tools/announce/` | Speak a message on the satellite in Sakke's words. In no profile: only the scheduler runs it |
 
 ## Routes
@@ -60,7 +62,6 @@ request may use is its profile's choice. How that fits together:
 | POST | `/v1/chat/completions` | Main agent endpoint (OpenAI-compatible). Optional `extra_system_prompt` is added to that turn - how a satellite-initiated question's answer knows what it answers |
 | POST | `/scene` | AI-powered scene designer |
 | POST | `/scene/save` | Save current light state as a scene |
-| GET | `/reminders/morning` | Morning greeting with tasks + calendar (for HA automations) |
 | GET | `/reminders/check` | Pending tasks check — returns null if all done (for HA automations) |
 | GET | `/display` | Tablet animation display (idle/listening/thinking/speaking orb) |
 | GET | `/display/events` | SSE stream of state changes for the display |
@@ -113,6 +114,7 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
 | Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
 | Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
+| Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything
