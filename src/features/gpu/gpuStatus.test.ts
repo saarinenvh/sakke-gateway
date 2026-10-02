@@ -50,10 +50,40 @@ describe("auto-detected state", () => {
   });
 });
 
-// The asymmetry here is deliberate and is the whole safety property: a false
-// "busy" costs one missed routing cycle, a false "available" sends inference to
-// a PC that is mid-game. It crashed the PC once. Nothing but a comment held it
-// in place before these tests.
+// A false "busy" costs one missed routing cycle; a false "available" sends
+// inference to a PC that is mid-game.
+describe("last input on the PC", () => {
+  it("is unknown until a push reports idle time", () => {
+    gpu.recordGpuStatus({ state: "available" });
+    expect(gpu.getGpuStatus().lastInputAt).toBeNull();
+  });
+
+  it("is the push time minus the reported idle time", () => {
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 90 });
+    expect(gpu.getGpuStatus().lastInputAt).toBe("2026-09-25T11:58:30.000Z");
+  });
+
+  it("keeps the last known time when a later push has no idle time", () => {
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 30 });
+    vi.advanceTimersByTime(20_000);
+    gpu.recordGpuStatus({ state: "busy" });
+    expect(gpu.getGpuStatus().lastInputAt).toBe("2026-09-25T11:59:30.000Z");
+  });
+
+  it("moves forward when input resumes", () => {
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 3600 });
+    vi.advanceTimersByTime(20_000);
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 1 });
+    expect(gpu.getGpuStatus().lastInputAt).toBe("2026-09-25T12:00:19.000Z");
+  });
+
+  it("is still reported when the status has gone stale", () => {
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 0 });
+    vi.advanceTimersByTime(60_000);
+    expect(gpu.getGpuStatus()).toMatchObject({ state: "unknown", lastInputAt: "2026-09-25T12:00:00.000Z" });
+  });
+});
+
 describe("manual override", () => {
   it("'gaming' forces busy even while the PC is reporting available", () => {
     gpu.recordGpuStatus({ state: "available" });

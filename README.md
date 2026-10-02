@@ -65,7 +65,7 @@ request may use is its profile's choice. How that fits together:
 | GET | `/display` | Tablet animation display (idle/listening/thinking/speaking orb) |
 | GET | `/display/events` | SSE stream of state changes for the display |
 | GET, POST | `/display/state` | Read or push a display state change |
-| GET, POST | `/internal/gpu-status` | The PC pushes its GPU status here; GET reports what's currently known |
+| GET, POST | `/internal/gpu-status` | The PC pushes its GPU status and idle time here; GET reports what's currently known, including `lastInputAt` |
 | GET | `/health` | Healthcheck |
 
 ## Architecture
