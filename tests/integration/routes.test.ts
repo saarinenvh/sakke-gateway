@@ -57,6 +57,22 @@ describe("POST /internal/gpu-status", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("accepts a push with the PC's idle time", async () => {
+    const res = await app.inject({
+      method: "POST", url: "/internal/gpu-status", payload: { state: "available", idleSeconds: 12.5, heartbeat: true },
+    });
+    expect(res.statusCode).toBe(200);
+    const status = await app.inject({ method: "GET", url: "/internal/gpu-status" });
+    expect(status.json().lastInputAt).toEqual(expect.any(String));
+  });
+
+  it.each([-1, "12", null, Number.POSITIVE_INFINITY])("rejects an invalid idle time: %o", async (idleSeconds) => {
+    const res = await app.inject({
+      method: "POST", url: "/internal/gpu-status", payload: { state: "available", idleSeconds },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("rejects a push with no body as a bad request, not a server error", async () => {
     const res = await app.inject({ method: "POST", url: "/internal/gpu-status" });
     expect(res.statusCode).toBe(400);
