@@ -70,6 +70,7 @@ classification and model limits to the same profiles.
 | `announcement` | wording an announcement | none | caller |
 | `tidiness_nag` | the tidiness coach's question | none | caller |
 | `morning_greeting` | the morning wake-up's good morning on the phone | none | caller |
+| `morning_brief` | the day summary on the satellite | none | caller |
 
 - **Named after the caller or the act**, not the kind of work. The bot's
   profiles will be named the same way (e.g. `telegram`, `sakariheitaja`) when it

@@ -47,8 +47,9 @@ flowchart TD
 
 Proactive speech takes other paths: the tidiness coach asks through
 `assist_satellite.start_conversation`, announcements go through
-`features/announcements/`, used by timers and scheduled jobs, and the morning
-wake-up speaks a phone notification (`integrations/homeAssistant/phone.ts`).
+`features/announcements/`, used by timers and scheduled jobs, the morning
+wake-up speaks a phone notification (`integrations/homeAssistant/phone.ts`), and
+the morning brief speaks already-worded text on the satellite.
 
 ## Modules
 
@@ -98,7 +99,8 @@ src/
 │                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
 │                         # tidiness/ is the cleaning coach's schedule, state and tick;
 │                         # scheduling/ owns scheduled_job: entity, repository, scheduler;
-│                         # morning/ is the alarm wake-up: policy, tick, and its two tables)
+│                         # morning/ is the alarm wake-up (wakeUp.ts) and the day summary
+│                         # at the first PC input (brief.ts): policy, ticks, and three tables)
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
 │   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
@@ -121,9 +123,10 @@ and the database.
   owns the data. See [tools.md](tools.md).
 - **Features don't import tools or the agent.** Where a feature needs the
   agent (announcement wording) or the tool registry (running a scheduled
-  call), `index.ts` injects it at startup: `setWordingWriter`, and the
-  scheduler's `JobRunner` and schedulability check. The agent imports every
-  tool, so a direct import would close a cycle.
+  call), `index.ts` injects it at startup: `setWordingWriter`, the
+  scheduler's `JobRunner` and schedulability check, and the morning brief's
+  calendar, task and weather readers. The agent imports every tool, so a
+  direct import would close a cycle.
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
   their own timeouts and error types. Responses are validated with Zod.
@@ -138,7 +141,7 @@ and the database.
    and runs pending migrations once connected. Then it imports any timers left
    in `timers.json` and starts the scheduler, which arms every pending job.
    Until then, scheduling reports itself unavailable. The morning wake-up
-   starts at the same point, since all its state is in the database.
+   and brief start at the same point, since all their state is in the database.
 4. Restores the tidiness coach's state and starts it.
 5. Loads the Home Assistant entity registry, and listens whether or not that
    worked.

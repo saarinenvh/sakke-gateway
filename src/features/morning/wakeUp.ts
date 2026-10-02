@@ -204,7 +204,7 @@ function errorMessage(err: unknown): string {
 const TICK_INTERVAL_MS = 30_000;
 
 // Ticks never overlap.
-export function startMorningCoach(deps: MorningDeps): void {
+export function startMorningWakeUp(deps: MorningDeps): void {
   let running = false;
   const tick = async (): Promise<void> => {
     if (running) return;

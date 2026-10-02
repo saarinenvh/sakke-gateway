@@ -18,7 +18,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
-- **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded
+- **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded. Later, on the first PC input after waking (after the watch's wake time on a day without an alarm), Sakke tells the satellite "you actually got up" with today's calendar, tasks and weather, in a structure that changes from day to day
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
 - **Web search** — SearXNG with Brave as the backing engine
 - **Google Tasks / Calendar** — query tasks and events by voice, via HA's todo and calendar integrations
@@ -114,7 +114,7 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
 | Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
 | Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
-| Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS` |
+| Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS`, `MORNING_WAKE_TIME_SENSOR`, `MORNING_BRIEF_MIN_DELAY_MINUTES`, `MORNING_BRIEF_CUTOFF` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything

@@ -1,4 +1,4 @@
-import type { CoffeeNews } from "./policy.js";
+import type { CoffeeNews, MorningStart } from "./policy.js";
 
 const COFFEE_FACTS: Record<CoffeeNews, string> = {
   brewing: "The coffee maker was loaded last night and is brewing now.",
@@ -26,4 +26,53 @@ export function buildGreetingRequest(coffee: CoffeeNews): string {
 
 export function fallbackGreeting(coffee: CoffeeNews): string {
   return FALLBACK_GREETINGS[coffee];
+}
+
+// --- The day summary ------------------------------------------------------------
+
+export interface DayFacts {
+  calendar: string;
+  tasks: string;
+  weather: string;
+}
+
+export interface BriefFacts {
+  day: DayFacts;
+  start: MorningStart;
+  timezone: string;
+  structureHint: string;
+  yesterdayBrief: string | null;
+}
+
+// One is picked per day in code: left alone, a small model repeats one shape.
+export const STRUCTURE_HINTS = [
+  "Lead with the weather, then what's on the calendar, then the tasks.",
+  "Lead with the earliest or biggest thing on the calendar, then fill in the rest.",
+  "Open with a one-line verdict on the day ahead, then the details.",
+  "Lead with the tasks, as if they've been waiting for the owner, then the calendar and the weather.",
+  "Tie the weather to what the day's plans mean, and end on the tasks.",
+] as const;
+
+export function buildBriefRequest(facts: BriefFacts): string {
+  return [
+    `${describeStart(facts.start, facts.timezone)} They have just sat down at the PC, with coffee.`,
+    "You already said good morning on their phone. Now, out loud on the speaker, open by noting they actually got up, then brief them on the day.",
+    `Facts. ${facts.day.calendar} ${facts.day.tasks} Weather: ${facts.day.weather.replace(/\n/g, "; ")}.`,
+    `Structure: ${facts.structureHint}`,
+    facts.yesterdayBrief ? `Yesterday you said: "${facts.yesterdayBrief}" Don't open the same way.` : "",
+    "Keep it to a few spoken sentences, mention only these facts, and ask nothing. Write only what you'll say. Do not call any tools.",
+  ].filter(Boolean).join(" ");
+}
+
+// Spoken when the model can't write the brief.
+export function fallbackBrief(day: DayFacts): string {
+  const conditions = day.weather.split("\n").slice(0, 2).join(", ");
+  return `Good, you're up. ${day.calendar} ${day.tasks} ${conditions}.`;
+}
+
+function describeStart(start: MorningStart, timezone: string): string {
+  const time = new Date(start.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
+  return start.source === "alarm"
+    ? `The owner's alarm rang at ${time}.`
+    : `The owner's watch says they woke at ${time}.`;
 }

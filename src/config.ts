@@ -86,6 +86,12 @@ export interface MorningConfig {
   alarmGraceMinutes: number;
   // A coffee answer counts for the next wake-up only within this window.
   coffeeAnswerHours: number;
+  // The watch's wake-time sensor: when the owner woke, on a day without an alarm.
+  wakeTimeSensorEntityId: string | undefined;
+  // PC input this soon after the morning starts doesn't count as being up.
+  briefMinDelayMinutes: number;
+  // No day summary from this local time on.
+  briefCutoff: LocalTime;
 }
 
 // The gateway's own database on the MariaDB server. Null when GATEWAY_DB_HOST
@@ -299,23 +305,43 @@ function loadMorningConfig(problems: string[]): MorningConfig {
     phoneNotifyService: env("MORNING_PHONE_NOTIFY_SERVICE"),
     alarmGraceMinutes: num("MORNING_ALARM_GRACE_MINUTES", 10),
     coffeeAnswerHours: num("MORNING_COFFEE_ANSWER_HOURS", 18),
+    wakeTimeSensorEntityId: env("MORNING_WAKE_TIME_SENSOR"),
+    briefMinDelayMinutes: num("MORNING_BRIEF_MIN_DELAY_MINUTES", 5),
+    briefCutoff: parseBriefCutoff(env("MORNING_BRIEF_CUTOFF"), problems),
   };
+}
+
+const DEFAULT_BRIEF_CUTOFF: LocalTime = { hour: 12, minute: 0 };
+
+function parseBriefCutoff(raw: string | undefined, problems: string[]): LocalTime {
+  if (raw === undefined) return DEFAULT_BRIEF_CUTOFF;
+  const cutoff = parseLocalTime(raw);
+  if (cutoff !== undefined) return cutoff;
+  problems.push(`MORNING_BRIEF_CUTOFF "${raw}" is not an HH:MM time - using 12:00`);
+  return DEFAULT_BRIEF_CUTOFF;
 }
 
 // "10:00,18:00" -> sorted times; a malformed list falls back to the default.
 function parseAskTimes(raw: string, problems: string[]): LocalTime[] {
   const times: LocalTime[] = [];
   for (const part of raw.split(",")) {
-    const match = part.trim().match(/^(\d{1,2}):(\d{2})$/);
-    const hour = Number(match?.[1]);
-    const minute = Number(match?.[2]);
-    if (!match || hour > 23 || minute > 59) {
+    const time = parseLocalTime(part);
+    if (time === undefined) {
       problems.push(`TIDINESS_ASK_TIMES "${raw}" is not a list of HH:MM times - using ${DEFAULT_ASK_TIMES}`);
       return parseAskTimes(DEFAULT_ASK_TIMES, problems);
     }
-    times.push({ hour, minute });
+    times.push(time);
   }
   return times.sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
+}
+
+// "07:30" -> { hour: 7, minute: 30 }; undefined unless a valid HH:MM.
+function parseLocalTime(raw: string): LocalTime | undefined {
+  const match = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
+  const hour = Number(match?.[1]);
+  const minute = Number(match?.[2]);
+  if (!match || hour > 23 || minute > 59) return undefined;
+  return { hour, minute };
 }
 
 export const config: Config = loadConfig();

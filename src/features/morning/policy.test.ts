@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { coffeeNewsOf, coffeeStateOf, findDueAlarm, nextArmedAlarm, type AlarmReading } from "./policy.js";
+import { coffeeNewsOf, coffeeStateOf, decideBrief, findDueAlarm, findMorningStart, nextArmedAlarm, pickForDay, type AlarmReading } from "./policy.js";
 
 const CLOCK = "com.google.android.deskclock";
 const MINUTE = 60_000;
@@ -83,5 +83,81 @@ describe("coffeeNewsOf", () => {
     expect(coffeeNewsOf("loaded", false)).toBe("failed_to_start");
     expect(coffeeNewsOf("not_loaded", false)).toBe("not_loaded");
     expect(coffeeNewsOf("unknown", false)).toBe("unknown");
+  });
+});
+
+describe("findMorningStart", () => {
+  const TZ = "Europe/Helsinki";
+  const today = "2026-10-05";
+  const alarm = Date.parse("2026-10-05T07:30:00+03:00");
+  const watch = Date.parse("2026-10-05T08:10:00+03:00");
+  const now = Date.parse("2026-10-05T09:00:00+03:00");
+
+  const base = { today, wakeAlarmAt: null, armedAlarmAt: null, watchWokeAt: null, now, timezone: TZ };
+
+  it("is the alarm on an alarm day, even if the watch says they woke earlier", () => {
+    const earlierWatch = Date.parse("2026-10-05T06:40:00+03:00");
+    expect(findMorningStart({ ...base, wakeAlarmAt: alarm, watchWokeAt: earlierWatch })).toEqual({ at: alarm, source: "alarm" });
+  });
+
+  it("hasn't started while today's alarm is still ahead, whatever the watch says", () => {
+    const earlyWatch = Date.parse("2026-10-05T06:10:00+03:00");
+    const before = Date.parse("2026-10-05T06:30:00+03:00");
+    expect(findMorningStart({ ...base, armedAlarmAt: alarm, watchWokeAt: earlyWatch, now: before })).toBeNull();
+  });
+
+  it("is the watch's wake time on a day without an alarm", () => {
+    expect(findMorningStart({ ...base, watchWokeAt: watch })).toEqual({ at: watch, source: "watch" });
+  });
+
+  it("uses the watch when the armed alarm is for another day", () => {
+    const monday = Date.parse("2026-10-06T07:30:00+03:00");
+    expect(findMorningStart({ ...base, armedAlarmAt: monday, watchWokeAt: watch })).toEqual({ at: watch, source: "watch" });
+  });
+
+  it("ignores a watch wake time from yesterday, before the watch has synced", () => {
+    const yesterday = Date.parse("2026-10-04T08:10:00+03:00");
+    expect(findMorningStart({ ...base, watchWokeAt: yesterday })).toBeNull();
+  });
+});
+
+describe("decideBrief", () => {
+  const TZ = "Europe/Helsinki";
+  const start = { at: Date.parse("2026-10-05T07:30:00+03:00"), source: "alarm" as const };
+  const base = {
+    now: Date.parse("2026-10-05T07:45:00+03:00"),
+    timezone: TZ,
+    cutoff: { hour: 12, minute: 0 },
+    minDelayMs: 5 * MINUTE,
+    start,
+    lastInputAt: Date.parse("2026-10-05T07:44:00+03:00"),
+    pcStatusFresh: true,
+  };
+
+  it("is due on PC input after the minimum delay", () => {
+    expect(decideBrief(base)).toEqual({ kind: "due", start });
+  });
+
+  it("waits for input inside the minimum delay or before the start", () => {
+    expect(decideBrief({ ...base, lastInputAt: Date.parse("2026-10-05T07:31:00+03:00") })).toEqual({ kind: "wait", reason: "not_up_yet" });
+    expect(decideBrief({ ...base, lastInputAt: Date.parse("2026-10-05T06:59:00+03:00") })).toEqual({ kind: "wait", reason: "not_up_yet" });
+    expect(decideBrief({ ...base, lastInputAt: null })).toEqual({ kind: "wait", reason: "not_up_yet" });
+  });
+
+  it("gives up at the cut-off", () => {
+    expect(decideBrief({ ...base, now: Date.parse("2026-10-05T12:00:00+03:00") })).toEqual({ kind: "wait", reason: "past_cutoff" });
+  });
+
+  it("waits without a morning start, or with a stale PC status", () => {
+    expect(decideBrief({ ...base, start: null })).toEqual({ kind: "wait", reason: "no_morning_start" });
+    expect(decideBrief({ ...base, pcStatusFresh: false })).toEqual({ kind: "wait", reason: "pc_status_unknown" });
+  });
+});
+
+describe("pickForDay", () => {
+  it("never gives two consecutive days the same choice", () => {
+    const choices = ["a", "b", "c"] as const;
+    const days = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"].map(day => pickForDay(day, choices));
+    for (let i = 1; i < days.length; i++) expect(days[i]).not.toBe(days[i - 1]);
   });
 });

@@ -53,7 +53,8 @@ async function prepareAnnouncement(message: string, log: FastifyBaseLogger): Pro
   return { spoken: message, wording: "fallback" };
 }
 
-async function speakOnSatellite(text: string): Promise<void> {
+// Speaks text that is already worded, as it is.
+export async function speakOnSatellite(text: string): Promise<void> {
   await showSpeakingWhile(text, () => callService(
     "assist_satellite",
     "announce",

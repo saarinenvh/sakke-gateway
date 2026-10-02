@@ -1,6 +1,7 @@
-import type { MorningStore } from "../../src/features/morning/coach.js";
+import type { BriefStore } from "../../src/features/morning/brief.js";
+import type { MorningStore } from "../../src/features/morning/wakeUp.js";
 import type { StepOutcome } from "../../src/features/morning/MorningDay.entity.js";
-import type { WakeDay, WakeReservation, WakeStep } from "../../src/features/morning/morningRepository.js";
+import type { BriefDay, BriefReservation, WakeDay, WakeReservation, WakeStep } from "../../src/features/morning/morningRepository.js";
 import { coffeeStateOf, type CoffeeAnswer, type CoffeeState } from "../../src/features/morning/policy.js";
 
 export interface FakeWakeDay {
@@ -12,10 +13,11 @@ export interface FakeWakeDay {
 
 // MorningRepository's contract in memory. The real repository is tested
 // against MariaDB in tests/integration/database.test.ts.
-export class FakeMorningStore implements MorningStore {
+export class FakeMorningStore implements MorningStore, BriefStore {
   armedAlarmAt: number | null = null;
   coffeeAnswer: CoffeeAnswer | null = null;
   readonly days = new Map<string, FakeWakeDay>();
+  readonly briefs = new Map<string, BriefDay & { status: "uncertain" | "delivered" }>();
   /** Makes the next reservation fail, like a dropped database connection. */
   failNextReservation = false;
 
@@ -53,5 +55,28 @@ export class FakeMorningStore implements MorningStore {
   async finishWake(localDate: string): Promise<void> {
     const day = this.days.get(localDate);
     if (day) day.status = "done";
+  }
+
+  async loadWakeAlarm(localDate: string): Promise<number | null> {
+    return this.days.get(localDate)?.alarmAt ?? null;
+  }
+
+  async hasBrief(localDate: string): Promise<boolean> {
+    return this.briefs.has(localDate);
+  }
+
+  async loadBriefText(localDate: string): Promise<string | null> {
+    return this.briefs.get(localDate)?.text ?? null;
+  }
+
+  async reserveBrief(brief: BriefDay): Promise<BriefReservation> {
+    if (this.briefs.has(brief.localDate)) return { kind: "already_reserved" };
+    this.briefs.set(brief.localDate, { ...brief, status: "uncertain" });
+    return { kind: "reserved" };
+  }
+
+  async markBriefDelivered(localDate: string): Promise<void> {
+    const brief = this.briefs.get(localDate);
+    if (brief) brief.status = "delivered";
   }
 }

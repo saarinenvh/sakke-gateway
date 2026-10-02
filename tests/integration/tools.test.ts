@@ -173,11 +173,12 @@ describe("inference profiles", () => {
     expect(offered.sort()).toEqual(toolNames().filter(name => !SCHEDULER_ONLY.includes(name)).sort());
   });
 
-  it("offers an announcement, the tidiness nag and the morning greeting no tools at all", async () => {
+  it("offers an announcement, the tidiness nag and the morning greeting and brief no tools at all", async () => {
     const { toolsForProfile } = await import("../../src/tools/registry.js");
     expect(toolsForProfile("announcement")).toEqual([]);
     expect(toolsForProfile("tidiness_nag")).toEqual([]);
     expect(toolsForProfile("morning_greeting")).toEqual([]);
+    expect(toolsForProfile("morning_brief")).toEqual([]);
   });
 
   it("keeps the registry's order, which is what the model is used to", async () => {
