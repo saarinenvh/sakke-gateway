@@ -104,30 +104,6 @@ export async function getCalendarText(period = "today"): Promise<string> {
   return `Events (${period}): ` + parts.join(", ") + ".";
 }
 
-export async function getMorningGreeting(): Promise<string> {
-  const parts: string[] = [];
-
-  const tasks = await getPendingTasks();
-  if (tasks.length > 0) {
-    const taskList = tasks.map(t => t.summary).join(", ");
-    parts.push(`Tasks for today: ${taskList}`);
-  }
-
-  for (const calendarId of config.ha.calendarEntities) {
-    const events = await getTodayEvents(calendarId);
-    if (events.length > 0) {
-      const eventList = events.map(formatEventTime).join(", ");
-      parts.push(`Calendar: ${eventList}`);
-    }
-  }
-
-  if (parts.length === 0) {
-    return "Good morning! Nothing on the schedule today.";
-  }
-
-  return `Good morning! ${parts.join(". ")}.`;
-}
-
 export async function getPendingReminder(): Promise<string | null> {
   const tasks = await getPendingTasks();
   if (tasks.length === 0) return null;

@@ -1,5 +1,6 @@
 import type { LocalTime } from "../../config.js";
 import type { StateChange } from "../../integrations/homeAssistant/client.js";
+import { localDate } from "../../util/time.js";
 
 // Pure rules: every input, including "now", is passed in.
 
@@ -179,10 +180,6 @@ export function runStartFromHistory(history: StateChange[], finishedAt: number):
 
 
 // --- Local calendar -------------------------------------------------------
-
-export function localDate(at: number, timezone: string): string {
-  return new Date(at).toLocaleDateString("sv-SE", { timeZone: timezone });
-}
 
 // Calendar days, compared as dates so DST can't shift the count.
 export function localDaysBetween(from: number, to: number, timezone: string): number {

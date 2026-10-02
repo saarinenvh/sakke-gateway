@@ -5,6 +5,7 @@ What the gateway stores, where, and who may change it.
 | Data | Where | Survives a restart |
 | --- | --- | --- |
 | Scheduled jobs and their history | gateway database, `scheduled_job` | yes |
+| Morning wake-up: the armed alarm, the coffee answer, each day's wake-up | gateway database, `morning_state`, `morning_day` | yes |
 | Tidiness coach state | `tidiness.json` in `STATE_DIR` | yes |
 | Conversations | memory (`agent/conversationStore.ts`) | no, by design |
 | GPU status, display state | memory | no; reported again |
@@ -53,7 +54,8 @@ tables or queries.
 
 - **Every table has exactly one owning module.** It defines the entity
   (`<Name>.entity.ts`) and a repository, and is the only code that writes the
-  table. `features/scheduling/` owns `scheduled_job`.
+  table. `features/scheduling/` owns `scheduled_job`; `features/morning/` owns
+  `morning_state` and `morning_day`.
 - **Other features read through the owner's repository**, never the table
   directly, so the owner's rules (for example: only a pending job can be
   finished) hold for every caller.

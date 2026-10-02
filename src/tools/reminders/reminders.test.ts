@@ -72,9 +72,8 @@ describe("getDateRange", () => {
 describe("isDueInRange", () => {
   const today = "2026-09-25";
 
-  // Finding #15. A due value carrying a time is a longer string that sorts
-  // after the plain date, so `due <= end` dropped it - silently, from the
-  // morning briefing.
+  // A due value carrying a time sorts after the plain date, so a plain
+  // `due <= end` would drop it.
   it("counts a task due at a specific time today", () => {
     expect(isDueInRange("2026-09-25T10:00:00", today, today)).toBe(true);
   });
