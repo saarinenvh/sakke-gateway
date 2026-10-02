@@ -44,12 +44,14 @@ export class MorningRepository {
   // leave a "loaded" answer behind for a later alarm.
   async reserveWake(day: WakeDay, coffeeValidAfter: number): Promise<WakeReservation> {
     return this.dataSource.transaction(async manager => {
-      if (await manager.existsBy(MorningDay, { localDate: day.localDate })) return { kind: "already_reserved" };
-
+      // Locked first, so concurrent reservations queue here and the check below
+      // sees any day another one created.
       const state = await manager.findOneOrFail(MorningState, {
         where: { id: STATE_ROW_ID },
         lock: { mode: "pessimistic_write" },
       });
+      if (await manager.existsBy(MorningDay, { localDate: day.localDate })) return { kind: "already_reserved" };
+
       const answer = state.coffeeLoaded === null || state.coffeeAnsweredAt === null
         ? null
         : { loaded: state.coffeeLoaded, answeredAt: state.coffeeAnsweredAt.getTime() };

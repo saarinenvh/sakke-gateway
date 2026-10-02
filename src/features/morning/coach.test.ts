@@ -195,6 +195,24 @@ describe("waking up", () => {
     expect(await ringAt(ALARM + MINUTE)).toEqual({ kind: "skipped", reason });
     expect(world.calls).toEqual([]);
     expect(world.store.days.size).toBe(0);
+    expect(world.store.armedAlarmAt).toBe(ALARM);
+  });
+
+  it("wakes the house if the owner shows up as home within the grace window", async () => {
+    world.setPresence("not_home");
+    await ringAt(ALARM + MINUTE);
+
+    world.setPresence("home");
+    expect((await ringAt(ALARM + 3 * MINUTE)).kind).toBe("woke");
+  });
+
+  it("lets the alarm go if the owner is still away when the grace window ends", async () => {
+    world.setPresence("not_home");
+    await ringAt(ALARM + MINUTE);
+
+    expect(await ringAt(ALARM + 11 * MINUTE)).toEqual({ kind: "idle", reason: "no_alarm_due" });
+    expect(world.store.armedAlarmAt).toBe(NEXT_ALARM);
+    expect(world.calls).toEqual([]);
   });
 
   it("does nothing when presence can't be read", async () => {

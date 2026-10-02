@@ -50,8 +50,9 @@ export async function runMorningTick(deps: MorningDeps): Promise<TickResult> {
   const dueAlarm = findDueAlarm(armedAt, deps.now(), config.morning.alarmGraceMinutes * 60_000);
   const result: TickResult = dueAlarm === null ? { kind: "idle", reason: "no_alarm_due" } : await wakeUp(dueAlarm, deps);
 
-  // Kept armed, so the next tick retries while the grace window lasts.
-  if (result.kind === "skipped" && result.reason === "reservation_failed") return result;
+  // Kept armed, so the next tick retries while the grace window lasts: the
+  // owner may show up as home a minute later, or the database come back.
+  if (result.kind === "skipped") return result;
 
   await rearm(armedAt, deps);
   return result;

@@ -5,7 +5,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 ## Features
 
 - **Multi-turn agent** — conversation history per session, follow-up questions work naturally
-- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 18 tools, each owned by the feature it belongs to
+- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 20 tools, each owned by the feature it belongs to
 - **Follow-up classification** — a second, deliberately small model decides whether the next utterance is a continuation, an unrelated new request, or room noise. Noise gets silence: when Sakke has to guess, it fails quiet
 - **GPU routing** — inference goes to the dev PC's GPU while it's idle and falls back to the server's own Ollama otherwise. Decided once per turn, and fails closed — "busy" and "unknown" both mean the server
 - **Home control** — lights, scenes, switches, media via the Home Assistant API
