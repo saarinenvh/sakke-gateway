@@ -66,7 +66,7 @@ describe("POST /internal/gpu-status", () => {
     expect(status.json().lastInputAt).toEqual(expect.any(String));
   });
 
-  it.each([-1, "12", null, Number.POSITIVE_INFINITY])("rejects an invalid idle time: %o", async (idleSeconds) => {
+  it.each([-1, "12", null, Number.POSITIVE_INFINITY, 1e13])("rejects an invalid idle time: %o", async (idleSeconds) => {
     const res = await app.inject({
       method: "POST", url: "/internal/gpu-status", payload: { state: "available", idleSeconds },
     });
