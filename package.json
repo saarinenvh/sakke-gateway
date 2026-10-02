@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "fastify": "^5.3.3",
+    "fastify": "^5.12.5",
     "js-logger": "^1.6.1",
     "js-yaml": "^4.1.0",
     "mysql2": "^3.24.4",
@@ -32,7 +32,7 @@
     "@types/node": "^22.0.0",
     "eslint": "^10.11.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.70.1",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^4.1.11"
   }
 }
