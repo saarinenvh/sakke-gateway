@@ -138,6 +138,16 @@ describe("when the brief comes", () => {
     expect(world.requests[0]).toContain("watch says they woke at 08:10");
   });
 
+  it("waits for today's alarm even when the watch says they woke before it", async () => {
+    world.store.armedAlarmAt = ALARM;
+    world.set(WATCH, new Date(at("2026-10-05T06:10")).toISOString());
+    world.setNow(at("2026-10-05T06:40"));
+    world.setPcInput(at("2026-10-05T06:39"));
+
+    expect(await runBriefTick(world.deps)).toEqual({ kind: "idle", reason: "no_morning_start" });
+    expect(world.spoken).toEqual([]);
+  });
+
   it("waits while the watch still shows yesterday's wake time", async () => {
     world.set(WATCH, new Date(at("2026-10-04T08:10")).toISOString());
     world.setNow(at("2026-10-05T08:40"));
@@ -191,6 +201,14 @@ describe("guards", () => {
     };
     expect(await runBriefTick(world.deps)).toEqual({ kind: "skipped", reason: "satellite_busy" });
     expect(world.store.briefs.size).toBe(0);
+  });
+
+  it("reports a spoken brief as uncertain when recording its delivery fails, and doesn't repeat it", async () => {
+    world.deps.store.markBriefDelivered = async () => { throw new Error("Connection lost"); };
+
+    expect(await runBriefTick(world.deps)).toMatchObject({ kind: "briefed", delivery: "uncertain" });
+    expect(world.spoken).toHaveLength(1);
+    expect(await runBriefTick(world.deps)).toEqual({ kind: "idle", reason: "already_briefed" });
   });
 
   it("keeps the reservation when speaking times out, so the day is never briefed twice", async () => {

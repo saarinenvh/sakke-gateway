@@ -4,7 +4,7 @@ import { callService, getState } from "../../integrations/homeAssistant/client.j
 import { speakOnPhone } from "../../integrations/homeAssistant/phone.js";
 import { moduleLog } from "../../logger.js";
 import { speakOnSatellite } from "../announcements/announcer.js";
-import { getGpuStatus } from "../gpu/gpuStatus.js";
+import { getPcInput } from "../gpu/gpuStatus.js";
 import type { BriefDeps } from "./brief.js";
 import type { MorningDeps } from "./wakeUp.js";
 import type { MorningRepository } from "./morningRepository.js";
@@ -40,13 +40,7 @@ export function createLiveBriefDeps(store: MorningRepository, readers: DayReader
     now: () => Date.now(),
     readState: entityId => getState(entityId),
     store,
-    readPcInput: () => {
-      const status = getGpuStatus();
-      return {
-        lastInputAt: status.lastInputAt === null ? null : Date.parse(status.lastInputAt),
-        fresh: status.state !== "unknown",
-      };
-    },
+    readPcInput: getPcInput,
     ...readers,
 
     // Throwaway conversation, and a profile without tools: writing a brief must never act.

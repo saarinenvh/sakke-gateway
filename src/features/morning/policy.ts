@@ -75,10 +75,24 @@ export interface MorningStart {
   source: MorningStartSource;
 }
 
+export interface MorningStartInput {
+  today: string;
+  // When today's alarm woke the house, or null if it hasn't.
+  wakeAlarmAt: number | null;
+  // The alarm being watched, if any.
+  armedAlarmAt: number | null;
+  watchWokeAt: number | null;
+  now: number;
+  timezone: string;
+}
+
 // The alarm wake-up when there was one, else the watch's wake time once it
-// reads today. An earlier watch time doesn't move an alarm day's start.
-export function findMorningStart(today: string, alarmAt: number | null, watchWokeAt: number | null, now: number, timezone: string): MorningStart | null {
-  if (alarmAt !== null) return { at: alarmAt, source: "alarm" };
+// reads today. An earlier watch time doesn't move an alarm day's start: while
+// today's alarm is still ahead, the morning hasn't started.
+export function findMorningStart(input: MorningStartInput): MorningStart | null {
+  const { today, wakeAlarmAt, armedAlarmAt, watchWokeAt, now, timezone } = input;
+  if (wakeAlarmAt !== null) return { at: wakeAlarmAt, source: "alarm" };
+  if (armedAlarmAt !== null && armedAlarmAt > now && localDate(armedAlarmAt, timezone) === today) return null;
   if (watchWokeAt !== null && watchWokeAt <= now && localDate(watchWokeAt, timezone) === today) return { at: watchWokeAt, source: "watch" };
   return null;
 }

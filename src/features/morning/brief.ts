@@ -3,6 +3,7 @@ import type { EntityState } from "../../integrations/homeAssistant/client.js";
 import { moduleLog } from "../../logger.js";
 import { withTimeout } from "../../util/async.js";
 import { localDate } from "../../util/time.js";
+import type { PcInput } from "../gpu/gpuStatus.js";
 import type { MorningRepository } from "./morningRepository.js";
 import { decideBrief, findMorningStart, pickForDay, type BriefDecision, type BriefWaitReason, type MorningStart } from "./policy.js";
 import { buildBriefRequest, fallbackBrief, STRUCTURE_HINTS, type DayFacts } from "./prompts.js";
@@ -10,13 +11,7 @@ import { buildBriefRequest, fallbackBrief, STRUCTURE_HINTS, type DayFacts } from
 // Scheduled check: once the owner is up and at the PC, brief them on the day,
 // on the satellite. All I/O goes through BriefDeps.
 
-export type BriefStore = Pick<MorningRepository, "loadWakeAlarm" | "hasBrief" | "loadBriefText" | "reserveBrief" | "markBriefDelivered">;
-
-export interface PcInput {
-  lastInputAt: number | null;
-  // The PC has pushed its status recently enough to trust lastInputAt.
-  fresh: boolean;
-}
+export type BriefStore = Pick<MorningRepository, "loadArmedAlarm" | "loadWakeAlarm" | "hasBrief" | "loadBriefText" | "reserveBrief" | "markBriefDelivered">;
 
 export interface BriefDeps {
   now(): number;
@@ -64,7 +59,14 @@ export async function runBriefTick(deps: BriefDeps): Promise<BriefTickResult> {
 
 async function decide(today: string, deps: BriefDeps): Promise<BriefDecision> {
   const now = deps.now();
-  const start = findMorningStart(today, await deps.store.loadWakeAlarm(today), await readWatchWokeAt(deps), now, config.timezone);
+  const start = findMorningStart({
+    today,
+    wakeAlarmAt: await deps.store.loadWakeAlarm(today),
+    armedAlarmAt: await deps.store.loadArmedAlarm(),
+    watchWokeAt: await readWatchWokeAt(deps),
+    now,
+    timezone: config.timezone,
+  });
   const pc = deps.readPcInput();
   return decideBrief({
     now,
@@ -122,7 +124,13 @@ async function brief(today: string, start: MorningStart, deps: BriefDeps): Promi
     return { kind: "briefed", localDate: today, wording, delivery: "uncertain" };
   }
 
-  await deps.store.markBriefDelivered(today, deps.now());
+  try {
+    await deps.store.markBriefDelivered(today, deps.now());
+  } catch (err) {
+    // Spoken, and the reservation already keeps it from repeating.
+    moduleLog().warn({ day: today, err: errorMessage(err) }, "Morning brief spoken, but its delivery could not be recorded");
+    return { kind: "briefed", localDate: today, wording, delivery: "uncertain" };
+  }
   moduleLog().info({ day: today, start: start.source, wording, text }, "Morning brief delivered");
   return { kind: "briefed", localDate: today, wording, delivery: "delivered" };
 }

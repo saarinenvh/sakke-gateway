@@ -85,3 +85,16 @@ export function getGpuStatus(): GpuStatusResult {
 function formatLastInputAt(): string | null {
   return lastInputAt !== null ? new Date(lastInputAt).toISOString() : null;
 }
+
+export interface PcInput {
+  lastInputAt: number | null;
+  // Judged by the heartbeat alone: a manual override says nothing about it.
+  fresh: boolean;
+}
+
+export function getPcInput(): PcInput {
+  return {
+    lastInputAt,
+    fresh: lastSeenAt !== null && Date.now() - lastSeenAt <= STALE_AFTER_MS,
+  };
+}

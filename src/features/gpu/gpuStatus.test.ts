@@ -84,6 +84,22 @@ describe("last input on the PC", () => {
   });
 });
 
+describe("PC input for the morning brief", () => {
+  it("is fresh only while heartbeats arrive, even under a manual override", () => {
+    gpu.recordGpuStatus({ state: "available", idleSeconds: 5 });
+    gpu.setManualOverride("busy");
+    expect(gpu.getPcInput()).toEqual({ lastInputAt: Date.parse("2026-09-25T11:59:55Z"), fresh: true });
+
+    vi.advanceTimersByTime(46_000);
+    expect(gpu.getGpuStatus().state).toBe("busy"); // the override still holds
+    expect(gpu.getPcInput().fresh).toBe(false);
+  });
+
+  it("is not fresh before any push", () => {
+    expect(gpu.getPcInput()).toEqual({ lastInputAt: null, fresh: false });
+  });
+});
+
 describe("manual override", () => {
   it("'gaming' forces busy even while the PC is reporting available", () => {
     gpu.recordGpuStatus({ state: "available" });

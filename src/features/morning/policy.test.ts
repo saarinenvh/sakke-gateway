@@ -93,18 +93,31 @@ describe("findMorningStart", () => {
   const watch = Date.parse("2026-10-05T08:10:00+03:00");
   const now = Date.parse("2026-10-05T09:00:00+03:00");
 
+  const base = { today, wakeAlarmAt: null, armedAlarmAt: null, watchWokeAt: null, now, timezone: TZ };
+
   it("is the alarm on an alarm day, even if the watch says they woke earlier", () => {
     const earlierWatch = Date.parse("2026-10-05T06:40:00+03:00");
-    expect(findMorningStart(today, alarm, earlierWatch, now, TZ)).toEqual({ at: alarm, source: "alarm" });
+    expect(findMorningStart({ ...base, wakeAlarmAt: alarm, watchWokeAt: earlierWatch })).toEqual({ at: alarm, source: "alarm" });
+  });
+
+  it("hasn't started while today's alarm is still ahead, whatever the watch says", () => {
+    const earlyWatch = Date.parse("2026-10-05T06:10:00+03:00");
+    const before = Date.parse("2026-10-05T06:30:00+03:00");
+    expect(findMorningStart({ ...base, armedAlarmAt: alarm, watchWokeAt: earlyWatch, now: before })).toBeNull();
   });
 
   it("is the watch's wake time on a day without an alarm", () => {
-    expect(findMorningStart(today, null, watch, now, TZ)).toEqual({ at: watch, source: "watch" });
+    expect(findMorningStart({ ...base, watchWokeAt: watch })).toEqual({ at: watch, source: "watch" });
+  });
+
+  it("uses the watch when the armed alarm is for another day", () => {
+    const monday = Date.parse("2026-10-06T07:30:00+03:00");
+    expect(findMorningStart({ ...base, armedAlarmAt: monday, watchWokeAt: watch })).toEqual({ at: watch, source: "watch" });
   });
 
   it("ignores a watch wake time from yesterday, before the watch has synced", () => {
     const yesterday = Date.parse("2026-10-04T08:10:00+03:00");
-    expect(findMorningStart(today, null, yesterday, now, TZ)).toBeNull();
+    expect(findMorningStart({ ...base, watchWokeAt: yesterday })).toBeNull();
   });
 });
 
