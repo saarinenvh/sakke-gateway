@@ -1,4 +1,5 @@
 import type { DataSource, Repository } from "typeorm";
+import { MorningBrief, type MorningStartSource } from "./MorningBrief.entity.js";
 import { MorningDay, type StepOutcome } from "./MorningDay.entity.js";
 import { MorningState } from "./MorningState.entity.js";
 import { coffeeStateOf, type CoffeeState } from "./policy.js";
@@ -16,14 +17,26 @@ export interface WakeDay {
 
 export type WakeReservation = { kind: "reserved"; coffee: CoffeeState } | { kind: "already_reserved" };
 
-// The only code that writes morning_state and morning_day.
+export interface BriefDay {
+  localDate: string;
+  morningStartAt: number;
+  startSource: MorningStartSource;
+  text: string;
+  reservedAt: number;
+}
+
+export type BriefReservation = { kind: "reserved" } | { kind: "already_reserved" };
+
+// The only code that writes morning_state, morning_day and morning_brief.
 export class MorningRepository {
   private readonly state: Repository<MorningState>;
   private readonly days: Repository<MorningDay>;
+  private readonly briefs: Repository<MorningBrief>;
 
   constructor(private readonly dataSource: DataSource) {
     this.state = dataSource.getRepository(MorningState);
     this.days = dataSource.getRepository(MorningDay);
+    this.briefs = dataSource.getRepository(MorningBrief);
   }
 
   async loadArmedAlarm(): Promise<number | null> {
@@ -79,5 +92,44 @@ export class MorningRepository {
 
   async finishWake(localDate: string, finishedAt: number): Promise<void> {
     await this.days.update({ localDate }, { status: "done", finishedAt: new Date(finishedAt) });
+  }
+
+  // When the day's alarm woke the house, or null if it didn't.
+  async loadWakeAlarm(localDate: string): Promise<number | null> {
+    const day = await this.days.findOneBy({ localDate });
+    return day?.alarmAt.getTime() ?? null;
+  }
+
+  async hasBrief(localDate: string): Promise<boolean> {
+    return this.briefs.existsBy({ localDate });
+  }
+
+  async loadBriefText(localDate: string): Promise<string | null> {
+    const brief = await this.briefs.findOneBy({ localDate });
+    return brief?.text ?? null;
+  }
+
+  // Takes the same lock as reserveWake, so two reservations for one day queue
+  // and the second sees the first.
+  async reserveBrief(brief: BriefDay): Promise<BriefReservation> {
+    return this.dataSource.transaction(async manager => {
+      await manager.findOneOrFail(MorningState, { where: { id: STATE_ROW_ID }, lock: { mode: "pessimistic_write" } });
+      if (await manager.existsBy(MorningBrief, { localDate: brief.localDate })) return { kind: "already_reserved" };
+
+      await manager.insert(MorningBrief, {
+        localDate: brief.localDate,
+        morningStartAt: new Date(brief.morningStartAt),
+        startSource: brief.startSource,
+        status: "uncertain",
+        text: brief.text,
+        reservedAt: new Date(brief.reservedAt),
+        deliveredAt: null,
+      });
+      return { kind: "reserved" };
+    });
+  }
+
+  async markBriefDelivered(localDate: string, deliveredAt: number): Promise<void> {
+    await this.briefs.update({ localDate }, { status: "delivered", deliveredAt: new Date(deliveredAt) });
   }
 }

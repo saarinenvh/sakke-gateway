@@ -2,10 +2,12 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import type { DatabaseConfig } from "../config.js";
 import { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
+import { MorningBrief } from "../features/morning/MorningBrief.entity.js";
 import { MorningDay } from "../features/morning/MorningDay.entity.js";
 import { MorningState } from "../features/morning/MorningState.entity.js";
 import { CreateScheduledJob1790682762782 } from "./migrations/1790682762782-CreateScheduledJob.js";
 import { CreateMorning1791028800000 } from "./migrations/1791028800000-CreateMorning.js";
+import { CreateMorningBrief1791049800000 } from "./migrations/1791049800000-CreateMorningBrief.js";
 
 // MariaDB drops connections idle longer than its wait_timeout (8 h by
 // default), and the scheduler can sit idle overnight. With no idle
@@ -25,8 +27,8 @@ export function createDataSource(database: DatabaseConfig): DataSource {
     timezone: "Z",
     synchronize: false,
     migrationsRun: true,
-    entities: [ScheduledJob, MorningState, MorningDay],
-    migrations: [CreateScheduledJob1790682762782, CreateMorning1791028800000],
+    entities: [ScheduledJob, MorningState, MorningDay, MorningBrief],
+    migrations: [CreateScheduledJob1790682762782, CreateMorning1791028800000, CreateMorningBrief1791049800000],
     extra: { maxIdle: MAX_IDLE_POOL_CONNECTIONS },
   });
 }

@@ -3,10 +3,13 @@ import { config } from "../../config.js";
 import { callService, getState } from "../../integrations/homeAssistant/client.js";
 import { speakOnPhone } from "../../integrations/homeAssistant/phone.js";
 import { moduleLog } from "../../logger.js";
-import type { MorningDeps } from "./coach.js";
+import { speakOnSatellite } from "../announcements/announcer.js";
+import { getGpuStatus } from "../gpu/gpuStatus.js";
+import type { BriefDeps } from "./brief.js";
+import type { MorningDeps } from "./wakeUp.js";
 import type { MorningRepository } from "./morningRepository.js";
 
-// Separate from coach.ts so the coach doesn't import the agent and every tool.
+// Separate from wakeUp.ts and brief.ts so they don't import the agent and every tool.
 export function createLiveMorningDeps(store: MorningRepository): MorningDeps {
   return {
     now: () => Date.now(),
@@ -25,5 +28,32 @@ export function createLiveMorningDeps(store: MorningRepository): MorningDeps {
       const service = config.morning.phoneNotifyService;
       if (service !== undefined) await speakOnPhone(service, text);
     },
+  };
+}
+
+// What the brief reports on. Injected by index.ts: they live under tools/, and
+// a feature doesn't import tools.
+export type DayReaders = Pick<BriefDeps, "readCalendar" | "readTasks" | "readWeather">;
+
+export function createLiveBriefDeps(store: MorningRepository, readers: DayReaders): BriefDeps {
+  return {
+    now: () => Date.now(),
+    readState: entityId => getState(entityId),
+    store,
+    readPcInput: () => {
+      const status = getGpuStatus();
+      return {
+        lastInputAt: status.lastInputAt === null ? null : Date.parse(status.lastInputAt),
+        fresh: status.state !== "unknown",
+      };
+    },
+    ...readers,
+
+    // Throwaway conversation, and a profile without tools: writing a brief must never act.
+    writeBrief: async request => {
+      const { content } = await runAgent(request, `morning-brief-${Date.now()}`, moduleLog(), { profile: "morning_brief" });
+      return content;
+    },
+    speak: text => speakOnSatellite(text),
   };
 }

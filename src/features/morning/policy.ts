@@ -1,4 +1,9 @@
-// Pure rules for the morning wake-up: every input, including "now", is passed in.
+import type { LocalTime } from "../../config.js";
+import { localDate, localMinuteOfDay } from "../../util/time.js";
+import type { MorningStartSource } from "./MorningBrief.entity.js";
+
+// Pure rules for the morning wake-up and the day summary: every input,
+// including "now", is passed in.
 
 // --- The alarm ---------------------------------------------------------------
 
@@ -61,4 +66,52 @@ export function coffeeNewsOf(coffee: CoffeeState, started: boolean): CoffeeNews 
     case "unknown":
       return "unknown";
   }
+}
+
+// --- The day summary ------------------------------------------------------------
+
+export interface MorningStart {
+  at: number;
+  source: MorningStartSource;
+}
+
+// The alarm wake-up when there was one, else the watch's wake time once it
+// reads today. An earlier watch time doesn't move an alarm day's start.
+export function findMorningStart(today: string, alarmAt: number | null, watchWokeAt: number | null, now: number, timezone: string): MorningStart | null {
+  if (alarmAt !== null) return { at: alarmAt, source: "alarm" };
+  if (watchWokeAt !== null && watchWokeAt <= now && localDate(watchWokeAt, timezone) === today) return { at: watchWokeAt, source: "watch" };
+  return null;
+}
+
+export interface BriefInput {
+  now: number;
+  timezone: string;
+  cutoff: LocalTime;
+  minDelayMs: number;
+  start: MorningStart | null;
+  lastInputAt: number | null;
+  // The PC's status is current, so lastInputAt can be trusted.
+  pcStatusFresh: boolean;
+}
+
+export type BriefWaitReason = "past_cutoff" | "no_morning_start" | "pc_status_unknown" | "not_up_yet";
+
+export type BriefDecision = { kind: "due"; start: MorningStart } | { kind: "wait"; reason: BriefWaitReason };
+
+// Due on the first PC input at least minDelayMs after the morning started,
+// before the cut-off.
+export function decideBrief(input: BriefInput): BriefDecision {
+  if (localMinuteOfDay(new Date(input.now), input.timezone) >= input.cutoff.hour * 60 + input.cutoff.minute) {
+    return { kind: "wait", reason: "past_cutoff" };
+  }
+  if (input.start === null) return { kind: "wait", reason: "no_morning_start" };
+  if (!input.pcStatusFresh) return { kind: "wait", reason: "pc_status_unknown" };
+  if (input.lastInputAt === null || input.lastInputAt < input.start.at + input.minDelayMs) return { kind: "wait", reason: "not_up_yet" };
+  return { kind: "due", start: input.start };
+}
+
+// Consecutive days always get different entries.
+export function pickForDay<T>(localDateString: string, choices: readonly T[]): T {
+  const dayNumber = Math.round(Date.parse(localDateString) / 86_400_000);
+  return choices[dayNumber % choices.length];
 }

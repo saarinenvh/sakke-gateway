@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { reloadConfig } from "../../config.js";
 import type { EntityState } from "../../integrations/homeAssistant/client.js";
 import { FakeMorningStore } from "../../../tests/fixtures/fakeMorningStore.js";
-import { runMorningTick, type MorningDeps } from "./coach.js";
+import { runMorningTick, type MorningDeps } from "./wakeUp.js";
 
 // The scheduled tick against a fake clock, fake HA states, a fake model and an
 // in-memory store. All times are made-up examples.

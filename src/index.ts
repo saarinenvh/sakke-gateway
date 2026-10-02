@@ -17,8 +17,11 @@ import { startScheduler } from "./features/scheduling/scheduler.js";
 import { isSchedulable, runScheduledCall } from "./tools/registry.js";
 import { MorningRepository } from "./features/morning/morningRepository.js";
 import { setCoffeeAnswerStore } from "./features/morning/coffee.js";
-import { startMorningCoach } from "./features/morning/coach.js";
-import { createLiveMorningDeps } from "./features/morning/liveDeps.js";
+import { startMorningWakeUp } from "./features/morning/wakeUp.js";
+import { createLiveBriefDeps, createLiveMorningDeps } from "./features/morning/liveDeps.js";
+import { startMorningBrief } from "./features/morning/brief.js";
+import { getCalendarText, getTasksText } from "./tools/reminders/reminders.js";
+import { getWeather } from "./tools/weather/weather.js";
 
 const app = buildApp();
 
@@ -59,12 +62,17 @@ async function startScheduling(dataSource: DataSource): Promise<void> {
   });
 }
 
-// The morning wake-up keeps all its state in the database, so it only starts
-// once that is connected: until then it does nothing.
+// The morning wake-up and day summary keep all their state in the database, so
+// they only start once that is connected: until then they do nothing.
 function startMorning(dataSource: DataSource): void {
   const morning = new MorningRepository(dataSource);
   setCoffeeAnswerStore(morning);
-  startMorningCoach(createLiveMorningDeps(morning));
+  startMorningWakeUp(createLiveMorningDeps(morning));
+  startMorningBrief(createLiveBriefDeps(morning, {
+    readCalendar: () => getCalendarText("today"),
+    readTasks: () => getTasksText("today"),
+    readWeather: () => getWeather(),
+  }));
 }
 
 // Not awaited: the gateway serves requests while the database is still

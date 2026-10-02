@@ -5,6 +5,7 @@ import { createDataSource } from "../../src/db/dataSource.js";
 import { connectDatabase } from "../../src/db/database.js";
 import { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
 import { JobRepository } from "../../src/features/scheduling/jobRepository.js";
+import { MorningBrief } from "../../src/features/morning/MorningBrief.entity.js";
 import { MorningDay } from "../../src/features/morning/MorningDay.entity.js";
 import { MorningRepository } from "../../src/features/morning/morningRepository.js";
 
@@ -35,7 +36,7 @@ async function dropGatewayTables(database: DatabaseConfig): Promise<void> {
     database: database.name,
   });
   await admin.initialize();
-  await admin.query("DROP TABLE IF EXISTS scheduled_job, morning_day, morning_state, migrations");
+  await admin.query("DROP TABLE IF EXISTS scheduled_job, morning_brief, morning_day, morning_state, migrations");
   await admin.destroy();
 }
 
@@ -58,7 +59,7 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
     if (dataSource?.isInitialized) await dataSource.destroy();
   });
 
-  const ALL_MIGRATIONS = ["CreateScheduledJob1790682762782", "CreateMorning1791028800000"];
+  const ALL_MIGRATIONS = ["CreateScheduledJob1790682762782", "CreateMorning1791028800000", "CreateMorningBrief1791049800000"];
 
   it("runs every migration on an empty database", async () => {
     expect(await appliedMigrationNames(dataSource)).toEqual(ALL_MIGRATIONS);
@@ -157,6 +158,7 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
 
     beforeEach(async () => {
       await dataSource.query("DELETE FROM morning_day");
+      await dataSource.query("DELETE FROM morning_brief");
       morning = new MorningRepository(dataSource);
       await morning.saveArmedAlarm(null);
       await dataSource.query("UPDATE morning_state SET coffee_loaded = NULL, coffee_answered_at = NULL");
@@ -197,6 +199,25 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
       const stored = await dataSource.getRepository(MorningDay).findOneByOrFail({ localDate: "2026-10-05" });
       expect(stored).toMatchObject({ status: "done", lights: "done", coffeeMaker: "skipped", greeting: "failed" });
       expect(stored.finishedAt?.toISOString()).toBe(new Date(ALARM + 60_000).toISOString());
+    });
+
+    it("tells when the day's alarm woke the house", async () => {
+      expect(await morning.loadWakeAlarm("2026-10-05")).toBeNull();
+      await morning.reserveWake(day, GOOD_NIGHT);
+      expect(await morning.loadWakeAlarm("2026-10-05")).toBe(ALARM);
+    });
+
+    it("reserves a day's brief once, keeps its text, and marks it delivered", async () => {
+      const brief = { localDate: "2026-10-05", morningStartAt: ALARM, startSource: "alarm" as const, text: "Hyvää huomenta, look who's up.", reservedAt: ALARM + 900_000 };
+
+      expect(await morning.reserveBrief(brief)).toEqual({ kind: "reserved" });
+      expect(await morning.reserveBrief(brief)).toEqual({ kind: "already_reserved" });
+      expect(await morning.hasBrief("2026-10-05")).toBe(true);
+      expect(await morning.loadBriefText("2026-10-05")).toBe("Hyvää huomenta, look who's up.");
+
+      await morning.markBriefDelivered("2026-10-05", ALARM + 960_000);
+      const stored = await dataSource.getRepository(MorningBrief).findOneByOrFail({ localDate: "2026-10-05" });
+      expect(stored).toMatchObject({ status: "delivered", startSource: "alarm" });
     });
   });
 });

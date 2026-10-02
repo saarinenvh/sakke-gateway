@@ -55,6 +55,11 @@ export const INFERENCE_PROFILES = {
     tools: [],
     contextOwner: "caller",
   },
+  // The day summary on the satellite once the owner is up. Never acts.
+  morning_brief: {
+    tools: [],
+    contextOwner: "caller",
+  },
 } as const satisfies Record<string, InferenceProfile>;
 
 export type InferenceProfileName = keyof typeof INFERENCE_PROFILES;
