@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import type { FastifyBaseLogger } from "fastify";
 import type { JobSource, ScheduledJob } from "./db/ScheduledJob.entity.js";
 import type { FinishedStatus, JobRepository } from "./db/jobRepository.js";
+import { CLOCK_TIME_GRACE_MS, decideMissedJob } from "./policy.js";
 
 // What the scheduler needs from storage; JobRepository in production, a fake
 // in tests.
@@ -60,13 +61,13 @@ export class Scheduler {
 
   constructor(private readonly deps: SchedulerDeps) {}
 
-  // Arms every pending job. A duration job that came due while the gateway was
-  // down is dropped rather than run late.
+  // Arms every pending job. One that came due while the gateway was down runs
+  // late or is dropped, by the rule in policy.ts.
   async start(): Promise<void> {
     const pending = await this.deps.store.listPending();
     let dropped = 0;
     for (const job of pending) {
-      if (this.cameDueWhileDown(job)) {
+      if (this.isDue(job) && decideMissedJob(job, this.deps.now()) === "drop") {
         await this.drop(job);
         dropped++;
         continue;
@@ -168,13 +169,14 @@ export class Scheduler {
   }
 
   private drop(job: ScheduledJob): Promise<void> {
-    return this.record(job, "dropped", "came due while the gateway was down");
+    const reason = job.source === "in"
+      ? "came due while the gateway was down"
+      : `came due more than ${CLOCK_TIME_GRACE_MS / 60_000} minutes before the gateway was back`;
+    return this.record(job, "dropped", reason);
   }
 
-  // Clock-time jobs get their own late-running rule in Phase 2; until then only
-  // duration jobs exist.
-  private cameDueWhileDown(job: ScheduledJob): boolean {
-    return job.source === "in" && job.runAt.getTime() <= this.deps.now().getTime();
+  private isDue(job: ScheduledJob): boolean {
+    return job.runAt.getTime() <= this.deps.now().getTime();
   }
 
   private findPending(idOrLabel: string): ScheduledJob | undefined {

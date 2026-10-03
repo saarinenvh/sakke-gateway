@@ -218,4 +218,33 @@ describe("restarting", () => {
     expect(ran).toEqual([]);
     expect(store.get(job.id)).toMatchObject({ status: "dropped", result: "came due while the gateway was down" });
   });
+  // A clock-time job ("at 16:00") missed while the gateway was down, found at
+  // startup this many minutes late.
+  async function restartLateBy(lateMinutes: number): Promise<ScheduledJob> {
+    const before = startScheduler();
+    const job = await scheduleJob(before, { ...inMinutes(5, "the meat"), source: "at" });
+    before.stop();
+
+    vi.setSystemTime(job.runAt.getTime() + lateMinutes * MINUTE_MS);
+    await startScheduler().start();
+    await vi.advanceTimersByTimeAsync(0);
+    return job;
+  }
+
+  it("still runs a clock-time job that came due up to 15 minutes ago", async () => {
+    const job = await restartLateBy(10);
+
+    expect(ran.map(r => r.id)).toEqual([job.id]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+  it("drops a clock-time job that came due more than 15 minutes ago", async () => {
+    const job = await restartLateBy(20);
+
+    expect(ran).toEqual([]);
+    expect(store.get(job.id)).toMatchObject({
+      status: "dropped",
+      result: "came due more than 15 minutes before the gateway was back",
+    });
+  });
 });
