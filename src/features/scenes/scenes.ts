@@ -6,7 +6,7 @@ import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
 import { getAllStates, callService, haPost, type EntityState } from "../../integrations/homeAssistant/client.js";
 import { chatCompletion } from "../../integrations/openai/client.js";
-import { readWikiDocWithFallback } from "../../tools/wiki/wiki.js";
+import { readWikiDocWithFallback } from "../wiki/wiki.js";
 import { stripCodeFence } from "../../util/text.js";
 import { parseOrThrow } from "../../util/validation.js";
 import { validateScenePlan, InvalidScenePlanError, type ScenePlanIssue } from "./sceneValidator.js";

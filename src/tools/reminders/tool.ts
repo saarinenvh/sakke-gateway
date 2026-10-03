@@ -1,6 +1,6 @@
 import type { Tool } from "../types.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";
-import { getTasksText, getCalendarText } from "./reminders.js";
+import { getTasksText, getCalendarText } from "../../features/reminders/reminders.js";
 import { getCalendarArgsSchema, getTasksArgsSchema } from "./schema.js";
 
 export const getTasksTool: Tool = {
