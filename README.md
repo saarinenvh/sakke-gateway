@@ -177,10 +177,11 @@ npm start
 npm test
 ```
 
-Unit tests sit next to the code as `*.test.ts`; integration tests live in
-`tests/`, driving the real Fastify app through `app.inject()` against fake
-Ollama and Home Assistant servers in `tests/fixtures/`. No test reaches the
-network.
+Unit tests sit in a `tests/` folder in the module they test, as `*.test.ts`
+(a test fails if one sits anywhere else). Integration tests live in the
+top-level `tests/integration/`, driving the real Fastify app through
+`app.inject()` against fake Ollama and Home Assistant servers in
+`tests/fixtures/`. No test reaches the network.
 
 `tests/integration/database.test.ts` runs the migrations and entities against
 a real MariaDB, and is skipped unless `TEST_DB_HOST` is set. CI provides a

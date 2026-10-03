@@ -99,12 +99,12 @@ a new tool can't be registered and silently never offered.
 ## Adding a tool
 
 1. `tools/<name>/schema.ts` with the arguments as a Zod schema (each field
-   `.describe()`d) and an example call, plus a `schema.test.ts` that parses it.
-   Then `tools/<name>/tool.ts` with the definition, whose `parameters` come from
-   `toolParameters(schema)`, and the executor in `tools/<name>/<name>.ts`, which
-   parses its arguments with that schema. `tools/__snapshots__/toolDefinitions.json`
-   records what the model sees, so update it on purpose (`vitest -u`) and review
-   the diff.
+   `.describe()`d) and an example call, plus `tools/<name>/tests/schema.test.ts`
+   that parses it. Then `tools/<name>/tool.ts` with the definition, whose
+   `parameters` come from `toolParameters(schema)`, and the executor in
+   `tools/<name>/<name>.ts`, which parses its arguments with that schema.
+   `tools/tests/__snapshots__/toolDefinitions.json` records what the model sees,
+   so update it on purpose (`vitest -u`) and review the diff.
 2. Put anything beyond a single call into a service under `features/`.
 3. Add it to `ALL` in `tools/registry.ts`, and to the profiles that should
    have it (usually `sakke`).

@@ -72,6 +72,7 @@ src/
 ├── config.ts             # all configuration, read once, validated, problems logged at startup
 ├── app.ts                # buildApp() — routes only, so tests can inject
 ├── index.ts              # composition root: wiring, then listen
+├── tests/                # config.test.ts, testLayout.test.ts (tests sit in tests/ folders)
 ├── db/                   # infrastructure only: dataSource.ts, database.ts (connect
 │                         # with retry), migrations/ - the one ordered schema history
 ├── inference/
@@ -83,32 +84,48 @@ src/
 │   ├── continuationCheck.ts  # the follow-up classifier
 │   ├── systemPrompt.ts   # concatenates the per-feature fragments
 │   ├── voiceText.ts      # strips anything that shouldn't be spoken aloud
-│   └── prompts/          # persona.md, toolDiscipline.md
+│   ├── prompts/          # persona.md, toolDiscipline.md
+│   └── tests/
 ├── tools/
 │   ├── registry.ts       # the one tool list, and the one try/catch
+│   ├── parameters.ts     # toolParameters(): a tool's parameters from its Zod schema
 │   ├── types.ts
+│   ├── tests/            # definitions.test.ts, __snapshots__/toolDefinitions.json
 │   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
 │       schedule/  tv/  wiki/  gpu/  vacuum/  announce/  coffee/
-│                         # each with feature.ts, tool.ts, prompt.ts as needed -
-│                         # gpu/ holds only tool.ts; its routing logic lives in features/gpu/
+│                         # each with tool.ts, schema.ts, tests/, and as needed
+│                         # the executor <name>.ts and prompt.ts - gpu/ and coffee/
+│                         # have no executor file; their logic lives in features/
 ├── features/
 │   └── scenes/  display/  gpu/  tidiness/  announcements/  scheduling/  morning/
-│                         # feature modules with their own routes/logic,
-│                         # but not in tools/registry.ts - nothing the model
-│                         # calls directly (gpu/ here is gpuStatus.ts + the
-│                         # /internal/gpu-status route; tools/gpu/'s tool.ts calls into it;
-│                         # tidiness/ is the cleaning coach's schedule, state and tick;
-│                         # scheduling/ owns scheduled_job: entity, repository, scheduler;
-│                         # morning/ is the alarm wake-up (wakeUp.ts) and the day summary
-│                         # at the first PC input (brief.ts): policy, ticks, and three tables)
+│                         # services with their own routes, logic and tables, not in
+│                         # tools/registry.ts - nothing the model calls directly.
+│                         # Each has a README.md (what it does, entry points, the
+│                         # tables it owns) and tests/; scheduling/ and morning/
+│                         # keep their entities and repositories in db/
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
 │   ├── homeAssistant/schema.ts  # what HA sends back: full examples + Zod schemas
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
 │   ├── homeAssistant/phone.ts     # spoken notifications on the phone (Companion app)
-│   └── ollama/           # client.ts (request/response/errors), schema.ts, types.ts
-└── …
+│   ├── ollama/           # client.ts (request/response/errors), schema.ts, types.ts
+│   └── openai/           # client.ts, schema.ts
+└── util/                 # async, text, time, validation (parseOrThrow)
+
+tests/                    # tests that cross modules
+├── integration/          # the Fastify app through app.inject(), and the real database
+└── fixtures/             # fakes they share: fakeOllama, fakeHomeAssistant, fakeJobStore
 ```
+
+What each feature does, and what it owns, is in its `README.md`.
+
+The layout follows the folder-structure convention in sakke-workspace's
+[`.agents/code-style.md`](https://github.com/saarinenvh/sakke-workspace/blob/main/.agents/code-style.md)
+("Folder structure"): fixed names for a feature's parts (`route.ts`,
+`schema.ts`, `policy.ts`, `prompts.ts`, `db/`, `tests/`), every module's tests
+in a `tests/` subfolder, and fakes used by one module in that module's
+`tests/`. `tsconfig.build.json` leaves every `tests/` folder out of the build,
+and `src/tests/testLayout.test.ts` fails if a `*.test.ts` file sits outside one.
 
 Every feature's `prompt.ts` is concatenated into the system prompt in a fixed
 order by `agent/systemPrompt.ts`. Adding a feature means adding a folder, not
@@ -138,8 +155,8 @@ that owns it: an integration's responses, a route's request body, a tool's
 arguments. Each file starts by naming who sends what over which transport. It
 then holds, per payload, an exported `…Example` with the **full** payload,
 including fields the gateway ignores (marked `// ignored`), and the Zod schema
-that declares only what the code reads. A `schema.test.ts` next to it parses
-every example, so an example can't drift away from its schema.
+that declares only what the code reads. A `schema.test.ts` in the module's
+`tests/` folder parses every example, so an example can't drift away from its schema.
 
 To see what crosses a boundary and what is used, read its `schema.ts`.
 

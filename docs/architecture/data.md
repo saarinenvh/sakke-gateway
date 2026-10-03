@@ -53,9 +53,11 @@ reported as a configuration problem at startup.
 tables or queries.
 
 - **Every table has exactly one owning module.** It defines the entity
-  (`<Name>.entity.ts`) and a repository, and is the only code that writes the
-  table. `features/scheduling/` owns `scheduled_job`; `features/morning/` owns
-  `morning_state`, `morning_day` and `morning_brief`.
+  (`<Name>.entity.ts`) and a repository (`<name>Repository.ts`) in its `db/`
+  folder, and is the only code that writes the table. `features/scheduling/db/`
+  holds `scheduled_job`; `features/morning/db/` holds `morning_state`,
+  `morning_day` and `morning_brief`. Each feature's `README.md` lists the tables
+  it owns.
 - **Other features read through the owner's repository**, never the table
   directly, so the owner's rules (for example: only a pending job can be
   finished) hold for every caller.
@@ -67,10 +69,13 @@ tables or queries.
 - **The entity is the row's type.** There is no second type for the same row.
   Code that needs to swap the storage (the scheduler, in tests) depends on the
   repository's shape (`Pick<JobRepository, …>`), not on a parallel interface.
+  That named shape (`JobStore` in `scheduler.ts`) lives with its callers, not
+  in `db/`.
 
 The one exception to plain TypeORM typing: its insert types can't express a
-JSON column holding arbitrary tool arguments, so `jobRepository.ts` has a
-single commented type assertion at the boundary.
+JSON column holding arbitrary tool arguments, so
+`features/scheduling/db/jobRepository.ts` has a single commented type
+assertion at the boundary.
 
 Why one owner: once a second module writes a table, nothing says whose rules
 apply, and they drift. The bot keeps all its tables in one `src/db/`, which
@@ -92,8 +97,11 @@ goals and the portal) each own their data.
 - **Locally**, the gateway uses a MariaDB on the dev machine with the dev-only
   values in `.env.example` (`npm run dev:env`). The SQL to create the database
   and its user is in the README.
-- **Most tests need no database:** the scheduler is tested with an in-memory
-  store (`tests/fixtures/fakeJobStore.ts`).
+- **Most tests need no database:** the scheduler and the morning ticks are
+  tested with in-memory stores. `fakeJobStore.ts` is in the repo's
+  `tests/fixtures/`, since tests outside scheduling use it too;
+  `fakeMorningStore.ts` is only used by morning's tests, so it lives in
+  `features/morning/tests/`.
 - **`tests/integration/database.test.ts`** runs the migrations and the
   repositories against a real MariaDB: a throwaway `mariadb:10.11` container in
   CI, or a local `sakke_gateway_test` database. It drops the gateway's tables
