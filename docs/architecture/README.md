@@ -155,7 +155,8 @@ and the database.
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
   their own timeouts and error types. Responses are validated with Zod.
-  `src/tests/moduleBoundaries.test.ts` enforces this rule and the one above.
+  `src/tests/moduleBoundaries.test.ts` fails on a `fetch(` outside
+  `integrations/` and on an import of a tool folder's internals.
 
 ## Boundary schemas
 
