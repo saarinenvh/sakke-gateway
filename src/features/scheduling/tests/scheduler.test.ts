@@ -270,6 +270,38 @@ describe("restarting", () => {
 });
 
 describe("claiming a due job", () => {
+  it("doesn't report a cancel that lost the race with the job coming due", async () => {
+    // The cancellation's write is held back until the job has been claimed.
+    let releaseCancel!: () => void;
+    const cancelHeld = new Promise<void>(resolve => { releaseCancel = resolve; });
+    const finish = store.finish.bind(store);
+    store.finish = async (...args) => {
+      if (args[1] === "cancelled") await cancelHeld;
+      return finish(...args);
+    };
+    // The job stays running until the test lets it finish.
+    let finishRun!: () => void;
+    const runHeld = new Promise<void>(resolve => { finishRun = resolve; });
+    const scheduler = startScheduler(async job => {
+      ran.push(job);
+      await runHeld;
+      return nextOutcome;
+    });
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    const cancelled = scheduler.cancel(job.id);
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+    expect(store.get(job.id)?.status).toBe("running");
+    releaseCancel();
+
+    expect(await cancelled).toBeNull();
+    finishRun();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ran.map(r => r.id)).toEqual([job.id]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+
   it("marks it running in the store before it runs", async () => {
     const statusWhileRunning: (string | undefined)[] = [];
     const scheduler = startScheduler(async job => {

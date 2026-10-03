@@ -121,6 +121,7 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
       await jobs.insert(job("late", 30));
       await jobs.insert(job("soon", 5));
       await jobs.insert(job("done", 1));
+      await jobs.claim("done");
       await jobs.finish("done", "done", "Announced.", new Date());
 
       expect((await jobs.listPending()).map(pending => pending.id)).toEqual(["soon", "late"]);
@@ -151,6 +152,15 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
       expect(await jobs.listRunning()).toEqual([]);
     });
 
+    it("doesn't cancel a job once it's running, and doesn't finish one that never ran", async () => {
+      await jobs.insert(job("racing", 5));
+      expect(await jobs.finish("racing", "done", "Announced.", new Date())).toBe(false);
+
+      await jobs.claim("racing");
+      expect(await jobs.finish("racing", "cancelled", null, new Date())).toBe(false);
+      expect((await jobs.listRunning()).map(running => running.id)).toEqual(["racing"]);
+    });
+
     it("doesn't claim a cancelled job", async () => {
       await jobs.insert(job("gone", 5));
       await jobs.finish("gone", "cancelled", null, new Date());
@@ -160,6 +170,7 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
 
     it("leaves existing jobs alone on a repeated import", async () => {
       await jobs.insert(job("kept", 5));
+      await jobs.claim("kept");
       await jobs.finish("kept", "done", "Announced.", new Date());
 
       await jobs.insertIgnoringExisting([job("kept", 5), job("new", 10)]);

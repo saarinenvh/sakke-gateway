@@ -14,7 +14,9 @@ repeated one.
 
 A job runs at most once. When it comes due it is first claimed in the
 database (`pending` → `running`), then run, then recorded as `done` or
-`failed`. If the claim can't be written, the job doesn't run then and stays
+`failed`. A job can only be cancelled while it's still `pending`, so a cancel
+that loses the race with the claim doesn't report success. If the claim can't
+be written, the job doesn't run then and stays
 `pending`; a duplicated announcement is the worse failure than a missed one.
 
 On startup the scheduler records any job still `running` as failed (it was
