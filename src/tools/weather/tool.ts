@@ -1,7 +1,7 @@
 import type { Tool } from "../types.js";
 import { toolParameters } from "../parameters.js";
 import { getWeatherArgsSchema } from "./schema.js";
-import { getWeather } from "./weather.js";
+import { getWeather } from "../../integrations/openMeteo/weather.js";
 
 export const weatherTool: Tool = {
   definition: {

@@ -11,9 +11,9 @@ import {
   isResetRequest,
   __clearAllConversations,
 } from "../conversationStore.js";
-import { clearSpotifySuggestion } from "../../tools/spotify/spotify.js";
+import { clearSpotifySuggestion } from "../../features/spotify/spotify.js";
 
-vi.mock("../../tools/spotify/spotify.js", () => ({ clearSpotifySuggestion: vi.fn() }));
+vi.mock("../../features/spotify/spotify.js", () => ({ clearSpotifySuggestion: vi.fn() }));
 
 const NUM_CTX = 16384;
 const BUDGET = contextBudgetChars(NUM_CTX);

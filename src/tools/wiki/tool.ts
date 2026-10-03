@@ -1,7 +1,7 @@
 import type { Tool } from "../types.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";
 import { createKnowledgeArgsSchema, getContextArgsSchema } from "./schema.js";
-import { readPage, saveNote } from "./wiki.js";
+import { readPage, saveNote } from "../../features/wiki/wiki.js";
 
 export const getContextTool: Tool = {
   definition: {

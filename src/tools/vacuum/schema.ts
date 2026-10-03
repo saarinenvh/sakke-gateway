@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VACUUM_ACTIONS } from "./vacuum.js";
+import { VACUUM_ACTIONS } from "../../features/tidiness/vacuumActions.js";
 
 // Model → gateway: the arguments of a vacuum tool call.
 

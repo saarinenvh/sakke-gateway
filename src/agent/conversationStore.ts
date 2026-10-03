@@ -1,5 +1,5 @@
 import { tools } from "../tools/registry.js";
-import { clearSpotifySuggestion } from "../tools/spotify/spotify.js";
+import { clearSpotifySuggestion } from "../features/spotify/spotify.js";
 import type { Message } from "../integrations/ollama/types.js";
 
 export interface Conversation {

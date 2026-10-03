@@ -6,10 +6,6 @@ import {
   type TodoItem,
 } from "../../integrations/homeAssistant/schema.js";
 
-// TZ, not config.timezone: the compose file, .env and .env.example all set TZ, and
-// nothing ever set config.timezone - this only ever worked because the hardcoded
-// fallback happened to be right.
-
 async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date): Promise<CalendarEvent[]> {
   const now = new Date();
   const s = start ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);

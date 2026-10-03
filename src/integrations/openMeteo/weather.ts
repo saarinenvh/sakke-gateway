@@ -1,11 +1,7 @@
-import { z } from "zod";
-import { config } from "../../config.js";
-import { parseJsonResponse } from "../../util/validation.js";
-import { weatherReadingSchema } from "./schema.js";
+import { fetchForecast } from "./client.js";
+import type { WeatherReading } from "./schema.js";
 
 const FORECAST_HOURS = 6;
-
-export type WeatherReading = z.output<typeof weatherReadingSchema>;
 
 const WMO_CODES: Record<number, string> = {
   0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
@@ -19,23 +15,9 @@ const WMO_CODES: Record<number, string> = {
 };
 
 export async function getWeather(): Promise<string> {
-  const url = new URL("https://api.open-meteo.com/v1/forecast");
-  url.searchParams.set("latitude", config.weather.lat);
-  url.searchParams.set("longitude", config.weather.lon);
-  url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,weather_code");
-  url.searchParams.set("hourly", "temperature_2m,precipitation_probability,wind_speed_10m");
-  url.searchParams.set("forecast_days", "1");
-  url.searchParams.set("timezone", "auto");
-
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
-
-  return formatWeather(await parseJsonResponse(res, weatherReadingSchema, "Open-Meteo forecast"));
+  return formatWeather(await fetchForecast());
 }
 
-// Split from getWeather so the mapping and the guards can be exercised without
-// a network call - and because "fetch" and "turn it into something speakable"
-// are separate jobs.
 export function formatWeather(reading: WeatherReading): string {
   const c = reading.current;
 

@@ -1,7 +1,7 @@
 import type { Tool } from "../types.js";
-import { toolParameters, parseToolArgs } from "../parameters.js";
+import { toolParameters } from "../parameters.js";
 import { spotifyArgsSchema } from "./schema.js";
-import { spotifyPlay, spotifyPause, spotifyNext, spotifyPrevious, spotifyVolume, spotifySuggest, spotifyPlayIndexed, spotifyPlayPersonal } from "./spotify.js";
+import { executeSpotify } from "./spotify.js";
 
 export const spotifyTool: Tool = {
   definition: {
@@ -13,32 +13,5 @@ export const spotifyTool: Tool = {
     },
   },
   repeatable: () => false,
-  execute: async (args, { conversationId }) => {
-    const { action, query, type = "track", volume, offset = 0, index } = parseToolArgs(spotifyArgsSchema, args, "spotify");
-
-    switch (action) {
-      case "suggest":
-        if (!query) return spotifySuggest(conversationId, "", type, offset);
-        // A known personal playlist should play instantly regardless of which
-        // action the model picked - the model is told to always call "suggest"
-        // first for named requests, so the personal-playlist shortcut can't
-        // depend on it choosing "play" instead.
-        return (await spotifyPlayPersonal(query)) ?? await spotifySuggest(conversationId, query, type, offset);
-      case "play":
-        if (index) return spotifyPlayIndexed(conversationId, index);
-        if (!query) return spotifyPlay();
-        // No direct search-and-blind-play anymore - STT makes exact-name matches
-        // too unreliable. A known personal playlist plays instantly (unambiguous);
-        // anything else falls back to search results instead of guessing.
-        return (await spotifyPlayPersonal(query)) ?? await spotifySuggest(conversationId, query, type, 0);
-      case "pause":
-        return spotifyPause();
-      case "next":
-        return spotifyNext();
-      case "previous":
-        return spotifyPrevious();
-      case "volume":
-        return spotifyVolume(volume ?? 50);
-    }
-  },
+  execute: executeSpotify,
 };

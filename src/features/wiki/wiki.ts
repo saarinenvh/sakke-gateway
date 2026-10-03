@@ -11,6 +11,12 @@ export type PageResult =
 // mount. Resolve it and check where it actually landed rather than trying to
 // spot bad input, which is the same reason saveNote below sanitises its
 // filename.
+// The vault's index.md, the page list the model is offered. Throws when no
+// wiki is mounted.
+export async function readIndex(): Promise<string> {
+  return fs.readFile(join(config.wikiRoot, "index.md"), "utf-8");
+}
+
 export async function readPage(page: string): Promise<PageResult> {
   const path = resolve(config.wikiRoot, `${page}.md`);
   if (path !== config.wikiRoot && !path.startsWith(`${config.wikiRoot}/`)) {

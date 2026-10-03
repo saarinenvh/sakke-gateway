@@ -93,11 +93,13 @@ src/
 │   ├── tests/            # definitions.test.ts, __snapshots__/toolDefinitions.json
 │   └── homeControl/  lists/  spotify/  weather/  search/  reminders/
 │       schedule/  tv/  wiki/  gpu/  vacuum/  announce/  coffee/
-│                         # each with tool.ts, schema.ts, tests/, and as needed
-│                         # the executor <name>.ts and prompt.ts - gpu/ and coffee/
-│                         # have no executor file; their logic lives in features/
+│                         # only the model's interface: tool.ts, schema.ts (the
+│                         # arguments), tests/, and as needed prompt.ts and the
+│                         # executor <name>.ts; services live in features/, HTTP
+│                         # in integrations/ (see tools.md)
 ├── features/
 │   └── scenes/  display/  gpu/  tidiness/  announcements/  scheduling/  morning/
+│       reminders/  wiki/  spotify/
 │                         # services with their own routes, logic and tables, not in
 │                         # tools/registry.ts - nothing the model calls directly.
 │                         # Each has a README.md (what it does, entry points, the
@@ -109,7 +111,11 @@ src/
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
 │   ├── homeAssistant/phone.ts     # spoken notifications on the phone (Companion app)
 │   ├── ollama/           # client.ts (request/response/errors), schema.ts, types.ts
-│   └── openai/           # client.ts, schema.ts
+│   ├── openai/           # client.ts, schema.ts
+│   ├── searxng/          # web search
+│   ├── openMeteo/        # the forecast, and its wording (weather.ts)
+│   ├── spotify/          # the Spotify Web API (token, search, albums)
+│   └── pcStatus/         # the PC's status service (/unload)
 └── util/                 # async, text, time, validation (parseOrThrow)
 
 tests/                    # tests that cross modules
@@ -144,9 +150,13 @@ and the database.
   scheduler's `JobRunner` and schedulability check, and the morning brief's
   calendar, task and weather readers. The agent imports every tool, so a
   direct import would close a cycle.
+- **Nothing outside `tools/` imports a tool folder's internals,** only its
+  `tool.ts` (the registry) and `prompt.ts` (the system prompt).
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
   their own timeouts and error types. Responses are validated with Zod.
+  `src/tests/moduleBoundaries.test.ts` fails on a `fetch(` outside
+  `integrations/` and on an import of a tool folder's internals.
 
 ## Boundary schemas
 

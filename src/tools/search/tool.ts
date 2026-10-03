@@ -1,7 +1,7 @@
 import type { Tool } from "../types.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";
 import { webSearchArgsSchema } from "./schema.js";
-import { webSearch } from "./webSearch.js";
+import { webSearch } from "./search.js";
 
 export const webSearchTool: Tool = {
   definition: {

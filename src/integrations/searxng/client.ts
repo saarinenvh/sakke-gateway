@@ -1,14 +1,14 @@
 import { config } from "../../config.js";
 import { parseJsonResponse } from "../../util/validation.js";
-import { searchResponseSchema } from "./schema.js";
+import { searchResponseSchema, type SearchResult } from "./schema.js";
 
-const MAX_RESULTS = 4;
+const SEARCH_TIMEOUT_MS = 8000;
 
-export async function webSearch(query: string): Promise<string> {
+export async function search(query: string): Promise<SearchResult[]> {
   const url = `${config.search.searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&language=en`;
 
   const res = await fetch(url, {
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
     headers: {
       "Accept": "application/json",
       "Accept-Language": "en-US,en;q=0.9",
@@ -21,11 +21,5 @@ export async function webSearch(query: string): Promise<string> {
   if (!res.ok) throw new Error(`SearXNG HTTP ${res.status}`);
 
   const data = await parseJsonResponse(res, searchResponseSchema, "SearXNG search");
-  const results = data.results.slice(0, MAX_RESULTS);
-
-  if (results.length === 0) return "No results found.";
-
-  return results
-    .map(r => `${r.title}\n${r.content ?? ""}\n${r.url}`)
-    .join("\n\n");
+  return data.results;
 }
