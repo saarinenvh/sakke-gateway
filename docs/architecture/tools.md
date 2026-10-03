@@ -3,33 +3,42 @@
 A tool is something the model can call. How one is built, how calls are run,
 and which requests may use which tools.
 
-## The four layers
+## A tool is only the model's interface
 
-A tool is split like an HTTP API, one layer per file:
+A tool folder holds what the model sees and the code that answers it, nothing
+the rest of the gateway needs:
 
 | File | Like | Holds |
 | --- | --- | --- |
 | `tools/<name>/prompt.ts` (optional) | API usage guide | when the model should use the tool; added to the system prompt |
 | `tools/<name>/schema.ts` | the request schema | the arguments as a Zod schema, with an example call |
 | `tools/<name>/tool.ts` | the OpenAPI document | name, description, `repeatable`, and `parameters` generated from the schema; points at the executor |
-| `tools/<name>/<name>.ts` | the request handler | validates the arguments, calls services, words the result for the model |
-| `features/<feature>/` | the service layer | business logic, database access, anything more than one call |
+| `tools/<name>/<name>.ts` (optional) | the request handler | parses the arguments, does what only this tool needs, words the result for the model |
 
-`tools/search/` is the plain case: the executor makes one HTTP request and
-formats the results. As soon as a tool needs a database, state, or logic other
-code also uses, that part is a service in `features/`, and the executor calls
-it. `tools/announce/` is that case: the executor parses `{ message }`, and
-`features/announcements/announcer.ts` does the work.
+Where the rest goes:
+
+- **A feature** (`features/<feature>/`) holds anything with state, a route, a
+  schedule, a database, or a second caller. The tool calls it. `tools/announce/`
+  parses `{ message }`, and `features/announcements/` does the work;
+  `tools/reminders/` calls `features/reminders/`, which also serves
+  `/reminders/check` and the morning brief.
+- **An integration** (`integrations/<service>/`) holds every HTTP call to an
+  outside service, with its `schema.ts`, even when only one tool uses it.
+  `tools/search/` has no feature: it calls `integrations/searxng/` and formats
+  the results.
+- **Logic that only this tool needs** may stay in its executor, as in
+  `tools/lists/` (matching and reordering list items) and `tools/homeControl/`
+  (the dispatcher). It moves to a feature when a second caller appears.
+
+Nothing outside `tools/` imports a tool folder's internals: the registry
+imports each `tool.ts`, and `agent/systemPrompt.ts` each `prompt.ts`.
 
 Why: the definition is what the model sees, and changes to it change how the
 model behaves; the executor is the boundary where untrusted model output is
-validated; the service is plain code that other features and the scheduler can
-call without going through the model. Keeping them apart means each can change
-without touching the others.
-
-Older tools (`vacuum/`, `lists/`, …) still keep some logic next to the
-executor. New tools follow the layers; old ones move when they're changed for
-another reason.
+validated; a feature is plain code that other features, routes and the
+scheduler can call without going through the model; an integration is the one
+place that knows a service's URLs, timeouts and shapes. Keeping them apart
+means each can change without touching the others.
 
 ## The registry
 
@@ -105,7 +114,9 @@ a new tool can't be registered and silently never offered.
    `tools/<name>/<name>.ts`, which parses its arguments with that schema.
    `tools/tests/__snapshots__/toolDefinitions.json` records what the model sees,
    so update it on purpose (`vitest -u`) and review the diff.
-2. Put anything beyond a single call into a service under `features/`.
+2. Put HTTP calls to an outside service in `integrations/<service>/`, and
+   anything with state, a route, a schedule, a database or a second caller in
+   `features/`.
 3. Add it to `ALL` in `tools/registry.ts`, and to the profiles that should
    have it (usually `sakke`).
 4. If it may run from the scheduler, give it `schedulable`, and allow only the
