@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import http from "http";
 import type { AddressInfo } from "net";
-import { runAgent } from "../../src/agent/agent.js";
+import { writeText } from "../../src/inference/writeText.js";
+import { setSystemPromptBuilder } from "../../src/inference/systemPrompt.js";
+import { buildSystemPrompt } from "../../src/agent/systemPrompt.js";
 import { reloadConfig } from "../../src/config.js";
 
 // What each tool-less caller profile sends to Ollama, byte for byte: the
@@ -24,8 +26,7 @@ let server: http.Server;
 let bodies: unknown[] = [];
 
 async function writeFor(profile: (typeof CALLER_REQUESTS)[number][0], request: string): Promise<string> {
-  const { content } = await runAgent(request, `pinned-${profile}`, log, { profile });
-  return content;
+  return writeText(profile, request, log);
 }
 
 beforeAll(async () => {
@@ -46,6 +47,7 @@ beforeAll(async () => {
   process.env.WIKI_ROOT = "/nonexistent-wiki";
   process.env.TZ = "Europe/Helsinki";
   reloadConfig();
+  setSystemPromptBuilder(buildSystemPrompt);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-03T06:30:00Z"));
 });

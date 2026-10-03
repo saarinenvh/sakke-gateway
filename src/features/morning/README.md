@@ -19,9 +19,7 @@ failed step doesn't stop the next one.
 
 | Export | Called by |
 | --- | --- |
-| `startMorningWakeUp(createLiveMorningDeps(repo))` | `index.ts`, once the database is connected |
-| `startMorningBrief(createLiveBriefDeps(repo, readers))` | `index.ts`, with the calendar, task and weather readers from `tools/` |
-| `setCoffeeAnswerStore(repo)` | `index.ts`, once the database is connected |
+| `startMorning(repo)` (`morning.ts`) | `index.ts`, once the database is connected: sets the coffee answer store and starts both ticks with their real dependencies |
 | `recordCoffeeAnswer(loaded, now)` | `tools/coffee/tool.ts`, when the owner answers good night's coffee question |
 
 ## Data
@@ -41,11 +39,11 @@ briefed twice.
 
 | File | Does |
 | --- | --- |
+| `morning.ts` | the main entry: starts both ticks, and builds their real dependencies (Home Assistant, `inference/writeText`, the phone, the satellite, the calendar, task and weather readers) |
 | `wakeUp.ts` | the wake-up tick |
 | `brief.ts` | the brief tick |
 | `policy.ts` | pure rules: the due alarm, coffee state, the morning's start, when the brief is due |
 | `prompts.ts` | the greeting and brief requests, and their fallbacks |
 | `coffee.ts` | records the coffee answer |
-| `liveDeps.ts` | the real Home Assistant, agent, phone and satellite calls behind both ticks |
 | `db/` | the three entities and `MorningRepository` |
 | `tests/fakeMorningStore.ts` | an in-memory `MorningRepository` for the tests |

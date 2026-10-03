@@ -12,7 +12,7 @@ though finished runs are tracked either way.
 
 | Export | Called by |
 | --- | --- |
-| `restoreTidinessState()`, then `startTidinessCoach(liveCoachDeps)` | `index.ts` at startup; the coach ticks periodically |
+| `startTidiness()` (`tidiness.ts`) | `index.ts` at startup: restores the state, then starts the coach, which ticks periodically |
 | `runVacuumAction` | `tools/vacuum/vacuum.ts`: move the vacuum, report its status or the last clean, "mark cleaned", answer a nag, snooze |
 | `VACUUM_ACTIONS`, `READ_ONLY_VACUUM_ACTIONS` | `tools/vacuum/schema.ts` (the action argument), `tools/vacuum/tool.ts` (`repeatable`) |
 | `findSpokenVacuumName` | `tools/vacuum/prompt.ts` |
@@ -27,10 +27,10 @@ in `STATE_DIR` on every change.
 
 | File | Does |
 | --- | --- |
+| `tidiness.ts` | the main entry: restores the state and starts the coach with its real dependencies (Home Assistant, `inference/writeText`, the satellite) |
 | `coach.ts` | the tick: track vacuum runs, decide, ask |
 | `policy.ts` | pure rules: the ask schedule, tone, run detection, which nag an answer belongs to |
 | `prompts.ts` | the request that words a nag, and the context its answer is read with |
 | `store.ts` | the state and `tidiness.json` |
 | `vacuum.ts` | which vacuum, and the name the owner gives it |
 | `vacuumActions.ts` | the vacuum tool's actions: drive the vacuum, describe it and the last clean, record answers to a nag |
-| `liveDeps.ts` | the real Home Assistant, agent and satellite calls behind `CoachDeps` |
