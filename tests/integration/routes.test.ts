@@ -3,6 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/app.js";
 import { startFakeOllama, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { reloadConfig } from "../../src/config.js";
+import { chatCompletionRequestExample, chatCompletionResponseSchema } from "../../src/agent/schema.js";
+import { parseOrThrow } from "../../src/util/validation.js";
 
 // The HTTP surface, through app.inject() - no port, no listening, no teardown
 // races. The gateway's callers are Home Assistant automations and the voice
@@ -172,6 +174,26 @@ describe("POST /v1/chat/completions", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it.each([
+    ["a message that isn't an object", ["lights on"]],
+    ["a message with no content", [{ role: "user" }]],
+    ["a non-string content", [{ role: "user", content: 42 }]],
+    ["a non-string role", [{ role: null, content: "lights on" }]],
+  ])("rejects %s as a bad request, not a server error", async (_case, messages) => {
+    ollama.script();
+    const res = await app.inject({
+      method: "POST", url: "/v1/chat/completions", payload: { conversation_id: "routes-bad", messages },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(ollama.requests()).toHaveLength(0);
+  });
+
+  it("answers in the shape sakke_agent reads", async () => {
+    ollama.script({ content: "Done." });
+    const res = await app.inject({ method: "POST", url: "/v1/chat/completions", payload: chatCompletionRequestExample });
+    parseOrThrow(chatCompletionResponseSchema, res.json(), "chat completion response");
+  });
+
   // 68a8a2b. A thrown agent call used to reach the caller as a bare 500, which
   // the voice pipeline read out as "Gateway error 500".
   it("degrades to a spoken apology rather than a 500 when the model fails", async () => {
@@ -188,5 +210,19 @@ describe("POST /v1/chat/completions", () => {
     expect(body.choices[0].message.content).toBe("Something broke on my end. Try that again.");
     // And the mic closes rather than staying open after a failure.
     expect(body.continue_conversation).toBe(false);
+  });
+});
+
+describe("POST /scene", () => {
+  it.each([{}, { description: "" }, { description: "cosy", apply: "yes" }, undefined])("rejects an invalid body: %o", async (payload) => {
+    const res = await app.inject({ method: "POST", url: "/scene", payload });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("POST /scene/save", () => {
+  it.each([{}, { name: "" }, { name: "Movie night", entity_ids: "light.sofa_lamp" }, undefined])("rejects an invalid body: %o", async (payload) => {
+    const res = await app.inject({ method: "POST", url: "/scene/save", payload });
+    expect(res.statusCode).toBe(400);
   });
 });

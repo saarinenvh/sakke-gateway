@@ -10,6 +10,7 @@ import { readWikiDocWithFallback } from "../../tools/wiki/wiki.js";
 import { stripCodeFence } from "../../util/text.js";
 import { parseOrThrow } from "../../util/validation.js";
 import { validateScenePlan, InvalidScenePlanError, type ScenePlanIssue } from "./sceneValidator.js";
+import { lightAttributesSchema } from "./schema.js";
 
 export { validateScenePlan, InvalidScenePlanError };
 export type { ScenePlanIssue };
@@ -219,20 +220,6 @@ function summarizeOutcomes(outcomes: SceneDeviceOutcome[]): ApplySceneResult {
 function createSceneId(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 }
-
-// HA reports null, not a missing key, for the attributes of a light that is
-// off. color_mode stays a plain string: HA has more modes (onoff, white,
-// unknown) than the switch below handles, and those fall to its default.
-const lightAttributesSchema = z.object({
-  brightness: z.number().nullish(),
-  color_mode: z.string().nullish(),
-  color_temp_kelvin: z.number().nullish(),
-  color_temp: z.number().nullish(),
-  rgb_color: z.tuple([z.number(), z.number(), z.number()]).nullish(),
-  hs_color: z.tuple([z.number(), z.number()]).nullish(),
-  xy_color: z.tuple([z.number(), z.number()]).nullish(),
-  effect: z.string().nullish(),
-});
 
 type HomeAssistantLightAttributes = z.output<typeof lightAttributesSchema>;
 
