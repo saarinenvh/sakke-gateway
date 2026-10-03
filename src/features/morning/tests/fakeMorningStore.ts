@@ -1,8 +1,8 @@
-import type { BriefStore } from "../../src/features/morning/brief.js";
-import type { MorningStore } from "../../src/features/morning/wakeUp.js";
-import type { StepOutcome } from "../../src/features/morning/MorningDay.entity.js";
-import type { BriefDay, BriefReservation, WakeDay, WakeReservation, WakeStep } from "../../src/features/morning/morningRepository.js";
-import { coffeeStateOf, type CoffeeAnswer, type CoffeeState } from "../../src/features/morning/policy.js";
+import type { BriefStore } from "../brief.js";
+import type { MorningStore } from "../wakeUp.js";
+import type { StepOutcome } from "../db/MorningDay.entity.js";
+import type { BriefDay, BriefReservation, WakeDay, WakeReservation, WakeStep } from "../db/morningRepository.js";
+import { coffeeStateOf, type CoffeeAnswer, type CoffeeState } from "../policy.js";
 
 export interface FakeWakeDay {
   alarmAt: number;

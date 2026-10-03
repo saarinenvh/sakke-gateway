@@ -1,7 +1,7 @@
 import { parseToolArgs } from "../parameters.js";
 import { config } from "../../config.js";
 import { activeScheduler, defaultAnnouncement, type Scheduler } from "../../features/scheduling/scheduler.js";
-import type { ScheduledJob } from "../../features/scheduling/ScheduledJob.entity.js";
+import type { ScheduledJob } from "../../features/scheduling/db/ScheduledJob.entity.js";
 import { scheduleRequestSchema, type SetRequest } from "./schema.js";
 
 const MINUTE_MS = 60_000;

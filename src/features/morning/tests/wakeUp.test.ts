@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { reloadConfig } from "../../../config.js";
 import type { EntityState } from "../../../integrations/homeAssistant/client.js";
-import { FakeMorningStore } from "../../../../tests/fixtures/fakeMorningStore.js";
+import { FakeMorningStore } from "./fakeMorningStore.js";
 import { runMorningTick, type MorningDeps } from "../wakeUp.js";
 
 // The scheduled tick against a fake clock, fake HA states, a fake model and an

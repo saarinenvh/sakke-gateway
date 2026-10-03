@@ -3,8 +3,8 @@ import type { EntityState } from "../../integrations/homeAssistant/client.js";
 import { moduleLog } from "../../logger.js";
 import { withTimeout } from "../../util/async.js";
 import { localDate } from "../../util/time.js";
-import type { StepOutcome } from "./MorningDay.entity.js";
-import type { MorningRepository, WakeReservation, WakeStep } from "./morningRepository.js";
+import type { StepOutcome } from "./db/MorningDay.entity.js";
+import type { MorningRepository, WakeReservation, WakeStep } from "./db/morningRepository.js";
 import { coffeeNewsOf, findDueAlarm, nextArmedAlarm, type AlarmReading, type CoffeeNews, type CoffeeState } from "./policy.js";
 import { buildGreetingRequest, fallbackGreeting } from "./prompts.js";
 

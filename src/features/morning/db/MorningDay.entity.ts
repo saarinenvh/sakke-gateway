@@ -1,5 +1,5 @@
 import { Column, Entity, PrimaryColumn } from "typeorm";
-import type { CoffeeState } from "./policy.js";
+import type { CoffeeState } from "../policy.js";
 
 export const WAKE_STATUSES = ["started", "done"] as const;
 export type WakeStatus = (typeof WAKE_STATUSES)[number];

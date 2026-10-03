@@ -1,10 +1,10 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import type { DatabaseConfig } from "../config.js";
-import { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
-import { MorningBrief } from "../features/morning/MorningBrief.entity.js";
-import { MorningDay } from "../features/morning/MorningDay.entity.js";
-import { MorningState } from "../features/morning/MorningState.entity.js";
+import { ScheduledJob } from "../features/scheduling/db/ScheduledJob.entity.js";
+import { MorningBrief } from "../features/morning/db/MorningBrief.entity.js";
+import { MorningDay } from "../features/morning/db/MorningDay.entity.js";
+import { MorningState } from "../features/morning/db/MorningState.entity.js";
 import { CreateScheduledJob1790682762782 } from "./migrations/1790682762782-CreateScheduledJob.js";
 import { CreateMorning1791028800000 } from "./migrations/1791028800000-CreateMorning.js";
 import { CreateMorningBrief1791049800000 } from "./migrations/1791049800000-CreateMorningBrief.js";

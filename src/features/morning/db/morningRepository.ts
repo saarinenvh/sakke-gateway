@@ -2,7 +2,7 @@ import type { DataSource, Repository } from "typeorm";
 import { MorningBrief, type MorningStartSource } from "./MorningBrief.entity.js";
 import { MorningDay, type StepOutcome } from "./MorningDay.entity.js";
 import { MorningState } from "./MorningState.entity.js";
-import { coffeeStateOf, type CoffeeState } from "./policy.js";
+import { coffeeStateOf, type CoffeeState } from "../policy.js";
 
 // The migration creates this row; it is only ever updated.
 const STATE_ROW_ID = 1;

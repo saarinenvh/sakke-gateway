@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { reloadConfig } from "../../../config.js";
 import type { EntityState } from "../../../integrations/homeAssistant/client.js";
-import { FakeMorningStore } from "../../../../tests/fixtures/fakeMorningStore.js";
+import { FakeMorningStore } from "./fakeMorningStore.js";
 import { runBriefTick, type BriefDeps } from "../brief.js";
 import { STRUCTURE_HINTS } from "../prompts.js";
 

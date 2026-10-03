@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeJobStore } from "../../../../tests/fixtures/fakeJobStore.js";
 import { Scheduler, type JobOutcome, type JobRequest, type JobRunner } from "../scheduler.js";
-import type { ScheduledJob } from "../ScheduledJob.entity.js";
+import type { ScheduledJob } from "../db/ScheduledJob.entity.js";
 // Each tool declares whether it may run unattended; the test uses the same answer.
 import { isSchedulable } from "../../../tools/registry.js";
 

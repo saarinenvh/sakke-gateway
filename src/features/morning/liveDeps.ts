@@ -7,7 +7,7 @@ import { speakOnSatellite } from "../announcements/announcer.js";
 import { getPcInput } from "../gpu/gpuStatus.js";
 import type { BriefDeps } from "./brief.js";
 import type { MorningDeps } from "./wakeUp.js";
-import type { MorningRepository } from "./morningRepository.js";
+import type { MorningRepository } from "./db/morningRepository.js";
 
 // Separate from wakeUp.ts and brief.ts so they don't import the agent and every tool.
 export function createLiveMorningDeps(store: MorningRepository): MorningDeps {
