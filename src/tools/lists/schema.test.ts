@@ -1,9 +1,9 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseOrThrow } from "../../util/validation.js";
 import { manageListArgsExample, manageListArgsSchema } from "./schema.js";
 
 describe("manage_list schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(manageListArgsSchema, manageListArgsExample, "manage_list args example");
+    expect(() => parseOrThrow(manageListArgsSchema, manageListArgsExample, "manage_list args example")).not.toThrow();
   });
 });

@@ -18,14 +18,14 @@ import {
 
 describe("spotify schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(spotifyArgsSchema, spotifyArgsExample, "spotify args example");
-    parseOrThrow(spotifyPlayerAttributesSchema, spotifyPlayerAttributesExample, "HA Spotify player attributes example");
-    parseOrThrow(tokenResponseSchema, tokenResponseExample, "Spotify token example");
-    parseOrThrow(searchResponseSchemaFor("tracks"), trackSearchResponseExample, "Spotify track search example");
-    parseOrThrow(searchResponseSchemaFor("artists"), artistSearchResponseExample, "Spotify artist search example");
-    parseOrThrow(searchResponseSchemaFor("albums"), albumSearchResponseExample, "Spotify album search example");
-    parseOrThrow(searchResponseSchemaFor("playlists"), playlistSearchResponseExample, "Spotify playlist search example");
-    parseOrThrow(artistAlbumsResponseSchema, artistAlbumsResponseExample, "Spotify artist albums example");
+    expect(() => parseOrThrow(spotifyArgsSchema, spotifyArgsExample, "spotify args example")).not.toThrow();
+    expect(() => parseOrThrow(spotifyPlayerAttributesSchema, spotifyPlayerAttributesExample, "HA Spotify player attributes example")).not.toThrow();
+    expect(() => parseOrThrow(tokenResponseSchema, tokenResponseExample, "Spotify token example")).not.toThrow();
+    expect(() => parseOrThrow(searchResponseSchemaFor("tracks"), trackSearchResponseExample, "Spotify track search example")).not.toThrow();
+    expect(() => parseOrThrow(searchResponseSchemaFor("artists"), artistSearchResponseExample, "Spotify artist search example")).not.toThrow();
+    expect(() => parseOrThrow(searchResponseSchemaFor("albums"), albumSearchResponseExample, "Spotify album search example")).not.toThrow();
+    expect(() => parseOrThrow(searchResponseSchemaFor("playlists"), playlistSearchResponseExample, "Spotify playlist search example")).not.toThrow();
+    expect(() => parseOrThrow(artistAlbumsResponseSchema, artistAlbumsResponseExample, "Spotify artist albums example")).not.toThrow();
   });
 
   it("read stop as pause and a numeric string as a number", () => {

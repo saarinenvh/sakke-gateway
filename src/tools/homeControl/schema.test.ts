@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseOrThrow } from "../../util/validation.js";
 import {
   controlHomeAssistantArgsExample,
@@ -13,9 +13,9 @@ import {
 
 describe("home control schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(controlHomeAssistantArgsSchema, controlHomeAssistantArgsExample, "control_home_assistant args example");
-    parseOrThrow(getDeviceStateArgsSchema, getDeviceStateArgsExample, "get_device_state args example");
-    parseOrThrow(runRoutineArgsSchema, runRoutineArgsExample, "run_routine args example");
-    parseOrThrow(refreshHomeDataArgsSchema, refreshHomeDataArgsExample, "refresh_home_data args example");
+    expect(() => parseOrThrow(controlHomeAssistantArgsSchema, controlHomeAssistantArgsExample, "control_home_assistant args example")).not.toThrow();
+    expect(() => parseOrThrow(getDeviceStateArgsSchema, getDeviceStateArgsExample, "get_device_state args example")).not.toThrow();
+    expect(() => parseOrThrow(runRoutineArgsSchema, runRoutineArgsExample, "run_routine args example")).not.toThrow();
+    expect(() => parseOrThrow(refreshHomeDataArgsSchema, refreshHomeDataArgsExample, "refresh_home_data args example")).not.toThrow();
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseOrThrow } from "../../util/validation.js";
 import {
   lightAttributesExample,
@@ -11,8 +11,8 @@ import {
 
 describe("scenes boundary schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(sceneRequestSchema, sceneRequestExample, "scene request example");
-    parseOrThrow(saveSceneRequestSchema, saveSceneRequestExample, "save scene request example");
-    parseOrThrow(lightAttributesSchema, lightAttributesExample, "light attributes example");
+    expect(() => parseOrThrow(sceneRequestSchema, sceneRequestExample, "scene request example")).not.toThrow();
+    expect(() => parseOrThrow(saveSceneRequestSchema, saveSceneRequestExample, "save scene request example")).not.toThrow();
+    expect(() => parseOrThrow(lightAttributesSchema, lightAttributesExample, "light attributes example")).not.toThrow();
   });
 });

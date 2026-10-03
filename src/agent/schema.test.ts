@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseOrThrow } from "../util/validation.js";
 import {
   chatCompletionRequestExample,
@@ -9,7 +9,7 @@ import {
 
 describe("agent boundary schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(chatCompletionRequestSchema, chatCompletionRequestExample, "chat completion request example");
-    parseOrThrow(chatCompletionResponseSchema, chatCompletionResponseExample, "chat completion response example");
+    expect(() => parseOrThrow(chatCompletionRequestSchema, chatCompletionRequestExample, "chat completion request example")).not.toThrow();
+    expect(() => parseOrThrow(chatCompletionResponseSchema, chatCompletionResponseExample, "chat completion response example")).not.toThrow();
   });
 });

@@ -15,16 +15,16 @@ import {
 
 describe("Home Assistant boundary schemas", () => {
   it("accept their examples", () => {
-    parseOrThrow(entityStateSchema, entityStateExample, "HA entity state example");
-    parseOrThrow(entityStatesSchema, [entityStateExample], "HA entity states example");
-    parseOrThrow(stateHistorySchema, stateHistoryExample, "HA state history example");
-    parseOrThrow(serviceResponseEnvelopeSchema, todoGetItemsResponseExample, "HA service response envelope example");
-    parseOrThrow(
+    expect(() => parseOrThrow(entityStateSchema, entityStateExample, "HA entity state example")).not.toThrow();
+    expect(() => parseOrThrow(entityStatesSchema, [entityStateExample], "HA entity states example")).not.toThrow();
+    expect(() => parseOrThrow(stateHistorySchema, stateHistoryExample, "HA state history example")).not.toThrow();
+    expect(() => parseOrThrow(serviceResponseEnvelopeSchema, todoGetItemsResponseExample, "HA service response envelope example")).not.toThrow();
+    expect(() => parseOrThrow(
       todoGetItemsResponseSchemaFor("todo.shopping_list"),
       todoGetItemsResponseExample.service_response,
       "HA todo.get_items example",
-    );
-    parseOrThrow(calendarEventsSchema, calendarEventsExample, "HA calendar events example");
+    )).not.toThrow();
+    expect(() => parseOrThrow(calendarEventsSchema, calendarEventsExample, "HA calendar events example")).not.toThrow();
   });
 });
 
