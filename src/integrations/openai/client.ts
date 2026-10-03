@@ -1,6 +1,6 @@
-import { z } from "zod";
 import { config } from "../../config.js";
 import { parseJsonResponse } from "../../util/validation.js";
+import { chatCompletionResponseSchema } from "./schema.js";
 
 // One OpenAI client, mirroring homeAssistant/client.ts's shape: a single place
 // for auth headers, timeout and error handling instead of each caller building
@@ -30,12 +30,12 @@ export interface ChatCompletionOptions {
   timeoutMs?: number;
 }
 
-// content is null when the model refuses or answers with tool calls instead.
-const chatCompletionResponseSchema = z.object({
-  choices: z
-    .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
-    .min(1),
-});
+// The body of POST /v1/chat/completions.
+interface ChatCompletionRequest {
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+}
 
 export async function chatCompletion(
   model: string,
@@ -46,17 +46,18 @@ export async function chatCompletion(
   // o-series reasoning models (o1, o3, ...) reject the request outright if
   // temperature is present at all - not just a default, the key must be missing.
   const isReasoningModel = model.startsWith("o");
+  const body: ChatCompletionRequest = {
+    model,
+    messages,
+    ...(temperature !== undefined && !isReasoningModel && { temperature }),
+  };
   const res = await fetch(`https://api.openai.com${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.openai.apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...(temperature !== undefined && !isReasoningModel && { temperature }),
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
 

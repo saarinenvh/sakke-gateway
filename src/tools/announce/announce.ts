@@ -1,12 +1,10 @@
-import { z } from "zod";
+import { parseToolArgs } from "../parameters.js";
 import type { ToolContext } from "../types.js";
-import { parseOrThrow } from "../../util/validation.js";
 import { announce } from "../../features/announcements/announcer.js";
-
-const announceArgsSchema = z.object({ message: z.string().trim().min(1) });
+import { announceArgsSchema } from "./schema.js";
 
 export async function executeAnnounce(args: Record<string, unknown>, ctx: ToolContext): Promise<string> {
-  const { message } = parseOrThrow(announceArgsSchema, args, "announce tool arguments");
+  const { message } = parseToolArgs(announceArgsSchema, args, "announce");
   const { wording } = await announce(message, ctx.log);
   return wording === "generated" ? "Announced." : "Announced, with the message as written.";
 }

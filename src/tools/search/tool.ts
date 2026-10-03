@@ -1,4 +1,6 @@
 import type { Tool } from "../types.js";
+import { toolParameters, parseToolArgs } from "../parameters.js";
+import { webSearchArgsSchema } from "./schema.js";
 import { webSearch } from "./webSearch.js";
 
 export const webSearchTool: Tool = {
@@ -7,15 +9,9 @@ export const webSearchTool: Tool = {
     function: {
       name: "web_search",
       description: "Search the web for current information, facts, news",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string" },
-        },
-        required: ["query"],
-      },
+      parameters: toolParameters(webSearchArgsSchema),
     },
   },
   repeatable: () => true,
-  execute: args => webSearch(args.query as string),
+  execute: args => webSearch(parseToolArgs(webSearchArgsSchema, args, "web_search").query),
 };

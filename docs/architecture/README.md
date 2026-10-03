@@ -103,10 +103,10 @@ src/
 │                         # at the first PC input (brief.ts): policy, ticks, and three tables)
 ├── integrations/
 │   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
-│   ├── homeAssistant/schemas.ts # Zod schemas for what HA sends back
+│   ├── homeAssistant/schema.ts  # what HA sends back: full examples + Zod schemas
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
 │   ├── homeAssistant/phone.ts     # spoken notifications on the phone (Companion app)
-│   └── ollama/           # client.ts (request/response/errors), schemas.ts (Zod), types.ts
+│   └── ollama/           # client.ts (request/response/errors), schema.ts, types.ts
 └── …
 ```
 
@@ -130,6 +130,18 @@ and the database.
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
   their own timeouts and error types. Responses are validated with Zod.
+
+## Boundary schemas
+
+Every place data crosses into the gateway has a `schema.ts` next to the code
+that owns it: an integration's responses, a route's request body, a tool's
+arguments. Each file starts by naming who sends what over which transport. It
+then holds, per payload, an exported `…Example` with the **full** payload,
+including fields the gateway ignores (marked `// ignored`), and the Zod schema
+that declares only what the code reads. A `schema.test.ts` next to it parses
+every example, so an example can't drift away from its schema.
+
+To see what crosses a boundary and what is used, read its `schema.ts`.
 
 ## Startup
 

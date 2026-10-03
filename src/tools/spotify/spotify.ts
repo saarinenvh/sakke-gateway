@@ -1,8 +1,8 @@
 import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
 import { getState as haGetState, callService } from "../../integrations/homeAssistant/client.js";
-import { parseJsonResponse } from "../../util/validation.js";
-import { artistAlbumsResponseSchema, searchResponseSchemaFor, tokenResponseSchema, type SearchResultKey } from "./schemas.js";
+import { parseJsonResponse, parseOrThrow } from "../../util/validation.js";
+import { artistAlbumsResponseSchema, searchResponseSchemaFor, spotifyPlayerAttributesSchema, tokenResponseSchema, type SearchResultKey } from "./schema.js";
 const SPOTIFY_ENTITY = "media_player.spotify_ville_saarinen";
 const TV_REMOTE_ENTITY = "remote.living_room_tv";
 // Name the TV shows up as in Spotify Connect's device list (media_player.select_source).
@@ -89,7 +89,7 @@ async function ensureActiveDevice(): Promise<void> {
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 1500));
     const { attributes } = await getEntity(SPOTIFY_ENTITY);
-    const sourceList = (attributes.source_list as string[] | undefined) ?? [];
+    const sourceList = parseOrThrow(spotifyPlayerAttributesSchema, attributes, `HA ${SPOTIFY_ENTITY} attributes`).source_list ?? [];
     if (sourceList.includes(SPOTIFY_TV_SOURCE)) {
       moduleLog().info({ tool: "spotify" }, `ensureActiveDevice: "${SPOTIFY_TV_SOURCE}" available, selecting it`);
       await haService("media_player.select_source", { entity_id: SPOTIFY_ENTITY, source: SPOTIFY_TV_SOURCE });

@@ -4,7 +4,7 @@ import {
   calendarEventsSchema,
   type CalendarEvent,
   type TodoItem,
-} from "../../integrations/homeAssistant/schemas.js";
+} from "../../integrations/homeAssistant/schema.js";
 
 // TZ, not config.timezone: the compose file, .env and .env.example all set TZ, and
 // nothing ever set config.timezone - this only ever worked because the hardcoded

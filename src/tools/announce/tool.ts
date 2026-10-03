@@ -1,5 +1,7 @@
 import type { Tool } from "../types.js";
+import { toolParameters } from "../parameters.js";
 import { executeAnnounce } from "./announce.js";
+import { announceArgsSchema } from "./schema.js";
 
 export const announceTool: Tool = {
   definition: {
@@ -7,13 +9,7 @@ export const announceTool: Tool = {
     function: {
       name: "announce",
       description: "Speak a message out loud on the voice satellite, in your own words. For reminders and timers at a scheduled time, not for replying in a conversation.",
-      parameters: {
-        type: "object",
-        properties: {
-          message: { type: "string", description: "What to tell the owner, e.g. 'take the minced meat out of the fridge'." },
-        },
-        required: ["message"],
-      },
+      parameters: toolParameters(announceArgsSchema),
     },
   },
   // Speaking the same thing twice is never what was asked for.

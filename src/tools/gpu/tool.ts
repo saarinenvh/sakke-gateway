@@ -2,6 +2,8 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Tool } from "../types.js";
 import { setManualOverride, clearManualOverride } from "../../features/gpu/gpuStatus.js";
 import { config } from "../../config.js";
+import { toolParameters, parseToolArgs } from "../parameters.js";
+import { setGamingModeArgsSchema } from "./schema.js";
 
 // status-service.ps1's default port - see scripts/gpu-router/ in sakke-workspace.
 const PC_STATUS_SERVICE_PORT = 5055;
@@ -26,22 +28,12 @@ export const setGamingModeTool: Tool = {
     function: {
       name: "set_gaming_mode",
       description: "Manually override whether the gaming PC's GPU is available for Sakke to use, instead of waiting for automatic detection. Use 'gaming' when the user says things like 'I'm gaming', 'I'm playing a game', 'leave my PC alone', 'stay off my GPU'. Use 'free' when they say the opposite - 'I'm free', 'done gaming', 'you can use my PC again' - which goes back to automatic detection rather than forcing availability.",
-      parameters: {
-        type: "object",
-        properties: {
-          mode: {
-            type: "string",
-            enum: ["gaming", "free"],
-            description: "'gaming' immediately marks the PC's GPU busy so Sakke stops routing there. 'free' clears the override and resumes automatic detection.",
-          },
-        },
-        required: ["mode"],
-      },
+      parameters: toolParameters(setGamingModeArgsSchema),
     },
   },
   repeatable: () => false,
   execute: async (args, { log }) => {
-    const mode = args.mode as string;
+    const { mode } = parseToolArgs(setGamingModeArgsSchema, args, "set_gaming_mode");
     const pcOllamaUrl = config.ollama.pc?.baseUrl;
     if (!pcOllamaUrl) return "GPU routing to your PC isn't configured, so there's nothing to override.";
 
@@ -57,10 +49,7 @@ export const setGamingModeTool: Tool = {
       }
       return "Got it, I'll leave your PC's GPU alone.";
     }
-    if (mode === "free") {
-      clearManualOverride();
-      return "Okay, I'll go back to automatically checking if your PC's GPU is free.";
-    }
-    return `Unknown gaming mode: ${mode}`;
+    clearManualOverride();
+    return "Okay, I'll go back to automatically checking if your PC's GPU is free.";
   },
 };

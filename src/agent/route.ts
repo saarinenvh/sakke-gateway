@@ -1,38 +1,18 @@
 import type { FastifyInstance } from "fastify";
 import { runAgent } from "./agent.js";
-
-interface ChatMessage {
-  role: string;
-  content: string;
-}
-
-interface ChatCompletionBody {
-  model?: string;
-  messages: ChatMessage[];
-  conversation_id?: string;
-  // Forwarded by sakke_agent from assist_satellite.start_conversation.
-  extra_system_prompt?: string;
-}
+import { chatCompletionRequestSchema, type ChatCompletionResponse } from "./schema.js";
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
-  app.post<{ Body: ChatCompletionBody }>("/v1/chat/completions", {
-    schema: {
-      body: {
-        type: "object",
-        required: ["messages"],
-        properties: {
-          model: { type: "string" },
-          messages: { type: "array" },
-          conversation_id: { type: "string" },
-          extra_system_prompt: { type: "string" },
-        },
-      },
-    },
-  }, async (request, reply) => {
-    const messages = request.body.messages ?? [];
-    const last = [...messages].reverse().find((m) => m.role === "user");
-    const text = last?.content?.trim() ?? "";
-    const conversationId = request.body.conversation_id ?? "default";
+  app.post("/v1/chat/completions", async (request, reply) => {
+    const parsed = chatCompletionRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "messages must be a list of { role, content } strings, and conversation_id and extra_system_prompt strings" });
+    }
+    const body = parsed.data;
+
+    const last = [...body.messages].reverse().find((m) => m.role === "user");
+    const text = last?.content.trim() ?? "";
+    const conversationId = body.conversation_id ?? "default";
 
     let responseText: string;
     let continueConversation = true;
@@ -41,7 +21,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       responseText = "Didn't catch that.";
     } else {
       try {
-        const extraSystemPrompt = request.body.extra_system_prompt?.trim() || undefined;
+        const extraSystemPrompt = body.extra_system_prompt?.trim() || undefined;
         const result = await runAgent(text, conversationId, request.log, { profile: "sakke", extraSystemPrompt });
         responseText = result.content;
         continueConversation = result.continueConversation;
@@ -58,7 +38,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    return reply.send({
+    const response = {
       id: "sakke-1",
       object: "chat.completion",
       model: "sakke",
@@ -70,6 +50,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         },
       ],
       continue_conversation: continueConversation,
-    });
+    };
+    return reply.send(response satisfies ChatCompletionResponse);
   });
 }
