@@ -139,6 +139,25 @@ describe.skipIf(testDatabase === null)("gateway database on MariaDB", () => {
       expect((await dataSource.getRepository(ScheduledJob).findOneByOrFail({ id: "gone" })).status).toBe("cancelled");
     });
 
+    it("claims a pending job once, and lists it as running until it finishes", async () => {
+      await jobs.insert(job("due", 5));
+
+      expect(await jobs.claim("due")).toBe(true);
+      expect(await jobs.claim("due")).toBe(false);
+      expect((await jobs.listRunning()).map(running => running.id)).toEqual(["due"]);
+      expect(await jobs.listPending()).toEqual([]);
+
+      expect(await jobs.finish("due", "done", "Announced.", new Date())).toBe(true);
+      expect(await jobs.listRunning()).toEqual([]);
+    });
+
+    it("doesn't claim a cancelled job", async () => {
+      await jobs.insert(job("gone", 5));
+      await jobs.finish("gone", "cancelled", null, new Date());
+
+      expect(await jobs.claim("gone")).toBe(false);
+    });
+
     it("leaves existing jobs alone on a repeated import", async () => {
       await jobs.insert(job("kept", 5));
       await jobs.finish("kept", "done", "Announced.", new Date());

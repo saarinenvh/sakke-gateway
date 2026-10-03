@@ -1,7 +1,7 @@
-import type { DataSource, QueryDeepPartialEntity, Repository } from "typeorm";
+import { In, type DataSource, type QueryDeepPartialEntity, type Repository } from "typeorm";
 import { ScheduledJob, type JobStatus } from "./ScheduledJob.entity.js";
 
-export type FinishedStatus = Exclude<JobStatus, "pending">;
+export type FinishedStatus = Exclude<JobStatus, "pending" | "running">;
 
 // The only code that writes scheduled_job. Every method resolves once its write
 // is committed, so a job the scheduler has acknowledged, cancelled or finished
@@ -28,10 +28,22 @@ export class JobRepository {
     return this.jobs.find({ where: { status: "pending" }, order: { runAt: "ASC" } });
   }
 
-  // Only a pending job changes, so a finished or cancelled one can't be
+  // Jobs that were running when the gateway stopped.
+  async listRunning(): Promise<ScheduledJob[]> {
+    return this.jobs.find({ where: { status: "running" }, order: { runAt: "ASC" } });
+  }
+
+  // Marks a due job as running, just before it runs. Only a pending job can be
+  // claimed, so a job runs at most once. Returns whether this call claimed it.
+  async claim(id: string): Promise<boolean> {
+    const update = await this.jobs.update({ id, status: "pending" }, { status: "running" });
+    return (update.affected ?? 0) > 0;
+  }
+
+  // Only an unfinished job changes, so a finished or cancelled one can't be
   // overwritten. Returns whether this one changed.
   async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
-    const update = await this.jobs.update({ id, status: "pending" }, { status, result, finishedAt });
+    const update = await this.jobs.update({ id, status: In(["pending", "running"]) }, { status, result, finishedAt });
     return (update.affected ?? 0) > 0;
   }
 }

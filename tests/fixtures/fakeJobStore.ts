@@ -28,10 +28,22 @@ export class FakeJobStore implements JobStore {
       .sort((a, b) => a.runAt.getTime() - b.runAt.getTime());
   }
 
-  async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
+  async listRunning(): Promise<ScheduledJob[]> {
+    return this.all().filter(job => job.status === "running");
+  }
+
+  async claim(id: string): Promise<boolean> {
     this.failIfAsked();
     const job = this.jobs.get(id);
     if (!job || job.status !== "pending") return false;
+    this.jobs.set(id, { ...job, status: "running" });
+    return true;
+  }
+
+  async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
+    this.failIfAsked();
+    const job = this.jobs.get(id);
+    if (!job || (job.status !== "pending" && job.status !== "running")) return false;
     this.jobs.set(id, { ...job, status, result, finishedAt });
     return true;
   }

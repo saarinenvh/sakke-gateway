@@ -12,10 +12,16 @@ passed today is tomorrow's unless "today" was said, and a daylight saving
 change moves a skipped time forward by the gap and takes the first of a
 repeated one.
 
-On startup the scheduler arms every pending job. One that came due while the
-gateway was down is dropped if it was a duration job, and run late if it was a
-clock-time job missed by at most 15 minutes. A late run gets the time it was
-due as `scheduledFor`, so a late announcement says so.
+A job runs at most once. When it comes due it is first claimed in the
+database (`pending` → `running`), then run, then recorded as `done` or
+`failed`. If the claim can't be written, the job doesn't run then and stays
+`pending`; a duplicated announcement is the worse failure than a missed one.
+
+On startup the scheduler records any job still `running` as failed (it was
+cut short, and isn't run again), then arms every pending job. One that came
+due while the gateway was down is dropped if it was a duration job, and run
+late if it was a clock-time job missed by at most 15 minutes. A late run gets
+the time it was due as `scheduledFor`, so a late announcement says so.
 
 ## Entry points
 

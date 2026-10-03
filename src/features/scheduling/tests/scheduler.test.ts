@@ -247,4 +247,51 @@ describe("restarting", () => {
       result: "came due more than 15 minutes before the gateway was back",
     });
   });
+
+  it("never runs a job again that was running when the gateway stopped", async () => {
+    const before = startScheduler(async job => {
+      ran.push(job);
+      // The gateway stops before the outcome is written.
+      store.failNextWrite = true;
+      return nextOutcome;
+    });
+    const job = await scheduleJob(before, { ...inMinutes(5, "the meat"), source: "at" });
+    await vi.advanceTimersByTimeAsync(5 * MINUTE_MS);
+    before.stop();
+    expect(store.get(job.id)?.status).toBe("running");
+
+    vi.setSystemTime(job.runAt.getTime() + 2 * MINUTE_MS);
+    await startScheduler().start();
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(ran).toHaveLength(1);
+    expect(store.get(job.id)).toMatchObject({ status: "failed", result: "outcome unknown: it was running when the gateway stopped" });
+  });
+});
+
+describe("claiming a due job", () => {
+  it("marks it running in the store before it runs", async () => {
+    const statusWhileRunning: (string | undefined)[] = [];
+    const scheduler = startScheduler(async job => {
+      statusWhileRunning.push(store.get(job.id)?.status);
+      return nextOutcome;
+    });
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(statusWhileRunning).toEqual(["running"]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+  it("doesn't run a job it can't mark as running, and leaves it pending for the next start", async () => {
+    const scheduler = startScheduler();
+    const job = await scheduleJob(scheduler, { ...inMinutes(1, "the meat"), source: "at" });
+    store.failNextWrite = true;
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(ran).toEqual([]);
+    expect(store.get(job.id)?.status).toBe("pending");
+  });
 });
