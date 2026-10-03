@@ -1,4 +1,6 @@
 import type { Tool } from "../types.js";
+import { toolParameters, parseToolArgs } from "../parameters.js";
+import { manageListArgsSchema } from "./schema.js";
 import { readList, addToList, completeInList, removeFromList, sortList } from "./lists.js";
 
 export const manageListTool: Tool = {
@@ -7,25 +9,13 @@ export const manageListTool: Tool = {
     function: {
       name: "manage_list",
       description: "Read, add, complete, or remove items from todo and shopping lists",
-      parameters: {
-        type: "object",
-        properties: {
-          action: {
-            type: "string",
-            enum: ["list_read", "list_add", "list_complete", "list_remove", "list_sort"],
-          },
-          list: { type: "string", description: "Entity ID of the list, e.g. todo.groceries" },
-          items: { type: "array", items: { type: "string" }, description: "Items to add (for list_add)" },
-          item: { type: "string", description: "Item name to complete or remove" },
-        },
-        required: ["action", "list"],
-      },
+      parameters: toolParameters(manageListArgsSchema),
     },
   },
   // Reading a list back is harmless to repeat; every mutating action isn't.
   repeatable: args => args.action === "list_read",
   execute: async args => {
-    const { action, list, items, item } = args as { action: string; list: string; items?: string[]; item?: string };
+    const { action, list, items, item } = parseToolArgs(manageListArgsSchema, args, "manage_list");
 
     if (action === "list_read") return readList(list);
     if (action === "list_add") {

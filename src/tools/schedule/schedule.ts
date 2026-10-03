@@ -1,43 +1,19 @@
-import { z } from "zod";
+import { parseToolArgs } from "../parameters.js";
 import { config } from "../../config.js";
-import { parseOrThrow } from "../../util/validation.js";
 import { activeScheduler, defaultAnnouncement, type Scheduler } from "../../features/scheduling/scheduler.js";
 import type { ScheduledJob } from "../../features/scheduling/ScheduledJob.entity.js";
+import { scheduleRequestSchema, type SetRequest } from "./schema.js";
 
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
 
-// A year out is the furthest anything is scheduled; it also keeps the due time
-// inside the range a Date can hold.
-const MAX_DELAY_MINUTES = 366 * 24 * 60;
-
 export const SCHEDULING_UNAVAILABLE = "Scheduling isn't available right now.";
-
-// run isn't offered to the model yet: announce is the only schedulable tool
-// until Phase 3. Without it, the job announces its label.
-const setSchema = z.object({
-  action: z.literal("set"),
-  when: z.object({ in_minutes: z.coerce.number().positive().max(MAX_DELAY_MINUTES) }),
-  label: z.string().trim().min(1),
-  run: z.object({
-    tool: z.string().trim().min(1),
-    args: z.record(z.string(), z.unknown()).default({}),
-  }).optional(),
-});
-
-const argsSchema = z.discriminatedUnion("action", [
-  setSchema,
-  z.object({ action: z.literal("cancel"), job_id: z.string().trim().min(1).optional() }),
-  z.object({ action: z.literal("list") }),
-]);
-
-type SetRequest = z.output<typeof setSchema>;
 
 export async function executeSchedule(args: Record<string, unknown>): Promise<string> {
   const scheduler = activeScheduler();
   if (!scheduler) return SCHEDULING_UNAVAILABLE;
 
-  const request = parseOrThrow(argsSchema, args, "schedule tool arguments");
+  const request = parseToolArgs(scheduleRequestSchema, args, "schedule");
   switch (request.action) {
     case "set":
       return setJob(scheduler, request);

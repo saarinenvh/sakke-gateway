@@ -80,7 +80,8 @@ describe("open_tv_app", () => {
   it("refuses an app it doesn't know, without calling Home Assistant", async () => {
     ha.setState("remote.living_room_tv", "on");
     const result = await run("open_tv_app", { app: "myspace" });
-    expect(result).toContain("Unknown app");
+    expect(result).toMatch(/^open_tv_app failed: .*failed validation/);
+    expect(result).toContain('"netflix"');
     expect(ha.serviceCalls()).toHaveLength(0);
   });
 });
@@ -103,7 +104,8 @@ describe("tv_remote_command", () => {
 
   it("refuses an unknown command without calling Home Assistant", async () => {
     const result = await run("tv_remote_command", { command: "eject" });
-    expect(result).toContain("Unknown remote command");
+    expect(result).toMatch(/^tv_remote_command failed: .*failed validation/);
+    expect(result).toContain('"home"');
     expect(ha.serviceCalls()).toHaveLength(0);
   });
 });

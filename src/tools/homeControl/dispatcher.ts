@@ -25,16 +25,14 @@ export async function dispatch(intent: Intent): Promise<string> {
   else if (intent.device) target["entity_id"] = intent.device;
   else target["entity_id"] = getLights().map(l => l.entity_id);
 
-  const reply = (fallback: string) => intent.response ?? fallback;
-
   switch (intent.action) {
     case "light_on":
       await callService("light", "turn_on", target);
-      return reply(intent.area ? `Lights on in ${intent.area}.` : "Lights on.");
+      return intent.area ? `Lights on in ${intent.area}.` : "Lights on.";
 
     case "light_off":
       await callService("light", "turn_off", target);
-      return reply(intent.area ? `Lights off in ${intent.area}.` : "Lights off.");
+      return intent.area ? `Lights off in ${intent.area}.` : "Lights off.";
 
     case "light_dim": {
       // Percent, not 0-255. The tool used to take HA's raw `brightness` scale,
@@ -42,12 +40,12 @@ export async function dispatch(intent: Intent): Promise<string> {
       // one number a person is most likely to say was also the most wrong.
       const pct = Math.max(0, Math.min(100, Math.round(intent.brightness_pct ?? 50)));
       await callService("light", "turn_on", { ...target, brightness_pct: pct });
-      return reply(`Brightness set to ${pct}%.`);
+      return `Brightness set to ${pct}%.`;
     }
 
     case "light_color":
       await callService("light", "turn_on", { ...target, color_name: intent.color });
-      return reply(`Color set to ${intent.color}.`);
+      return `Color set to ${intent.color}.`;
 
     case "scene_activate": {
       const scenes = getScenes();
@@ -64,14 +62,14 @@ export async function dispatch(intent: Intent): Promise<string> {
         await callService("remote", "turn_on", { entity_id: "remote.living_room_tv" });
         await callService("switch", "turn_on", { entity_id: "switch.rgbic_tv_backlight_dreamview" });
       }
-      return reply(`Scene activated.`);
+      return `Scene activated.`;
     }
 
     case "scene_create": {
       const name = intent.scene_name ?? "custom_scene";
       const entityIds = getLights().map(l => l.entity_id);
       await saveCurrentStateAsScene(name, entityIds);
-      return reply(`Scene "${name}" saved.`);
+      return `Scene "${name}" saved.`;
     }
 
     case "scene_design": {
@@ -79,29 +77,26 @@ export async function dispatch(intent: Intent): Promise<string> {
       const plan = await designScene(description);
       const result = await applyScene(plan);
 
-      // A pre-canned intent.response would confidently confirm success even
-      // on partial/total failure - bypass reply() for those cases rather than
-      // letting the model's own guess override what actually happened.
-      if (result.allSucceeded) return reply(`Scene "${plan.name}" applied.`);
+      if (result.allSucceeded) return `Scene "${plan.name}" applied.`;
       if (result.anySucceeded) return `Scene "${plan.name}" only partially applied - some lights didn't respond.`;
       return `Couldn't apply the "${plan.name}" scene - none of the lights responded.`;
     }
 
     case "media_play":
       await callService("media_player", "media_play", target);
-      return reply("Playing.");
+      return "Playing.";
 
     case "media_pause":
       await callService("media_player", "media_pause", target);
-      return reply("Paused.");
+      return "Paused.";
 
     case "media_stop":
       await callService("media_player", "media_stop", target);
-      return reply("Stopped.");
+      return "Stopped.";
 
     case "media_volume":
       await callService("media_player", "volume_set", { ...target, volume_level: (intent.volume ?? 50) / 100 });
-      return reply(`Volume set to ${intent.volume}%.`);
+      return `Volume set to ${intent.volume}%.`;
 
     case "switch_on":
     case "switch_off": {
@@ -115,11 +110,10 @@ export async function dispatch(intent: Intent): Promise<string> {
       }
       const on = intent.action === "switch_on";
       await callService("homeassistant", on ? "turn_on" : "turn_off", target);
-      return reply(on ? "Turned on." : "Turned off.");
+      return on ? "Turned on." : "Turned off.";
     }
 
-    case "unknown":
     default:
-      return reply("I didn't understand that.");
+      return "I didn't understand that.";
   }
 }

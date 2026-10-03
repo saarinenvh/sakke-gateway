@@ -1,26 +1,9 @@
 import { z } from "zod";
 import { config } from "../../config.js";
 import { parseJsonResponse } from "../../util/validation.js";
+import { weatherReadingSchema } from "./schema.js";
 
 const FORECAST_HOURS = 6;
-
-// Open-Meteo leaves gaps in hourly series as null rather than dropping them.
-const hourlySeriesSchema = z.array(z.number().nullable()).optional();
-
-const weatherReadingSchema = z.object({
-  current: z.object({
-    weather_code: z.number(),
-    temperature_2m: z.number(),
-    apparent_temperature: z.number(),
-    precipitation: z.number(),
-    wind_speed_10m: z.number(),
-    wind_gusts_10m: z.number(),
-  }),
-  hourly: z.object({
-    precipitation_probability: hourlySeriesSchema,
-    wind_speed_10m: hourlySeriesSchema,
-  }),
-});
 
 export type WeatherReading = z.output<typeof weatherReadingSchema>;
 

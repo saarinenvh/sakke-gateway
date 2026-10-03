@@ -2,8 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Tool } from "../types.js";
 import { setManualOverride, clearManualOverride } from "../../features/gpu/gpuStatus.js";
 import { config } from "../../config.js";
-import { parseOrThrow } from "../../util/validation.js";
-import { toolParameters } from "../parameters.js";
+import { toolParameters, parseToolArgs } from "../parameters.js";
 import { setGamingModeArgsSchema } from "./schema.js";
 
 // status-service.ps1's default port - see scripts/gpu-router/ in sakke-workspace.
@@ -34,7 +33,7 @@ export const setGamingModeTool: Tool = {
   },
   repeatable: () => false,
   execute: async (args, { log }) => {
-    const { mode } = parseOrThrow(setGamingModeArgsSchema, args, "set_gaming_mode tool arguments");
+    const { mode } = parseToolArgs(setGamingModeArgsSchema, args, "set_gaming_mode");
     const pcOllamaUrl = config.ollama.pc?.baseUrl;
     if (!pcOllamaUrl) return "GPU routing to your PC isn't configured, so there's nothing to override.";
 

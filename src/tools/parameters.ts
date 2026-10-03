@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseOrThrow } from "../util/validation.js";
 import type { ToolDefinition } from "./types.js";
 
 type ToolParameters = ToolDefinition["function"]["parameters"];
@@ -10,4 +11,11 @@ type ToolParameters = ToolDefinition["function"]["parameters"];
 export function toolParameters(schema: z.ZodObject): ToolParameters {
   const { properties = {}, required = [] } = z.toJSONSchema(schema, { io: "input" });
   return { type: "object", properties, required };
+}
+
+// Parses a tool call's arguments. A small model often sends `null` for a field
+// it means to leave out, so a null counts as absent rather than invalid.
+export function parseToolArgs<S extends z.ZodType>(schema: S, args: Record<string, unknown>, toolName: string): z.output<S> {
+  const present = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== null));
+  return parseOrThrow(schema, present, `${toolName} tool arguments`);
 }
