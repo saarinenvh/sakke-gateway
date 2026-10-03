@@ -38,7 +38,7 @@ function readSourceFiles(dir: string): SourceFile[] {
 
 function relativeImports(text: string): string[] {
   const found: string[] = [];
-  for (const match of text.matchAll(/(?:\bfrom|\bimport\(|^import)\s*["'](\.{1,2}\/[^"']+)["']/gm)) found.push(match[1]);
+  for (const match of text.matchAll(/(?:\bfrom|\bimport\s*\(|^\s*import)\s*["'](\.{1,2}\/[^"']+)["']/gm)) found.push(match[1]);
   return found;
 }
 

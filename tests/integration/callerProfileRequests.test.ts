@@ -5,6 +5,7 @@ import { writeText } from "../../src/inference/writeText.js";
 import { setSystemPromptBuilder } from "../../src/inference/systemPrompt.js";
 import { buildSystemPrompt } from "../../src/agent/systemPrompt.js";
 import { reloadConfig } from "../../src/config.js";
+import { announce } from "../../src/features/announcements/announcer.js";
 
 // What each tool-less caller profile sends to Ollama, byte for byte: the
 // system prompt, the messages and the request options. Pinned so that moving
@@ -66,5 +67,20 @@ describe("caller profile requests", () => {
     expect(bodies).toHaveLength(1);
     await expect(JSON.stringify({ request: bodies[0], text }, null, 2) + "\n")
       .toMatchFileSnapshot(`__snapshots__/callerProfileRequests/${profile}.json`);
+  });
+
+  // The other callers build their requests in prompts.ts files their own tests
+  // cover; the announcer builds its request inline, so pin it through announce.
+  it("the announcer sends the pinned announcement request", async () => {
+    const [, pinnedRequest] = CALLER_REQUESTS[0];
+    bodies = [];
+    await writeFor("announcement", pinnedRequest);
+    const [pinned] = bodies;
+
+    bodies = [];
+    // Home Assistant is unreachable here, so speaking fails after the wording.
+    await announce("the pasta is done", log).catch(() => undefined);
+
+    expect(bodies).toEqual([pinned]);
   });
 });
