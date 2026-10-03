@@ -15,9 +15,9 @@ override can force `busy` or `available` for a while (a default set in `gpuStatu
 
 | Export | Called by |
 | --- | --- |
-| `getGpuStatus()` | `agent/ollamaRouter.ts`, to pick the Ollama for a turn |
+| `getGpuStatus()` | `inference/ollamaRouter.ts`, to pick the Ollama for a request |
 | `setManualOverride`, `clearManualOverride` | `tools/gpu/tool.ts`, the model's GPU tool |
-| `getPcInput()` | `features/morning/liveDeps.ts`, for the morning brief's "first PC input" |
+| `getPcInput()` | `features/morning/morning.ts`, for the morning brief's "first PC input" |
 
 ## Data
 

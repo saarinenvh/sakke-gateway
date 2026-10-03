@@ -314,17 +314,6 @@ describe("tools outside the profile", () => {
   });
 });
 
-describe("a turn that must not act", () => {
-  it("never offers the tool schema under a profile with no tools", async () => {
-    ollama.script({ content: "Shall I vacuum, or do you enjoy the dust?" });
-
-    const result = await runAgent("write the nag", nextId(), log, { profile: "tidiness_nag" });
-
-    expect(result.content).toBe("Shall I vacuum, or do you enjoy the dust?");
-    expect(ollama.requests().map(r => r.hasTools)).toEqual([false]);
-  });
-});
-
 // Ollama restarts a loaded model whenever a request asks for a different
 // context size, so a mismatch here reloaded the shared model twice per
 // follow-up turn: once for the classifier, once more for the reply.
@@ -352,30 +341,5 @@ describe("whose context a request is", () => {
     expect(getConversation(id)).toBeDefined();
     expect(getCurrentState()).toBe("speaking");
     expect(result.continueConversation).toBe(true);
-  });
-
-  it("leaves no trace of a request its caller owns: no history, no display", async () => {
-    broadcastState("idle");
-    ollama.script({ content: "Time's up on the pasta, sir." });
-    const id = nextId();
-
-    const result = await runAgent("Tell the owner this now: Time's up: the pasta.", id, log, { profile: "announcement" });
-
-    expect(result.content).toBe("Time's up on the pasta, sir.");
-    expect(getConversation(id)).toBeUndefined();
-    expect(getCurrentState()).toBe("idle");
-    expect(result.continueConversation).toBe(false);
-  });
-
-  it("never treats a caller-owned request as a reply to an earlier one", async () => {
-    ollama.script({ content: "First line." }, { content: "Second line." });
-    const id = nextId();
-
-    await runAgent("say the first thing", id, log, { profile: "announcement" });
-    await runAgent("say the second thing", id, log, { profile: "announcement" });
-
-    // Each starts from the system prompt alone: nothing carried over.
-    const [, second] = ollama.requests();
-    expect(second.messages.map(m => m.role)).toEqual(["system", "user"]);
   });
 });

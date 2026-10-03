@@ -3,10 +3,10 @@ import { config } from "../../config.js";
 import { callService } from "../../integrations/homeAssistant/client.js";
 import { showSpeakingWhile } from "../display/displayState.js";
 import { withTimeout } from "../../util/async.js";
+import { writeText } from "../../inference/writeText.js";
+import { moduleLog } from "../../logger.js";
 
-// How Sakke would say a message, in its own voice. Injected at startup
-// (index.ts) rather than imported: writing it needs the agent, and the agent
-// imports every tool, this one included.
+// How Sakke would say a message, in its own voice.
 export type WordingWriter = (message: string) => Promise<string>;
 
 // A due announcement never waits long for its wording; past this, the message
@@ -24,10 +24,12 @@ export interface Announcement {
   wording: WordingSource;
 }
 
-let writeWording: WordingWriter = async () => {
-  throw new Error("no announcement wording writer configured");
-};
+const writeAnnouncementWording: WordingWriter = message =>
+  writeText("announcement", `Tell the owner this now, out loud, in your own words and briefly: ${message}`, moduleLog());
 
+let writeWording: WordingWriter = writeAnnouncementWording;
+
+// Tests replace the wording writer; the gateway uses the real one.
 export function setWordingWriter(writer: WordingWriter): void {
   writeWording = writer;
 }
