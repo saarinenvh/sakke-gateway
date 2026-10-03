@@ -20,8 +20,8 @@ import { setCoffeeAnswerStore } from "./features/morning/coffee.js";
 import { startMorningWakeUp } from "./features/morning/wakeUp.js";
 import { createLiveBriefDeps, createLiveMorningDeps } from "./features/morning/liveDeps.js";
 import { startMorningBrief } from "./features/morning/brief.js";
-import { getCalendarText, getTasksText } from "./tools/reminders/reminders.js";
-import { getWeather } from "./tools/weather/weather.js";
+import { getCalendarText, getTasksText } from "./features/reminders/reminders.js";
+import { getWeather } from "./integrations/openMeteo/weather.js";
 
 const app = buildApp();
 

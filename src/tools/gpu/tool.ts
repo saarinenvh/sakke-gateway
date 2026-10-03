@@ -1,26 +1,9 @@
-import type { FastifyBaseLogger } from "fastify";
 import type { Tool } from "../types.js";
 import { setManualOverride, clearManualOverride } from "../../features/gpu/gpuStatus.js";
 import { config } from "../../config.js";
+import { unloadPcOllamaModels } from "../../integrations/pcStatus/client.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";
 import { setGamingModeArgsSchema } from "./schema.js";
-
-// status-service.ps1's default port - see scripts/gpu-router/ in sakke-workspace.
-const PC_STATUS_SERVICE_PORT = 5055;
-
-// Asks the PC's own status-service.ps1 to free Ollama's VRAM (its POST
-// /unload, stateless, just runs the same local unload it already does for
-// auto-detected busy) rather than duplicating that trick here - the actual
-// "how" of unloading Ollama should live in exactly one place. Same host as
-// PC_OLLAMA_BASE_URL, different port - the status service and Ollama are
-// separate processes on the PC.
-async function unloadPcOllamaModels(pcOllamaUrl: string, log: FastifyBaseLogger): Promise<void> {
-  const host = new URL(pcOllamaUrl).hostname;
-  const url = `http://${host}:${PC_STATUS_SERVICE_PORT}/unload`;
-  const res = await fetch(url, { method: "POST", signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`PC status service /unload ${res.status}`);
-  log.info({ url }, "Requested PC to unload Ollama VRAM");
-}
 
 export const setGamingModeTool: Tool = {
   definition: {
