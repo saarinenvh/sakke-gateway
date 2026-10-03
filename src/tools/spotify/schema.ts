@@ -53,7 +53,7 @@ export const spotifyPlayerAttributesExample = {
 };
 
 export const spotifyPlayerAttributesSchema = z.object({
-  source_list: z.array(z.string()).optional(),
+  source_list: z.array(z.string()).nullish(),
 });
 
 // Spotify Web API → gateway (client credentials flow).

@@ -32,4 +32,8 @@ describe("spotify schemas", () => {
     expect(spotifyArgsSchema.parse({ action: "media_stop" })).toEqual({ action: "pause" });
     expect(spotifyArgsSchema.parse({ action: "volume", volume: "40" })).toEqual({ action: "volume", volume: 40 });
   });
+
+  it("read a null source_list as no devices yet", () => {
+    expect(spotifyPlayerAttributesSchema.parse({ source_list: null }).source_list ?? []).toEqual([]);
+  });
 });
