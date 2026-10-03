@@ -1,6 +1,7 @@
 import { tools } from "../tools/registry.js";
 import { clearSpotifySuggestion } from "../features/spotify/spotify.js";
 import type { Message } from "../integrations/ollama/types.js";
+import { RESPONSE_RESERVE_TOKENS } from "../inference/ollamaRequest.js";
 
 export interface Conversation {
   messages: Message[];
@@ -53,9 +54,6 @@ export function pruneStale(): void {
 // margin - approximate on purpose, trimming a turn earlier than strictly
 // necessary is harmless, but truncating mid-request (the original bug) isn't.
 const CHARS_PER_TOKEN = 4;
-// Exported so agent.ts's num_predict is the same literal, not a second one
-// that has to be kept in sync by convention.
-export const RESPONSE_RESERVE_TOKENS = 2000;
 const SAFETY_MARGIN_TOKENS = 300; // chat template / role overhead, not reflected in raw content length
 
 // The tool schemas ride along with every request and are a meaningful share of
