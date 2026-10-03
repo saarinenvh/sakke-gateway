@@ -59,7 +59,7 @@ function hoursOfDay(hour: number, meridiem: Meridiem): number[] {
 }
 
 function earliest(instants: Date[]): Date {
-  return instants.reduce((first, instant) => (instant < first ? instant : first));
+  return instants.reduce((first, instant) => (instant < first ? instant : first), instants[0]);
 }
 
 // How late a clock-time job may still run after the gateway was down. A
