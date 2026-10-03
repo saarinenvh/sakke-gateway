@@ -1,8 +1,10 @@
 import { parseToolArgs } from "../parameters.js";
 import { config } from "../../config.js";
 import { activeScheduler, defaultAnnouncement, type Scheduler } from "../../features/scheduling/scheduler.js";
-import type { ScheduledJob } from "../../features/scheduling/db/ScheduledJob.entity.js";
-import { scheduleRequestSchema, type SetRequest } from "./schema.js";
+import { resolveClockTime } from "../../features/scheduling/policy.js";
+import type { JobSource, ScheduledJob } from "../../features/scheduling/db/ScheduledJob.entity.js";
+import { addDays, localDate, localTimeOfDay } from "../../util/time.js";
+import { scheduleRequestSchema, type ScheduleWhen, type SetRequest } from "./schema.js";
 
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
@@ -24,14 +26,18 @@ export async function executeSchedule(args: Record<string, unknown>): Promise<st
   }
 }
 
+type Timing =
+  | { kind: "due"; runAt: Date; source: JobSource; spoken: string }
+  | { kind: "refused"; reply: string };
+
 async function setJob(scheduler: Scheduler, request: SetRequest): Promise<string> {
-  const delayMs = Math.round(request.when.in_minutes * MINUTE_MS);
-  if (delayMs < SECOND_MS) return "That's too soon to schedule - give it at least a second.";
+  const timing = resolveTiming(request.when, new Date());
+  if (timing.kind === "refused") return timing.reply;
 
   const call = request.run ?? defaultAnnouncement(request.label);
   const result = await scheduler.schedule({
-    runAt: new Date(Date.now() + delayMs),
-    source: "in",
+    runAt: timing.runAt,
+    source: timing.source,
     tool: call.tool,
     args: call.args,
     label: request.label,
@@ -39,7 +45,27 @@ async function setJob(scheduler: Scheduler, request: SetRequest): Promise<string
 
   if (result.kind === "not_schedulable") return `${result.tool} can't be scheduled.`;
   const { job } = result;
-  return `Scheduled for ${localTime(job.runAt)}, in ${describeDelay(delayMs)}: ${job.label}. ID: ${job.id}.`;
+  return `Scheduled for ${timing.spoken}: ${job.label}. ID: ${job.id}.`;
+}
+
+// When the job is due, and how to say it back, so a misheard time is caught.
+function resolveTiming(when: ScheduleWhen, now: Date): Timing {
+  if (when.kind === "in") {
+    const delayMs = Math.round(when.minutes * MINUTE_MS);
+    if (delayMs < SECOND_MS) return { kind: "refused", reply: "That's too soon to schedule - give it at least a second." };
+    const runAt = new Date(now.getTime() + delayMs);
+    return { kind: "due", runAt, source: "in", spoken: `${localTime(runAt)}, in ${describeDelay(delayMs)}` };
+  }
+
+  const resolution = resolveClockTime(when.time, now, config.timezone);
+  switch (resolution.kind) {
+    case "resolved":
+      return { kind: "due", runAt: resolution.runAt, source: "at", spoken: `${localTime(resolution.runAt)} ${resolution.day}` };
+    case "contradictory":
+      return { kind: "refused", reply: "That time contradicts itself (an hour of 13 or more with am, or 0 with pm). Nothing was scheduled; ask which time was meant." };
+    case "passed_today":
+      return { kind: "refused", reply: "That time has already passed today. Nothing was scheduled." };
+  }
 }
 
 // Without an id, the only scheduled job is the one meant.
@@ -63,12 +89,21 @@ function listJobs(scheduler: Scheduler): string {
 }
 
 function describeJob(job: ScheduledJob): string {
-  const remainingMs = Math.max(0, job.runAt.getTime() - Date.now());
-  return `${job.id}: "${job.label}" at ${localTime(job.runAt)}, in ${describeDelay(remainingMs)}`;
+  const now = new Date();
+  const remainingMs = Math.max(0, job.runAt.getTime() - now.getTime());
+  return `${job.id}: "${job.label}" at ${localTime(job.runAt)}${dayAfterToday(job.runAt, now)}, in ${describeDelay(remainingMs)}`;
+}
+
+// Nothing for today; " tomorrow", or the date, for a later day.
+function dayAfterToday(at: Date, now: Date): string {
+  const today = localDate(now.getTime(), config.timezone);
+  const day = localDate(at.getTime(), config.timezone);
+  if (day === today) return "";
+  return day === addDays(today, 1) ? " tomorrow" : ` on ${day}`;
 }
 
 function localTime(at: Date): string {
-  return at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone });
+  return localTimeOfDay(at, config.timezone);
 }
 
 function describeDelay(delayMs: number): string {
