@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { config } from "../../config.js";
 import { parseJsonResponse } from "../../util/validation.js";
-import { entityStateSchema, entityStatesSchema, stateHistorySchema, todoItemsSchema, type EntityState, type TodoItem } from "./schemas.js";
+import {
+  entityStateSchema,
+  entityStatesSchema,
+  serviceResponseEnvelopeSchema,
+  stateHistorySchema,
+  todoGetItemsResponseSchemaFor,
+  type EntityState,
+  type TodoItem,
+} from "./schema.js";
 
 export type { EntityState };
 
@@ -31,12 +39,6 @@ export class HaError extends Error {
 export interface RequestOptions {
   timeoutMs?: number;
 }
-
-// Newer HA versions wrap a service's data as { changed_states, service_response };
-// older ones return the data bare.
-const serviceResponseEnvelopeSchema = z.object({
-  service_response: z.record(z.string(), z.unknown()),
-});
 
 export async function haGet<S extends z.ZodType>(path: string, schema: S, options?: RequestOptions): Promise<z.output<S>> {
   const res = await request("GET", path, undefined, options);
@@ -97,11 +99,8 @@ export async function callServiceWithResponse<S extends z.ZodType>(
   return parseJsonResponse(res, z.preprocess(unwrapServiceResponse, schema), `HA POST ${path}`);
 }
 
-// todo.get_items answers keyed by entity id. The entity asked about must be
-// in the answer - a missing one is a malformed response, not an empty list.
 export async function getTodoItems(entityId: string, options?: RequestOptions): Promise<TodoItem[]> {
-  const schema = z.object({ [entityId]: todoItemsSchema });
-  const response = await callServiceWithResponse("todo", "get_items", { entity_id: entityId }, schema, options);
+  const response = await callServiceWithResponse("todo", "get_items", { entity_id: entityId }, todoGetItemsResponseSchemaFor(entityId), options);
   return response[entityId].items;
 }
 
