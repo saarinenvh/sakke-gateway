@@ -20,6 +20,18 @@ describe("localWallTimeToInstant", () => {
     expect(localWallTimeToInstant(date, hour, minute, HELSINKI).toISOString()).toBe(expected);
   });
 
+  // Far from UTC, the change happens on the previous UTC day.
+  const otherZones: [string, string, string, number, number, string][] = [
+    ["Auckland, a skipped time (02:30 -> 03:30)", "Pacific/Auckland", "2027-09-26", 2, 30, "2027-09-25T14:30:00.000Z"],
+    ["Auckland, the first of a repeated time", "Pacific/Auckland", "2027-04-04", 2, 30, "2027-04-03T13:30:00.000Z"],
+    ["New York, a skipped time (02:30 -> 03:30)", "America/New_York", "2027-03-14", 2, 30, "2027-03-14T07:30:00.000Z"],
+    ["New York, the first of a repeated time", "America/New_York", "2026-11-01", 1, 30, "2026-11-01T05:30:00.000Z"],
+  ];
+
+  it.each(otherZones)("%s", (_what, timezone, date, hour, minute, expected) => {
+    expect(localWallTimeToInstant(date, hour, minute, timezone).toISOString()).toBe(expected);
+  });
+
   it("works for a timezone without daylight saving", () => {
     expect(localWallTimeToInstant("2026-10-25", 3, 30, "UTC").toISOString()).toBe("2026-10-25T03:30:00.000Z");
   });
