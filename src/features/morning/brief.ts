@@ -4,7 +4,7 @@ import { moduleLog } from "../../logger.js";
 import { withTimeout } from "../../util/async.js";
 import { localDate } from "../../util/time.js";
 import type { PcInput } from "../gpu/gpuStatus.js";
-import type { MorningRepository } from "./morningRepository.js";
+import type { MorningRepository } from "./db/morningRepository.js";
 import { decideBrief, findMorningStart, pickForDay, type BriefDecision, type BriefWaitReason, type MorningStart } from "./policy.js";
 import { buildBriefRequest, fallbackBrief, STRUCTURE_HINTS, type DayFacts } from "./prompts.js";
 

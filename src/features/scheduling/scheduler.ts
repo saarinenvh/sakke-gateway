@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import type { FastifyBaseLogger } from "fastify";
-import type { JobSource, ScheduledJob } from "./ScheduledJob.entity.js";
-import type { FinishedStatus, JobRepository } from "./jobRepository.js";
+import type { JobSource, ScheduledJob } from "./db/ScheduledJob.entity.js";
+import type { FinishedStatus, JobRepository } from "./db/jobRepository.js";
 
 // What the scheduler needs from storage; JobRepository in production, a fake
 // in tests.

@@ -3,11 +3,11 @@ import { DataSource } from "typeorm";
 import type { DatabaseConfig } from "../../src/config.js";
 import { createDataSource } from "../../src/db/dataSource.js";
 import { connectDatabase } from "../../src/db/database.js";
-import { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
-import { JobRepository } from "../../src/features/scheduling/jobRepository.js";
-import { MorningBrief } from "../../src/features/morning/MorningBrief.entity.js";
-import { MorningDay } from "../../src/features/morning/MorningDay.entity.js";
-import { MorningRepository } from "../../src/features/morning/morningRepository.js";
+import { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
+import { JobRepository } from "../../src/features/scheduling/db/jobRepository.js";
+import { MorningBrief } from "../../src/features/morning/db/MorningBrief.entity.js";
+import { MorningDay } from "../../src/features/morning/db/MorningDay.entity.js";
+import { MorningRepository } from "../../src/features/morning/db/morningRepository.js";
 
 // Runs against a real MariaDB only when TEST_DB_HOST is set: the CI service
 // container, or a local throwaway database. It drops the gateway's tables

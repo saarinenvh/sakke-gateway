@@ -1,5 +1,5 @@
-import type { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
-import type { FinishedStatus } from "../../src/features/scheduling/jobRepository.js";
+import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
+import type { FinishedStatus } from "../../src/features/scheduling/db/jobRepository.js";
 import type { JobStore } from "../../src/features/scheduling/scheduler.js";
 
 // JobRepository's contract in memory. The real repository is tested against

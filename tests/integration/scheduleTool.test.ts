@@ -4,7 +4,7 @@ import { FakeJobStore } from "../fixtures/fakeJobStore.js";
 import { executeTool, isSchedulable, runScheduledCall } from "../../src/tools/registry.js";
 import { startScheduler, stopScheduler } from "../../src/features/scheduling/scheduler.js";
 import { setWordingWriter } from "../../src/features/announcements/announcer.js";
-import type { ScheduledJob } from "../../src/features/scheduling/ScheduledJob.entity.js";
+import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
 import { config, reloadConfig } from "../../src/config.js";
 
 // The schedule tool as the model uses it, on a scheduler over an in-memory

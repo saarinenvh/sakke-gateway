@@ -1,4 +1,4 @@
-import type { MorningRepository } from "./morningRepository.js";
+import type { MorningRepository } from "./db/morningRepository.js";
 
 // The repository once the database is connected. Until then a coffee answer
 // can't be recorded.

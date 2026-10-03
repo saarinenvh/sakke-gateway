@@ -1,6 +1,6 @@
 import type { LocalTime } from "../../config.js";
 import { localDate, localMinuteOfDay } from "../../util/time.js";
-import type { MorningStartSource } from "./MorningBrief.entity.js";
+import type { MorningStartSource } from "./db/MorningBrief.entity.js";
 
 // Pure rules for the morning wake-up and the day summary: every input,
 // including "now", is passed in.
