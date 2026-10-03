@@ -191,7 +191,8 @@ describe("POST /v1/chat/completions", () => {
   it("answers in the shape sakke_agent reads", async () => {
     ollama.script({ content: "Done." });
     const res = await app.inject({ method: "POST", url: "/v1/chat/completions", payload: chatCompletionRequestExample });
-    parseOrThrow(chatCompletionResponseSchema, res.json(), "chat completion response");
+    const response = parseOrThrow(chatCompletionResponseSchema, res.json(), "chat completion response");
+    expect(response.choices[0].message.content).toBe("Done.");
   });
 
   // 68a8a2b. A thrown agent call used to reach the caller as a bare 500, which
