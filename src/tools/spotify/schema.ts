@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelNumber } from "../parameters.js";
 
 // Model → gateway: the arguments of a spotify tool call.
 
@@ -21,9 +22,9 @@ export const spotifyArgsSchema = z.object({
     .describe("Search query for suggest, or for play when directly naming a known personal playlist. Omit when picking a previously suggested option by index."),
   type: z.enum(SPOTIFY_CONTENT_TYPES).optional()
     .describe("Type of content to search for (defaults to track). Only used with suggest."),
-  volume: z.coerce.number().optional().describe("0-100 for volume action"),
-  offset: z.coerce.number().optional().describe("Pagination offset for suggest only - 0 for first 3 results, 3 for the next 3, etc."),
-  index: z.coerce.number().optional()
+  volume: modelNumber.optional().describe("0-100 for volume action"),
+  offset: modelNumber.optional().describe("Pagination offset for suggest only - 0 for first 3 results, 3 for the next 3, etc."),
+  index: modelNumber.optional()
     .describe("For 'play' only: which of the 3 most recently suggested options to play (1, 2, or 3). No other parameters needed - the server already knows what was suggested."),
 });
 

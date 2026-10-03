@@ -19,3 +19,11 @@ export function parseToolArgs<S extends z.ZodType>(schema: S, args: Record<strin
   const present = Object.fromEntries(Object.entries(args).filter(([, value]) => value !== null));
   return parseOrThrow(schema, present, `${toolName} tool arguments`);
 }
+
+// A number argument, which the model sometimes sends as a string ("50"). A
+// blank string stays a string and fails, rather than becoming 0 the way
+// Number("") and z.coerce would: for a brightness, that's lights out.
+export const modelNumber = z.preprocess(
+  value => (typeof value === "string" && value.trim() !== "" ? Number(value) : value),
+  z.number(),
+);

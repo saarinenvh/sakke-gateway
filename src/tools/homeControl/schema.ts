@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelNumber } from "../parameters.js";
 
 // Model → gateway: the arguments of a control_home_assistant tool call.
 
@@ -13,10 +14,6 @@ export const controlHomeAssistantArgsExample = {
   color: "warm white",
   volume: 40,
 };
-
-// The model sometimes sends a number as a string ("50"). Not z.coerce, which
-// would turn a null into 0 - for brightness, lights out.
-const modelNumber = z.preprocess(value => (typeof value === "string" ? Number(value) : value), z.number());
 
 export const controlHomeAssistantArgsSchema = z.object({
   action: z
