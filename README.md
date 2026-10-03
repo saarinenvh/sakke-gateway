@@ -47,7 +47,7 @@ request may use is its profile's choice. How that fits together:
 | `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
 | `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
 | `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, stored in the gateway database |
+| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, after a duration or at a clock time, stored in the gateway database |
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |

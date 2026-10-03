@@ -6,7 +6,7 @@ import { Column, Entity, Index, PrimaryColumn } from "typeorm";
 export const JOB_SOURCES = ["in", "at"] as const;
 export type JobSource = (typeof JOB_SOURCES)[number];
 
-export const JOB_STATUSES = ["pending", "done", "failed", "cancelled", "dropped"] as const;
+export const JOB_STATUSES = ["pending", "running", "done", "failed", "cancelled", "dropped"] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 // A tool call stored to run later. Rows stay after they finish, as the
