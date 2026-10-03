@@ -83,7 +83,7 @@ beforeEach(() => {
 
 describe("Spotify requests carry Spotify's own token, not Home Assistant's", () => {
   it("search (spotifySuggest) sends the Spotify access token", async () => {
-    const { spotifySuggest } = await import("../../src/tools/spotify/spotify.js");
+    const { spotifySuggest } = await import("../../src/features/spotify/spotify.js");
     await spotifySuggest("cred-test-search", "ensiferum", "track", 0);
 
     expect(spotifyAuthHeaders).toHaveLength(1);
@@ -93,7 +93,7 @@ describe("Spotify requests carry Spotify's own token, not Home Assistant's", () 
   });
 
   it("artist album lookup (via the suggest-then-pick flow) sends the Spotify access token", async () => {
-    const { spotifySuggest, spotifyPlayIndexed } = await import("../../src/tools/spotify/spotify.js");
+    const { spotifySuggest, spotifyPlayIndexed } = await import("../../src/features/spotify/spotify.js");
     await spotifySuggest("cred-test-artist", "ensiferum", "artist", 0);
     await spotifyPlayIndexed("cred-test-artist", 1);
 
