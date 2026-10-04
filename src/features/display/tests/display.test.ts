@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { broadcastState, getCurrentState, showSpeakingWhile, speakingDurationMs } from "../displayState.js";
+import { broadcastState, getCurrentState, showSpeakingWhile, speakingDurationMs } from "../display.js";
 
 // A speech attempt the test finishes by hand.
 function pendingSpeech() {

@@ -1,7 +1,7 @@
 import { config } from "../../config.js";
 import { callService, getState, getStateHistory } from "../../integrations/homeAssistant/client.js";
 import { moduleLog } from "../../logger.js";
-import { showSpeakingWhile } from "../display/displayState.js";
+import { showSpeakingWhile } from "../display/display.js";
 import { writeText } from "../../inference/writeText.js";
 import { startTidinessCoach, type CoachDeps } from "./coach.js";
 import { restoreTidinessState } from "./store.js";

@@ -1,6 +1,6 @@
 import { parseToolArgs } from "../parameters.js";
 import type { ToolContext } from "../types.js";
-import { announce } from "../../features/announcements/announcer.js";
+import { announce } from "../../features/announcements/announcements.js";
 import { announceArgsSchema } from "./schema.js";
 
 export async function executeAnnounce(args: Record<string, unknown>, ctx: ToolContext): Promise<string> {

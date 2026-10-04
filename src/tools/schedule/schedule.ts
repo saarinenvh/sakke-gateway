@@ -1,6 +1,6 @@
 import { parseToolArgs } from "../parameters.js";
 import { config } from "../../config.js";
-import { activeScheduler, defaultAnnouncement, type Scheduler } from "../../features/scheduling/scheduler.js";
+import { activeScheduler, defaultAnnouncement, type Scheduler } from "../../features/scheduling/scheduling.js";
 import type { ScheduledJob } from "../../features/scheduling/db/ScheduledJob.entity.js";
 import { scheduleRequestSchema, type SetRequest } from "./schema.js";
 
