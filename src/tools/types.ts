@@ -20,6 +20,8 @@ export interface ToolContext {
   log: FastifyBaseLogger;
   /** Tools that keep per-conversation state (Spotify's suggestions) key on this. */
   conversationId: string;
+  /** Set only when the scheduler runs the call: the time the job was due. */
+  scheduledFor?: Date;
 }
 
 // A tool's schema and its implementation live together, in the feature that

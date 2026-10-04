@@ -363,7 +363,7 @@
   },
   {
     "function": {
-      "description": "Timers and reminders: set one, cancel one, or list what's scheduled. 'Set a timer for 10 minutes for the pasta', 'remind me in half an hour to check the oven' -> set, with when.in_minutes and a short label; when it's time, you announce the label out loud. 'Cancel the pasta timer' -> cancel. 'What timers do I have?' -> list.",
+      "description": "Timers and reminders: set one, cancel one, or list what's scheduled. When it's time, you announce the label out loud. 'Set a timer for 10 minutes for the pasta', 'remind me in half an hour to check the oven' -> set with when.in_minutes. 'Remind me at 4 pm to take the meat out' -> set with when.at {hour: 4, meridiem: 'pm'}; 'at half past six' -> {hour: 6, minute: 30, meridiem: 'unspecified'}; 'tomorrow at 7' -> {hour: 7, meridiem: 'unspecified', day: 'tomorrow'}. Give the hour as said and never work out the time yourself; the reply says the time back. 'Cancel the pasta timer' -> cancel. 'What timers do I have?' -> list.",
       "name": "schedule",
       "parameters": {
         "properties": {
@@ -380,20 +380,52 @@
             "type": "string"
           },
           "label": {
-            "description": "For set: what it's for, e.g. 'the pasta' or 'check the oven'. Announced when it's time.",
+            "description": "For set: what it's for, e.g. 'the pasta' or 'take the meat out of the fridge'. Announced when it's time.",
             "type": "string"
           },
           "when": {
-            "description": "For set: when it should happen.",
+            "description": "For set: when it should happen. Either in_minutes or at, never both.",
             "properties": {
+              "at": {
+                "description": "For a clock time: 'at 4 pm', 'at half past six', 'tomorrow at 7'.",
+                "properties": {
+                  "day": {
+                    "description": "Only if it was said: 'today' or 'tomorrow'.",
+                    "enum": [
+                      "today",
+                      "tomorrow"
+                    ],
+                    "type": "string"
+                  },
+                  "hour": {
+                    "description": "The hour as said: 4 for 'at 4' or 'at 4 pm', 16 for 'at 16:00'.",
+                    "type": "number"
+                  },
+                  "meridiem": {
+                    "description": "'am' or 'pm' only if it was said; otherwise 'unspecified'.",
+                    "enum": [
+                      "am",
+                      "pm",
+                      "unspecified"
+                    ],
+                    "type": "string"
+                  },
+                  "minute": {
+                    "description": "Minutes past the hour, e.g. 30 for 'half past'. Leave out for on the hour.",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "hour",
+                  "meridiem"
+                ],
+                "type": "object"
+              },
               "in_minutes": {
-                "description": "Minutes from now, e.g. 10, or 0.5 for thirty seconds.",
+                "description": "Only for 'in X minutes': minutes from now, e.g. 10, or 0.5 for thirty seconds.",
                 "type": "number"
               }
             },
-            "required": [
-              "in_minutes"
-            ],
             "type": "object"
           }
         },

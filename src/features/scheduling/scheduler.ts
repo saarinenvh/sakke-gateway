@@ -2,10 +2,11 @@ import { randomBytes } from "crypto";
 import type { FastifyBaseLogger } from "fastify";
 import type { JobSource, ScheduledJob } from "./db/ScheduledJob.entity.js";
 import type { FinishedStatus, JobRepository } from "./db/jobRepository.js";
+import { CLOCK_TIME_GRACE_MS, decideMissedJob } from "./policy.js";
 
 // What the scheduler needs from storage; JobRepository in production, a fake
 // in tests.
-export type JobStore = Pick<JobRepository, "insert" | "insertIgnoringExisting" | "listPending" | "finish">;
+export type JobStore = Pick<JobRepository, "insert" | "insertIgnoringExisting" | "listPending" | "listRunning" | "claim" | "finish">;
 
 export interface JobOutcome {
   status: Extract<FinishedStatus, "done" | "failed">;
@@ -60,13 +61,18 @@ export class Scheduler {
 
   constructor(private readonly deps: SchedulerDeps) {}
 
-  // Arms every pending job. A duration job that came due while the gateway was
-  // down is dropped rather than run late.
+  // Arms every pending job. One that came due while the gateway was down runs
+  // late or is dropped, by the rule in policy.ts. One that was running when the
+  // gateway stopped is recorded as failed, never run again.
   async start(): Promise<void> {
+    for (const job of await this.deps.store.listRunning()) {
+      await this.record(job, "failed", "outcome unknown: it was running when the gateway stopped");
+    }
+
     const pending = await this.deps.store.listPending();
     let dropped = 0;
     for (const job of pending) {
-      if (this.cameDueWhileDown(job)) {
+      if (this.isDue(job) && decideMissedJob(job, this.deps.now()) === "drop") {
         await this.drop(job);
         dropped++;
         continue;
@@ -140,9 +146,26 @@ export class Scheduler {
       return;
     }
     this.armed.delete(job.id);
+    if (!(await this.claim(job))) return;
 
     const outcome = await this.run(job);
     await this.record(job, outcome.status, outcome.result);
+  }
+
+  // Marked running in the database before it runs, so a run cut short by a
+  // stop is never repeated. If that can't be written, the job doesn't run now:
+  // it stays pending, and the next start decides, as for any job missed while
+  // the gateway was down. Missing an announcement is the quieter failure than
+  // saying it twice.
+  private async claim(job: ScheduledJob): Promise<boolean> {
+    try {
+      if (await this.deps.store.claim(job.id)) return true;
+      this.deps.log.warn({ jobId: job.id }, "Due job is no longer pending, not running it");
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.deps.log.error({ jobId: job.id, err: reason }, "Could not mark a due job as running, not running it now");
+    }
+    return false;
   }
 
   private async run(job: ScheduledJob): Promise<JobOutcome> {
@@ -154,8 +177,8 @@ export class Scheduler {
   }
 
   // The job has already run; a failure to record it is logged, not retried.
-  // After a restart the row is still pending, and a duration job is then
-  // dropped rather than run a second time.
+  // The row stays running, and the next start records it as failed rather
+  // than running it again.
   private async record(job: ScheduledJob, status: FinishedStatus, result: string | null): Promise<void> {
     const stored = result === null ? null : result.slice(0, MAX_STORED_RESULT_CHARS);
     try {
@@ -168,13 +191,14 @@ export class Scheduler {
   }
 
   private drop(job: ScheduledJob): Promise<void> {
-    return this.record(job, "dropped", "came due while the gateway was down");
+    const reason = job.source === "in"
+      ? "came due while the gateway was down"
+      : `came due more than ${CLOCK_TIME_GRACE_MS / 60_000} minutes before the gateway was back`;
+    return this.record(job, "dropped", reason);
   }
 
-  // Clock-time jobs get their own late-running rule in Phase 2; until then only
-  // duration jobs exist.
-  private cameDueWhileDown(job: ScheduledJob): boolean {
-    return job.source === "in" && job.runAt.getTime() <= this.deps.now().getTime();
+  private isDue(job: ScheduledJob): boolean {
+    return job.runAt.getTime() <= this.deps.now().getTime();
   }
 
   private findPending(idOrLabel: string): ScheduledJob | undefined {
