@@ -47,6 +47,32 @@ export function recentExchanges(messages: Message[], count = CLASSIFIER_HISTORY_
   return exchanges.slice(-count);
 }
 
+// Short answers the model can misread as noise, trusted only when the
+// assistant's last reply asked something. Compared lowercased and without
+// punctuation.
+const SHORT_ANSWERS: ReadonlySet<string> = new Set([
+  "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please", "yes please", "sure thing", "of course",
+  "do it", "yes do it", "yeah do it", "go ahead", "go for it",
+]);
+
+/**
+ * A short yes-style answer to a reply that asked the user something. Short
+ * declines aren't here: sakke_agent closes the mic on them before the gateway.
+ */
+export function isShortAnswerToQuestion(lastAssistantMessage: string, newUtterance: string): boolean {
+  // Anywhere, not only at the end: the persona often adds a quip after the
+  // question ("Want me to activate it? Just say the word.").
+  return lastAssistantMessage.includes("?") && SHORT_ANSWERS.has(normalizeUtterance(newUtterance));
+}
+
+function normalizeUtterance(utterance: string): string {
+  return utterance
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function truncateReply(reply: string): string {
   return reply.length > MAX_REPLY_CHARS ? `${reply.slice(0, MAX_REPLY_CHARS)}...` : reply;
 }
@@ -65,6 +91,15 @@ export async function classifyFollowUp(
   newUtterance: string,
   log: FastifyBaseLogger,
 ): Promise<FollowUpVerdict> {
+  // Decided without the model: the prompt can't be tuned to catch these
+  // without breaking other verdicts.
+  const lastUserMessage = exchanges[exchanges.length - 1]?.user ?? "";
+  const lastAssistantMessage = exchanges[exchanges.length - 1]?.assistant ?? "";
+  if (isShortAnswerToQuestion(lastAssistantMessage, newUtterance)) {
+    log.info({ lastUserMessage, lastAssistantMessage, newUtterance, verdict: "continuation", decidedBy: "short-answer rule" }, "Follow-up classification");
+    return "continuation";
+  }
+
   // The user's messages supply the topic to compare against; the assistant's
   // line alone lets an open-ended reply "continue" into anything.
   // Addressee is decided before topic: judged by topic first, the model
@@ -122,7 +157,7 @@ Answer in exactly this form: <category> <complexity>, for example: continuation 
     const complexity = parseComplexity(raw);
 
     // TEMP: info level to observe real-world verdicts during tuning; demote to log.debug once validated.
-    log.info({ model, exchanges, newUtterance, raw, verdict, complexity }, "Follow-up classification");
+    log.info({ model, lastUserMessage, lastAssistantMessage, newUtterance, raw, verdict, complexity }, "Follow-up classification");
 
     return verdict;
   } catch (err) {
