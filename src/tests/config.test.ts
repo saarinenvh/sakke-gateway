@@ -167,7 +167,7 @@ describe("openai", () => {
     expect(config.openai.lightingTimeoutMs).toBe(60_000);
   });
 
-  it.each(["soon", "0", "-5", "1.5"])("reports a timeout of %s and uses the default", raw => {
+  it.each(["soon", "0", "-5", "1.5", "90000", "2147483648"])("reports a timeout of %s and uses the default", raw => {
     env({ OPENAI_LIGHTING_TIMEOUT_MS: raw });
     expect(config.openai.lightingTimeoutMs).toBe(75_000);
     expect(config.problems.some(p => p.includes("OPENAI_LIGHTING_TIMEOUT_MS"))).toBe(true);

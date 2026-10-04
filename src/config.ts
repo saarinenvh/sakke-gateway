@@ -337,12 +337,18 @@ function parseReasoningEffort(raw: string | undefined, problems: string[]): Reas
 // Long enough for gpt-5.x at high reasoning effort, with room left for the
 // Ollama turns around the tool call inside Home Assistant's 90 s.
 const DEFAULT_LIGHTING_TIMEOUT_MS = 75_000;
+// Home Assistant abandons the voice turn at 90 s, so a longer wait only hides
+// the failure. The cap also keeps the value far below Node's timer limit, past
+// which AbortSignal.timeout would fire almost immediately.
+const MAX_LIGHTING_TIMEOUT_MS = 90_000;
 
 function parseLightingTimeoutMs(raw: string | undefined, problems: string[]): number {
   if (raw === undefined) return DEFAULT_LIGHTING_TIMEOUT_MS;
   const parsed = Number(raw);
-  if (Number.isInteger(parsed) && parsed > 0) return parsed;
-  problems.push(`OPENAI_LIGHTING_TIMEOUT_MS "${raw}" is not a positive whole number of milliseconds - using ${DEFAULT_LIGHTING_TIMEOUT_MS}`);
+  if (Number.isInteger(parsed) && parsed > 0 && parsed < MAX_LIGHTING_TIMEOUT_MS) return parsed;
+  problems.push(
+    `OPENAI_LIGHTING_TIMEOUT_MS "${raw}" must be a whole number of milliseconds between 1 and ${MAX_LIGHTING_TIMEOUT_MS - 1} - using ${DEFAULT_LIGHTING_TIMEOUT_MS}`,
+  );
   return DEFAULT_LIGHTING_TIMEOUT_MS;
 }
 
