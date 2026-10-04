@@ -24,8 +24,14 @@ export interface Announcement {
   wording: WordingSource;
 }
 
+// Not "tell the owner": the model took "owner" as a form of address and began
+// with "Owner, ...".
+export function announcementRequest(message: string): string {
+  return `Say this out loud now, in your own words and briefly: ${message}`;
+}
+
 const writeAnnouncementWording: WordingWriter = message =>
-  writeText("announcement", `Tell the owner this now, out loud, in your own words and briefly: ${message}`, moduleLog());
+  writeText("announcement", announcementRequest(message), moduleLog());
 
 let writeWording: WordingWriter = writeAnnouncementWording;
 

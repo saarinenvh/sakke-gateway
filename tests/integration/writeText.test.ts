@@ -44,7 +44,7 @@ describe("writeText", () => {
     broadcastState("idle");
     ollama.script({ content: "Time's up on the pasta, sir." });
 
-    const text = await writeText("announcement", "Tell the owner this now: Time's up: the pasta.", log);
+    const text = await writeText("announcement", "Say this out loud now: Time's up: the pasta.", log);
 
     expect(text).toBe("Time's up on the pasta, sir.");
     expect(getCurrentState()).toBe("idle");
