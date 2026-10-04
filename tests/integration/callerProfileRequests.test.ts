@@ -5,7 +5,7 @@ import { writeText } from "../../src/inference/writeText.js";
 import { setSystemPromptBuilder } from "../../src/inference/systemPrompt.js";
 import { buildSystemPrompt } from "../../src/agent/systemPrompt.js";
 import { reloadConfig } from "../../src/config.js";
-import { announce } from "../../src/features/announcements/announcements.js";
+import { announce, announcementRequest } from "../../src/features/announcements/announcements.js";
 
 // What each tool-less caller profile sends to Ollama, byte for byte: the
 // system prompt, the messages and the request options. Pinned so that moving
@@ -17,7 +17,7 @@ const log: any = { info: () => {}, warn: () => {}, error: () => {}, debug: () =>
 const MODEL_REPLY = "**Good morning!** Coffee is *ready*.";
 
 const CALLER_REQUESTS = [
-  ["announcement", "Tell the owner this now, out loud, in your own words and briefly: the pasta is done"],
+  ["announcement", announcementRequest("the pasta is done")],
   ["tidiness_nag", "Ask whether to clean; it has been 9 days."],
   ["morning_greeting", "Write the good morning."],
   ["morning_brief", "Summarise the day."],
