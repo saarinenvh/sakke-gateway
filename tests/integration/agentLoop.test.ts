@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeOllama, toolCall, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { runAgent } from "../../src/agent/agent.js";
-import { broadcastState, getCurrentState } from "../../src/features/display/displayState.js";
+import { broadcastState, getCurrentState } from "../../src/features/display/display.js";
 import { getConversation } from "../../src/agent/conversationStore.js";
 import { reloadConfig } from "../../src/config.js";
 

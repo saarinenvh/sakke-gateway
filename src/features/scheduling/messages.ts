@@ -1,7 +1,7 @@
 import { localTimeOfDay } from "../../util/time.js";
 import { withLateNotice } from "../announcements/messages.js";
 import type { ScheduledJob } from "./db/ScheduledJob.entity.js";
-import type { JobOutcome } from "./scheduler.js";
+import type { JobOutcome } from "./scheduling.js";
 
 // What Sakke is asked to say after a scheduled action ran. It's worded in
 // Sakke's voice when it's spoken, and said as it is if that fails.

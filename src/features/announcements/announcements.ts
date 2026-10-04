@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "../../config.js";
 import { callService } from "../../integrations/homeAssistant/client.js";
-import { showSpeakingWhile } from "../display/displayState.js";
+import { showSpeakingWhile } from "../display/display.js";
 import { withTimeout } from "../../util/async.js";
 import { writeText } from "../../inference/writeText.js";
 import { moduleLog } from "../../logger.js";

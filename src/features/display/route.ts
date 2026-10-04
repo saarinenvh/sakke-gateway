@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { registerSSEClient, broadcastState, getCurrentState } from "./displayState.js";
+import { registerSSEClient, broadcastState, getCurrentState } from "./display.js";
 import { stateChangeSchema } from "./schema.js";
 
 const HTML = `<!DOCTYPE html>

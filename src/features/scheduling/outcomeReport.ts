@@ -1,9 +1,9 @@
 import type { FastifyBaseLogger } from "fastify";
 import { config } from "../../config.js";
-import { announce } from "../announcements/announcer.js";
+import { announce } from "../announcements/announcements.js";
 import type { ScheduledJob } from "./db/ScheduledJob.entity.js";
 import { outcomeMessage } from "./messages.js";
-import { ANNOUNCE_TOOL, type JobOutcome } from "./scheduler.js";
+import { ANNOUNCE_TOOL, type JobOutcome } from "./scheduling.js";
 
 // After a scheduled action, Sakke says how it went, done or failed. A
 // scheduled announcement already said everything there was to say.

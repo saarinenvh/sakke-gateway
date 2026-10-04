@@ -9,7 +9,7 @@ import { createDataSource } from "./db/dataSource.js";
 import { connectDatabase, DATABASE_RETRY_DELAY_MS } from "./db/database.js";
 import { JobRepository } from "./features/scheduling/db/jobRepository.js";
 import { importLegacyTimers } from "./features/scheduling/legacyTimers.js";
-import { startScheduler } from "./features/scheduling/scheduler.js";
+import { startScheduler } from "./features/scheduling/scheduling.js";
 import { reportOutcome } from "./features/scheduling/outcomeReport.js";
 import { isSchedulable, runScheduledCall } from "./tools/registry.js";
 import { MorningRepository } from "./features/morning/db/morningRepository.js";

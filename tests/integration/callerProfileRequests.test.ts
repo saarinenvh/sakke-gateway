@@ -5,7 +5,7 @@ import { writeText } from "../../src/inference/writeText.js";
 import { setSystemPromptBuilder } from "../../src/inference/systemPrompt.js";
 import { buildSystemPrompt } from "../../src/agent/systemPrompt.js";
 import { reloadConfig } from "../../src/config.js";
-import { announce } from "../../src/features/announcements/announcer.js";
+import { announce } from "../../src/features/announcements/announcements.js";
 
 // What each tool-less caller profile sends to Ollama, byte for byte: the
 // system prompt, the messages and the request options. Pinned so that moving

@@ -22,5 +22,5 @@ None. It keeps nothing between calls.
 
 | File | Does |
 | --- | --- |
-| `announcer.ts` | `announce`, the wording request, and `speakOnSatellite`; shows Sakke speaking on the display while the satellite talks |
+| `announcements.ts` | `announce`, the wording request, and `speakOnSatellite`; shows Sakke speaking on the display while the satellite talks |
 | `messages.ts` | `withLateNotice` |

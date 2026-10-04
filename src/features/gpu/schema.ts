@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { GpuStatusPush } from "./gpuStatus.js";
+import type { GpuStatusPush } from "./gpu.js";
 
 // PC status service → gateway, POST /internal/gpu-status.
 // Pushed by scripts/gpu-router/status-service.ps1 (sakke-workspace).

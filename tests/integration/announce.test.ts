@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
-import { announce, setWordingWriter, WORDING_TIMEOUT_MS } from "../../src/features/announcements/announcer.js";
+import { announce, setWordingWriter, WORDING_TIMEOUT_MS } from "../../src/features/announcements/announcements.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { config, reloadConfig } from "../../src/config.js";
-import { broadcastState, getCurrentState } from "../../src/features/display/displayState.js";
+import { broadcastState, getCurrentState } from "../../src/features/display/display.js";
 
 // announce against a fake Home Assistant. The wording writer is replaced per
 // test; in production index.ts wires in the agent.

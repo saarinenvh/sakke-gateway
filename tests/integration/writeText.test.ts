@@ -3,7 +3,7 @@ import { startFakeOllama, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { writeText } from "../../src/inference/writeText.js";
 import { setSystemPromptBuilder } from "../../src/inference/systemPrompt.js";
 import { buildSystemPrompt } from "../../src/agent/systemPrompt.js";
-import { broadcastState, getCurrentState } from "../../src/features/display/displayState.js";
+import { broadcastState, getCurrentState } from "../../src/features/display/display.js";
 import { reloadConfig } from "../../src/config.js";
 
 // A piece of text a feature asks for: it must never act, and it leaves no
