@@ -50,10 +50,6 @@ export interface ApplySceneResult {
   anySucceeded: boolean;
 }
 
-// Scene design is a big single completion, so more generous than the 5-8s used
-// for the quick HA/Spotify calls.
-const SCENE_DESIGN_TIMEOUT_MS = 30000;
-
 // The lamp descriptions live in the wiki when one is mounted, so moving a lamp
 // or re-describing a room is an Obsidian edit rather than a redeploy - see
 // readWikiDocWithFallback for the bundled-copy fallback.
@@ -78,7 +74,7 @@ export async function designScene(description: string): Promise<ScenePlan> {
     {
       temperature: 0.7,
       reasoningEffort: config.openai.lightingReasoningEffort,
-      timeoutMs: SCENE_DESIGN_TIMEOUT_MS,
+      timeoutMs: config.openai.lightingTimeoutMs,
     },
   );
 
