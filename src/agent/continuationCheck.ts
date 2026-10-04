@@ -53,10 +53,12 @@ export function recentExchanges(messages: Message[], count = CLASSIFIER_HISTORY_
 const SHORT_ANSWERS: ReadonlySet<string> = new Set([
   "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please", "yes please", "sure thing", "of course",
   "do it", "yes do it", "yeah do it", "go ahead", "go for it",
-  "no", "nope", "nah", "no thanks", "no thank you", "not now", "no need", "never mind",
 ]);
 
-/** A short yes/no-style answer to a reply that asked the user something. */
+/**
+ * A short yes-style answer to a reply that asked the user something. Short
+ * declines aren't here: sakke_agent closes the mic on them before the gateway.
+ */
 export function isShortAnswerToQuestion(lastAssistantMessage: string, newUtterance: string): boolean {
   // Anywhere, not only at the end: the persona often adds a quip after the
   // question ("Want me to activate it? Just say the word.").

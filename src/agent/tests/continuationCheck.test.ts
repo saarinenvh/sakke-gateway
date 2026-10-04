@@ -47,9 +47,13 @@ describe("recentExchanges", () => {
 describe("isShortAnswerToQuestion", () => {
   const question = "Rain is expected. Would you like the hourly forecast?";
 
-  it("accepts a short yes or no right after a question", () => {
-    expect(isShortAnswerToQuestion(question, "no thanks")).toBe(true);
+  it("accepts a short yes right after a question", () => {
+    expect(isShortAnswerToQuestion(question, "sure")).toBe(true);
     expect(isShortAnswerToQuestion(question, "Yes please")).toBe(true);
+  });
+
+  it("leaves a short decline alone, since sakke_agent closes the mic on it", () => {
+    expect(isShortAnswerToQuestion(question, "no thanks")).toBe(false);
   });
 
   it("accepts an answer when the question isn't the reply's last sentence", () => {
@@ -57,7 +61,7 @@ describe("isShortAnswerToQuestion", () => {
   });
 
   it("ignores case, punctuation and extra spaces", () => {
-    expect(isShortAnswerToQuestion(question, "  No,  thanks! ")).toBe(true);
+    expect(isShortAnswerToQuestion(question, "  Yes,  please! ")).toBe(true);
     expect(isShortAnswerToQuestion(question, "Yeah, do it.")).toBe(true);
   });
 
@@ -66,6 +70,6 @@ describe("isShortAnswerToQuestion", () => {
   });
 
   it("leaves longer speech that only starts like an answer to the model", () => {
-    expect(isShortAnswerToQuestion(question, "no, I was talking to my brother")).toBe(false);
+    expect(isShortAnswerToQuestion(question, "yes, but only in the kitchen")).toBe(false);
   });
 });
