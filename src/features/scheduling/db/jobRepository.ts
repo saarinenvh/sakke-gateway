@@ -1,7 +1,17 @@
 import type { DataSource, QueryDeepPartialEntity, Repository } from "typeorm";
 import { ScheduledJob, type JobStatus } from "./ScheduledJob.entity.js";
 
-export type FinishedStatus = Exclude<JobStatus, "pending">;
+export type FinishedStatus = Exclude<JobStatus, "pending" | "running">;
+
+// A job is cancelled or dropped before it runs, and done or failed after it
+// was claimed. Holding finish to these keeps a cancel that loses the race with
+// the claim from reporting success while the job runs.
+export const FINISHED_FROM: Record<FinishedStatus, "pending" | "running"> = {
+  cancelled: "pending",
+  dropped: "pending",
+  done: "running",
+  failed: "running",
+};
 
 // The only code that writes scheduled_job. Every method resolves once its write
 // is committed, so a job the scheduler has acknowledged, cancelled or finished
@@ -28,10 +38,22 @@ export class JobRepository {
     return this.jobs.find({ where: { status: "pending" }, order: { runAt: "ASC" } });
   }
 
-  // Only a pending job changes, so a finished or cancelled one can't be
-  // overwritten. Returns whether this one changed.
+  // Jobs that were running when the gateway stopped.
+  async listRunning(): Promise<ScheduledJob[]> {
+    return this.jobs.find({ where: { status: "running" }, order: { runAt: "ASC" } });
+  }
+
+  // Marks a due job as running, just before it runs. Only a pending job can be
+  // claimed, so a job runs at most once. Returns whether this call claimed it.
+  async claim(id: string): Promise<boolean> {
+    const update = await this.jobs.update({ id, status: "pending" }, { status: "running" });
+    return (update.affected ?? 0) > 0;
+  }
+
+  // Only from the state FINISHED_FROM allows, so a finished or cancelled job
+  // can't be overwritten. Returns whether this one changed.
   async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
-    const update = await this.jobs.update({ id, status: "pending" }, { status, result, finishedAt });
+    const update = await this.jobs.update({ id, status: FINISHED_FROM[status] }, { status, result, finishedAt });
     return (update.affected ?? 0) > 0;
   }
 }

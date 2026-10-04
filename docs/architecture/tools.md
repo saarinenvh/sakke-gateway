@@ -48,10 +48,12 @@ free change.
 
 It runs a call two ways:
 
-- `runTool(name, args, log, conversationId)` returns what happened:
-  `{ kind: "ok", result }`, `{ kind: "failed", error }` or `{ kind: "unknown" }`.
-  It never throws. The scheduler uses it, so it can tell a failure without
-  reading text.
+- `runTool(name, args, log, conversationId, scheduledFor?)` returns what
+  happened: `{ kind: "ok", result }`, `{ kind: "failed", error }` or
+  `{ kind: "unknown" }`. It never throws. The scheduler uses it, through
+  `runScheduledCall`, so it can tell a failure without reading text; it also
+  passes the time the job was due, which a tool reads as `ctx.scheduledFor`
+  (`announce` uses it to say a late announcement is late).
 - `executeTool(...)` is the same, worded for the model: the result, or
   "`<name>` failed: …", or "Unknown tool: …". The agent loop uses it.
 

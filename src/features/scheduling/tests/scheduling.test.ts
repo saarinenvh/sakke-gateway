@@ -218,4 +218,112 @@ describe("restarting", () => {
     expect(ran).toEqual([]);
     expect(store.get(job.id)).toMatchObject({ status: "dropped", result: "came due while the gateway was down" });
   });
+  // A clock-time job ("at 16:00") missed while the gateway was down, found at
+  // startup this many minutes late.
+  async function restartLateBy(lateMinutes: number): Promise<ScheduledJob> {
+    const before = startScheduler();
+    const job = await scheduleJob(before, { ...inMinutes(5, "the meat"), source: "at" });
+    before.stop();
+
+    vi.setSystemTime(job.runAt.getTime() + lateMinutes * MINUTE_MS);
+    await startScheduler().start();
+    await vi.advanceTimersByTimeAsync(0);
+    return job;
+  }
+
+  it("still runs a clock-time job that came due up to 15 minutes ago", async () => {
+    const job = await restartLateBy(10);
+
+    expect(ran.map(r => r.id)).toEqual([job.id]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+  it("drops a clock-time job that came due more than 15 minutes ago", async () => {
+    const job = await restartLateBy(20);
+
+    expect(ran).toEqual([]);
+    expect(store.get(job.id)).toMatchObject({
+      status: "dropped",
+      result: "came due more than 15 minutes before the gateway was back",
+    });
+  });
+
+  it("never runs a job again that was running when the gateway stopped", async () => {
+    const before = startScheduler(async job => {
+      ran.push(job);
+      // The gateway stops before the outcome is written.
+      store.failNextWrite = true;
+      return nextOutcome;
+    });
+    const job = await scheduleJob(before, { ...inMinutes(5, "the meat"), source: "at" });
+    await vi.advanceTimersByTimeAsync(5 * MINUTE_MS);
+    before.stop();
+    expect(store.get(job.id)?.status).toBe("running");
+
+    vi.setSystemTime(job.runAt.getTime() + 2 * MINUTE_MS);
+    await startScheduler().start();
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(ran).toHaveLength(1);
+    expect(store.get(job.id)).toMatchObject({ status: "failed", result: "outcome unknown: it was running when the gateway stopped" });
+  });
+});
+
+describe("claiming a due job", () => {
+  it("doesn't report a cancel that lost the race with the job coming due", async () => {
+    // The cancellation's write is held back until the job has been claimed.
+    let releaseCancel!: () => void;
+    const cancelHeld = new Promise<void>(resolve => { releaseCancel = resolve; });
+    const finish = store.finish.bind(store);
+    store.finish = async (...args) => {
+      if (args[1] === "cancelled") await cancelHeld;
+      return finish(...args);
+    };
+    // The job stays running until the test lets it finish.
+    let finishRun!: () => void;
+    const runHeld = new Promise<void>(resolve => { finishRun = resolve; });
+    const scheduler = startScheduler(async job => {
+      ran.push(job);
+      await runHeld;
+      return nextOutcome;
+    });
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    const cancelled = scheduler.cancel(job.id);
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+    expect(store.get(job.id)?.status).toBe("running");
+    releaseCancel();
+
+    expect(await cancelled).toBeNull();
+    finishRun();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ran.map(r => r.id)).toEqual([job.id]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+
+  it("marks it running in the store before it runs", async () => {
+    const statusWhileRunning: (string | undefined)[] = [];
+    const scheduler = startScheduler(async job => {
+      statusWhileRunning.push(store.get(job.id)?.status);
+      return nextOutcome;
+    });
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(statusWhileRunning).toEqual(["running"]);
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+  it("doesn't run a job it can't mark as running, and leaves it pending for the next start", async () => {
+    const scheduler = startScheduler();
+    const job = await scheduleJob(scheduler, { ...inMinutes(1, "the meat"), source: "at" });
+    store.failNextWrite = true;
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(ran).toEqual([]);
+    expect(store.get(job.id)?.status).toBe("pending");
+  });
 });

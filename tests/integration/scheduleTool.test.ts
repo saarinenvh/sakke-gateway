@@ -20,6 +20,11 @@ const log: any = { info: () => {}, warn: () => {}, error: () => {}, debug: () =>
 
 const schedule = (args: Record<string, unknown>) => executeTool("schedule", args, log, "schedule-test");
 const setTimer = (minutes: number, label: string) => schedule({ action: "set", when: { in_minutes: minutes }, label });
+const setAt = (at: Record<string, unknown>, label: string) => schedule({ action: "set", when: { at }, label });
+// The fake keeps every call it has seen; each test looks only at its own.
+let callsBeforeTest = 0;
+const spokenOnSatellite = () => ha.serviceCalls().slice(callsBeforeTest)
+  .filter(call => call.service === "announce").map(call => call.data.message);
 
 beforeAll(async () => {
   ha = await startFakeHomeAssistant();
@@ -40,6 +45,7 @@ beforeEach(async () => {
   // AbortSignal timeout.
   vi.useFakeTimers({ now: START, toFake: ["setTimeout", "clearTimeout", "Date"] });
   store = new FakeJobStore();
+  callsBeforeTest = ha.serviceCalls().length;
   setWordingWriter(async message => message);
   await startScheduler({
     store,
@@ -151,15 +157,68 @@ describe("when the job is due", () => {
     await vi.advanceTimersByTimeAsync(MINUTE_MS);
     await vi.waitFor(() => expect(store.all()[0].status).toBe("done"), { timeout: 2_000 });
 
-    const spoken = ha.serviceCalls().filter(call => call.service === "announce").map(call => call.data.message);
-    expect(spoken).toContain("Time's up: the pasta.");
+    expect(spokenOnSatellite()).toContain("Time's up: the pasta.");
+  });
+});
+
+describe("clock times", () => {
+  it("stores a clock-time job and says the resolved time back", async () => {
+    const reply = await setAt({ hour: 4, meridiem: "pm" }, "take the meat out");
+
+    const [job] = store.all();
+    expect(job).toMatchObject({ runAt: new Date("2026-09-29T13:00:00.000Z"), source: "at", label: "take the meat out" });
+    expect(reply).toBe(`Scheduled for 16:00 today: take the meat out. ID: ${job.id}.`);
+  });
+
+  it("says when a time has rolled over to tomorrow", async () => {
+    expect(await setAt({ hour: 4, meridiem: "am" }, "the bread")).toMatch(/^Scheduled for 04:00 tomorrow: the bread\./);
+  });
+
+  it("refuses a time that contradicts itself, storing nothing", async () => {
+    expect(await setAt({ hour: 16, meridiem: "am" }, "never")).toMatch(/contradicts itself/);
+    expect(store.all()).toEqual([]);
+  });
+
+  it("refuses today at a time already passed, storing nothing", async () => {
+    expect(await setAt({ hour: 9, meridiem: "am", day: "today" }, "never")).toBe("That time has already passed today. Nothing was scheduled.");
+    expect(store.all()).toEqual([]);
+  });
+
+  it("lists a job due tomorrow as tomorrow", async () => {
+    await setAt({ hour: 7, meridiem: "am" }, "the bread");
+    expect(await schedule({ action: "list" })).toMatch(/"the bread" at 07:00 tomorrow, in 19 hours$/);
+  });
+
+  it("announces a clock-time job when it's due", async () => {
+    await setAt({ hour: 12, minute: 30, meridiem: "pm" }, "the meat");
+
+    await vi.advanceTimersByTimeAsync(30 * MINUTE_MS);
+    await vi.waitFor(() => expect(store.all()[0].status).toBe("done"), { timeout: 2_000 });
+
+    expect(spokenOnSatellite()).toContain("Time's up: the meat.");
   });
 });
 
 describe("runScheduledCall", () => {
-  const job = (tool: string, args: Record<string, unknown>): ScheduledJob => ({
-    id: "abc123", runAt: START, source: "in", tool, args, label: "test",
+  const job = (tool: string, args: Record<string, unknown>, runAt = START): ScheduledJob => ({
+    id: "abc123", runAt, source: "in", tool, args, label: "test",
     status: "pending", createdAt: START, finishedAt: null, result: null,
+  });
+
+  it("says an announcement is late when it runs well after its time", async () => {
+    const dueTenMinutesAgo = new Date(START.getTime() - 10 * MINUTE_MS);
+
+    await runScheduledCall(job("announce", { message: "Time's up: the meat." }, dueTenMinutesAgo), log);
+
+    expect(spokenOnSatellite()).toEqual(["Time's up: the meat. (This was due at 11:50.)"]);
+  });
+
+  it("says nothing about lateness for the usual few seconds", async () => {
+    const dueSecondsAgo = new Date(START.getTime() - 5_000);
+
+    await runScheduledCall(job("announce", { message: "Time's up: the pasta." }, dueSecondsAgo), log);
+
+    expect(spokenOnSatellite()).toEqual(["Time's up: the pasta."]);
   });
 
   it("refuses a stored call whose tool no longer runs unattended", async () => {

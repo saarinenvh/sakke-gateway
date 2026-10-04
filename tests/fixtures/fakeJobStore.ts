@@ -1,5 +1,5 @@
 import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
-import type { FinishedStatus } from "../../src/features/scheduling/db/jobRepository.js";
+import { FINISHED_FROM, type FinishedStatus } from "../../src/features/scheduling/db/jobRepository.js";
 import type { JobStore } from "../../src/features/scheduling/scheduling.js";
 
 // JobRepository's contract in memory. The real repository is tested against
@@ -28,10 +28,22 @@ export class FakeJobStore implements JobStore {
       .sort((a, b) => a.runAt.getTime() - b.runAt.getTime());
   }
 
-  async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
+  async listRunning(): Promise<ScheduledJob[]> {
+    return this.all().filter(job => job.status === "running");
+  }
+
+  async claim(id: string): Promise<boolean> {
     this.failIfAsked();
     const job = this.jobs.get(id);
     if (!job || job.status !== "pending") return false;
+    this.jobs.set(id, { ...job, status: "running" });
+    return true;
+  }
+
+  async finish(id: string, status: FinishedStatus, result: string | null, finishedAt: Date): Promise<boolean> {
+    this.failIfAsked();
+    const job = this.jobs.get(id);
+    if (!job || job.status !== FINISHED_FROM[status]) return false;
     this.jobs.set(id, { ...job, status, result, finishedAt });
     return true;
   }

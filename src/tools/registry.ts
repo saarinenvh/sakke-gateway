@@ -108,7 +108,7 @@ export async function runScheduledCall(job: ScheduledJob, log: FastifyBaseLogger
   if (!isSchedulable(job.tool, job.args)) {
     return { status: "failed", result: `${job.tool} can't be run by the scheduler` };
   }
-  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`);
+  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`, job.runAt);
   switch (run.kind) {
     case "ok":
       return { status: "done", result: run.result };
@@ -139,6 +139,7 @@ export async function runTool(
   args: Record<string, unknown>,
   log: FastifyBaseLogger,
   conversationId: string,
+  scheduledFor?: Date,
 ): Promise<ToolRun> {
   const tool = byName.get(name);
   if (!tool) {
@@ -148,7 +149,7 @@ export async function runTool(
 
   log.info({ conversationId, tool: name, args }, "Tool call");
   try {
-    const result = await tool.execute(args, { log, conversationId });
+    const result = await tool.execute(args, { log, conversationId, scheduledFor });
     log.info({ conversationId, tool: name, result: preview(result) }, "Tool result");
     return { kind: "ok", result };
   } catch (err) {
