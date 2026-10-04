@@ -328,6 +328,24 @@ describe("a follow-up turn", () => {
     const [classifierRequest] = ollama.classifierRequests();
     expect(classifierRequest.numCtx).toBe(ollama.requests()[0].numCtx);
   });
+
+  // The model called a short answer to an offer noise on every eval run,
+  // which silenced a real reply.
+  it("answers a short reply to its own question even when the model would say noise", async () => {
+    ollama.setClassifierVerdict("noise");
+    try {
+      ollama.script({ content: "Rain is expected. Would you like the hourly forecast?" }, { content: "Here's the hourly forecast." });
+      const id = nextId();
+
+      await runAgent("what's the weather tomorrow", id, log, SAKKE);
+      const reply = await runAgent("Yes, please.", id, log, SAKKE);
+
+      expect(reply.content).toBe("Here's the hourly forecast.");
+      expect(ollama.classifierRequests()).toHaveLength(0);
+    } finally {
+      ollama.setClassifierVerdict("continuation");
+    }
+  });
 });
 
 describe("whose context a request is", () => {

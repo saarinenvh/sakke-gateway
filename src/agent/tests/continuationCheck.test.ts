@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Message } from "../../integrations/ollama/types.js";
-import { recentExchanges } from "../continuationCheck.js";
+import { isShortAnswerToQuestion, recentExchanges } from "../continuationCheck.js";
 
 const user = (content: string): Message => ({ role: "user", content });
 const reply = (content: string): Message => ({ role: "assistant", content });
@@ -41,5 +41,36 @@ describe("recentExchanges", () => {
 
     expect(exchange.assistant.length).toBeLessThan(400);
     expect(exchange.assistant.endsWith("...")).toBe(true);
+  });
+});
+
+describe("isShortAnswerToQuestion", () => {
+  const question = "Rain is expected. Would you like the hourly forecast?";
+
+  it("accepts a short yes right after a question", () => {
+    expect(isShortAnswerToQuestion(question, "sure")).toBe(true);
+    expect(isShortAnswerToQuestion(question, "Yes please")).toBe(true);
+  });
+
+  it("leaves a short decline alone, since sakke_agent closes the mic on it", () => {
+    expect(isShortAnswerToQuestion(question, "no thanks")).toBe(false);
+  });
+
+  it("accepts an answer when the question isn't the reply's last sentence", () => {
+    expect(isShortAnswerToQuestion("The candle scene exists. Want me to activate it? Just say the word.", "yes")).toBe(true);
+  });
+
+  it("ignores case, punctuation and extra spaces", () => {
+    expect(isShortAnswerToQuestion(question, "  Yes,  please! ")).toBe(true);
+    expect(isShortAnswerToQuestion(question, "Yeah, do it.")).toBe(true);
+    expect(isShortAnswerToQuestion(question, "Yes,please")).toBe(true);
+  });
+
+  it("leaves an answer after a plain statement to the model", () => {
+    expect(isShortAnswerToQuestion("The living room lights are on.", "okay")).toBe(false);
+  });
+
+  it("leaves longer speech that only starts like an answer to the model", () => {
+    expect(isShortAnswerToQuestion(question, "yes, but only in the kitchen")).toBe(false);
   });
 });
