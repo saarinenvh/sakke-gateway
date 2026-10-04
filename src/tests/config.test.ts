@@ -10,7 +10,7 @@ const MANAGED = [
   "PC_OLLAMA_BASE_URL", "PC_OLLAMA_MODEL", "PC_OLLAMA_NUM_CTX", "PC_OLLAMA_THINK", "PC_OLLAMA_KEEP_ALIVE",
   "HA_BASE_URL", "HA_TOKEN", "ASSIST_SATELLITE_ENTITY_ID", "TASKS_TODO", "CALENDAR_ENTITIES",
   "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET",
-  "OPENAI_API_KEY", "OPENAI_LIGHTING_MODEL",
+  "OPENAI_PUBLIC_API_KEY", "OPENAI_LIGHTING_MODEL", "OPENAI_LIGHTING_REASONING_EFFORT", "OPENAI_LIGHTING_TIMEOUT_MS",
   "SEARXNG_URL", "WEATHER_LAT", "WEATHER_LON",
   "GATEWAY_DB_HOST", "GATEWAY_DB_PORT", "GATEWAY_DB_NAME", "GATEWAY_DB_USERNAME", "GATEWAY_DB_PASSWORD",
 ];
@@ -134,6 +134,43 @@ describe("problems reported at startup", () => {
   it("treats a blank required value as missing", () => {
     env({ HA_TOKEN: "", OLLAMA_CLASSIFIER_BASE_URL: "http://x:11434" });
     expect(config.problems.some(p => p.includes("HA_TOKEN"))).toBe(true);
+  });
+});
+
+describe("openai", () => {
+  it("reads the sakke-public key", () => {
+    env({ OPENAI_PUBLIC_API_KEY: "sk-public" });
+    expect(config.openai.publicApiKey).toBe("sk-public");
+  });
+
+  it("leaves the reasoning effort to the model when unset", () => {
+    expect(config.openai.lightingReasoningEffort).toBeUndefined();
+  });
+
+  it("reads a valid reasoning effort", () => {
+    env({ OPENAI_LIGHTING_REASONING_EFFORT: "low" });
+    expect(config.openai.lightingReasoningEffort).toBe("low");
+  });
+
+  it("reports an unknown reasoning effort and falls back to the model's default", () => {
+    env({ OPENAI_LIGHTING_REASONING_EFFORT: "turbo" });
+    expect(config.openai.lightingReasoningEffort).toBeUndefined();
+    expect(config.problems.some(p => p.includes("OPENAI_LIGHTING_REASONING_EFFORT"))).toBe(true);
+  });
+
+  it("gives scene design 75 seconds by default", () => {
+    expect(config.openai.lightingTimeoutMs).toBe(75_000);
+  });
+
+  it("reads a configured scene design timeout", () => {
+    env({ OPENAI_LIGHTING_TIMEOUT_MS: "60000" });
+    expect(config.openai.lightingTimeoutMs).toBe(60_000);
+  });
+
+  it.each(["soon", "0", "-5", "1.5", "90000", "2147483648"])("reports a timeout of %s and uses the default", raw => {
+    env({ OPENAI_LIGHTING_TIMEOUT_MS: raw });
+    expect(config.openai.lightingTimeoutMs).toBe(75_000);
+    expect(config.problems.some(p => p.includes("OPENAI_LIGHTING_TIMEOUT_MS"))).toBe(true);
   });
 });
 

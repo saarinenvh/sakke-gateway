@@ -19,6 +19,8 @@
 // a module-level const. That last part is what makes a test able to change a
 // value between cases without any module-reset machinery.
 
+import { reasoningEffortSchema, type ReasoningEffort } from "./integrations/openai/schema.js";
+
 // Blank is not the same as unset - see the note above about docker-compose.
 function env(name: string): string | undefined {
   const value = process.env[name];
@@ -131,7 +133,16 @@ export interface Config {
   // configuration, not a constant, and tests set it to zero.
   tvWakeMs: number;
   spotify: { clientId: string; clientSecret: string };
-  openai: { apiKey: string; lightingModel: string };
+  openai: {
+    // The sakke-public OpenAI project: inputs and outputs are shared with
+    // OpenAI in exchange for free daily usage. Only send it what may be shared.
+    publicApiKey: string;
+    lightingModel: string;
+    lightingReasoningEffort: ReasoningEffort | undefined;
+    // How long scene design may wait for OpenAI. Must stay under the 90 s the
+    // Home Assistant sakke_agent component gives the whole voice turn.
+    lightingTimeoutMs: number;
+  };
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
   tidiness: TidinessConfig;
@@ -223,8 +234,10 @@ function loadConfig(): Config {
       clientSecret: env("SPOTIFY_CLIENT_SECRET") ?? "",
     },
     openai: {
-      apiKey: env("OPENAI_API_KEY") ?? "",
+      publicApiKey: env("OPENAI_PUBLIC_API_KEY") ?? "",
       lightingModel: env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o",
+      lightingReasoningEffort: parseReasoningEffort(env("OPENAI_LIGHTING_REASONING_EFFORT"), problems),
+      lightingTimeoutMs: parseLightingTimeoutMs(env("OPENAI_LIGHTING_TIMEOUT_MS"), problems),
     },
     search: { searxngUrl: env("SEARXNG_URL") ?? "http://searxng:8080" },
     weather: {
@@ -309,6 +322,34 @@ function loadMorningConfig(problems: string[]): MorningConfig {
     briefMinDelayMinutes: num("MORNING_BRIEF_MIN_DELAY_MINUTES", 5),
     briefCutoff: parseBriefCutoff(env("MORNING_BRIEF_CUTOFF"), problems),
   };
+}
+
+function parseReasoningEffort(raw: string | undefined, problems: string[]): ReasoningEffort | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = reasoningEffortSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  problems.push(
+    `OPENAI_LIGHTING_REASONING_EFFORT "${raw}" is not one of ${reasoningEffortSchema.options.join(", ")} - using the model's default`,
+  );
+  return undefined;
+}
+
+// Long enough for gpt-5.x at high reasoning effort, with room left for the
+// Ollama turns around the tool call inside Home Assistant's 90 s.
+const DEFAULT_LIGHTING_TIMEOUT_MS = 75_000;
+// Home Assistant abandons the voice turn at 90 s, so a longer wait only hides
+// the failure. The cap also keeps the value far below Node's timer limit, past
+// which AbortSignal.timeout would fire almost immediately.
+const MAX_LIGHTING_TIMEOUT_MS = 90_000;
+
+function parseLightingTimeoutMs(raw: string | undefined, problems: string[]): number {
+  if (raw === undefined) return DEFAULT_LIGHTING_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0 && parsed < MAX_LIGHTING_TIMEOUT_MS) return parsed;
+  problems.push(
+    `OPENAI_LIGHTING_TIMEOUT_MS "${raw}" must be a whole number of milliseconds between 1 and ${MAX_LIGHTING_TIMEOUT_MS - 1} - using ${DEFAULT_LIGHTING_TIMEOUT_MS}`,
+  );
+  return DEFAULT_LIGHTING_TIMEOUT_MS;
 }
 
 const DEFAULT_BRIEF_CUTOFF: LocalTime = { hour: 12, minute: 0 };

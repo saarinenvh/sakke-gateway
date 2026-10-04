@@ -86,7 +86,7 @@ Three places, and the choice is not arbitrary:
 
 - **TypeScript 5** — Fastify HTTP server
 - **Ollama** — local LLM inference, model per `OLLAMA_MODEL`; a separate, smaller `OLLAMA_CLASSIFIER_MODEL` for follow-up classification
-- **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o)
+- **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o; optional `OPENAI_LIGHTING_REASONING_EFFORT` for gpt-5.x and o-series models; `OPENAI_LIGHTING_TIMEOUT_MS`, default 75000, kept under Home Assistant's 90 s per voice turn). Uses the `sakke-public` project key, whose traffic is shared with OpenAI
 - **Home Assistant** — smart home backend
 - **MariaDB 10.11 + TypeORM** — the gateway's own database, for scheduled jobs; see [docs/architecture/data.md](docs/architecture/data.md)
 - **Open-Meteo** — weather API
@@ -112,7 +112,7 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | GPU routing (optional) | `PC_OLLAMA_BASE_URL`, `PC_OLLAMA_MODEL`, `PC_OLLAMA_NUM_CTX`, `PC_OLLAMA_THINK`, `PC_OLLAMA_KEEP_ALIVE` |
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
-| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_PUBLIC_API_KEY`, `OPENAI_LIGHTING_MODEL`, `OPENAI_LIGHTING_REASONING_EFFORT`, `OPENAI_LIGHTING_TIMEOUT_MS`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
 | Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
 | Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS`, `MORNING_WAKE_TIME_SENSOR`, `MORNING_BRIEF_MIN_DELAY_MINUTES`, `MORNING_BRIEF_CUTOFF` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
