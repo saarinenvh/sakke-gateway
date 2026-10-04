@@ -66,8 +66,13 @@ the model it already ran.
 
 `schedulable(args)` says whether the scheduler may run the call later, with
 nobody there to see it. It's optional and missing means no, so a tool has to
-opt in; today only `announce` does. The scheduler checks it when a job is set,
-and the registry's `runScheduledCall` checks it again when the job runs.
+opt in. `announce`, `vacuum` (start/stop/dock), `control_home_assistant`
+(except designing or saving a scene) and `run_routine` do, each checking its
+own argument schema, so a call with bad arguments is refused when it's set
+rather than failing later. The scheduler checks it when a job is set, and the
+registry's `runScheduledCall` checks it again when the job runs. A scheduled
+tool's failure must throw: Sakke reports the outcome out loud, and a problem
+returned as an ordinary result would be reported as done.
 
 ## Request profiles
 

@@ -10,6 +10,7 @@ import { connectDatabase, DATABASE_RETRY_DELAY_MS } from "./db/database.js";
 import { JobRepository } from "./features/scheduling/db/jobRepository.js";
 import { importLegacyTimers } from "./features/scheduling/legacyTimers.js";
 import { startScheduler } from "./features/scheduling/scheduling.js";
+import { reportOutcome } from "./features/scheduling/outcomeReport.js";
 import { isSchedulable, runScheduledCall } from "./tools/registry.js";
 import { MorningRepository } from "./features/morning/db/morningRepository.js";
 import { startMorning } from "./features/morning/morning.js";
@@ -49,6 +50,7 @@ async function startScheduling(dataSource: DataSource): Promise<void> {
   await startScheduler({
     store: jobs,
     runJob: job => runScheduledCall(job, app.log),
+    reportOutcome: (job, outcome) => reportOutcome(job, outcome, app.log),
     isSchedulable,
     now: () => new Date(),
     log: app.log,

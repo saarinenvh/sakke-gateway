@@ -149,6 +149,11 @@ describe("error handling", () => {
     expect(result).toContain("injected failure");
   });
 
+  it("reports an action that didn't happen as a failure, not a result", async () => {
+    const result = await run("control_home_assistant", { action: "light_off", area: "nowhere" });
+    expect(result).toMatch(/^control_home_assistant failed: No area named "nowhere" exists/);
+  });
+
   it("names an unknown tool instead of failing silently", async () => {
     expect(await run("teleport")).toContain("Unknown tool");
   });
@@ -161,6 +166,37 @@ describe("registry", () => {
     const { tools, toolNames } = await import("../../src/tools/registry.js");
     expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
     expect(tools).toHaveLength(20);
+  });
+});
+
+describe("scheduling", () => {
+  it("offers the model exactly the tools that can run unattended, other than announce", async () => {
+    const { schedulableToolNames } = await import("../../src/tools/registry.js");
+    const { RUNNABLE_TOOLS } = await import("../../src/tools/schedule/schema.js");
+    const runnable = schedulableToolNames().filter(name => name !== "announce");
+    expect([...RUNNABLE_TOOLS].sort()).toEqual(runnable.sort());
+  });
+
+  // [tool, arguments, schedulable]
+  const calls: [string, Record<string, unknown>, boolean][] = [
+    ["vacuum", { action: "start" }, true],
+    ["vacuum", { action: "dock" }, true],
+    ["vacuum", { action: "status" }, false],
+    ["vacuum", { action: "snooze" }, false],
+    ["control_home_assistant", { action: "light_off", area: "living_room" }, true],
+    ["control_home_assistant", { action: "scene_activate", scene: "evening" }, true],
+    ["control_home_assistant", { action: "scene_design", scene_description: "cosy" }, false],
+    ["control_home_assistant", { action: "scene_create", scene_name: "now" }, false],
+    ["control_home_assistant", { action: "explode" }, false],
+    ["run_routine", { script_id: "good_night" }, true],
+    ["run_routine", {}, false],
+    ["get_weather", {}, false],
+    ["schedule", { action: "list" }, false],
+  ];
+
+  it.each(calls)("%s %o is schedulable: %s", async (tool, args, expected) => {
+    const { isSchedulable } = await import("../../src/tools/registry.js");
+    expect(isSchedulable(tool, args)).toBe(expected);
   });
 });
 

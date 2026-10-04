@@ -3,6 +3,7 @@ import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fake
 import { FakeJobStore } from "../fixtures/fakeJobStore.js";
 import { executeTool, isSchedulable, runScheduledCall } from "../../src/tools/registry.js";
 import { startScheduler, stopScheduler } from "../../src/features/scheduling/scheduling.js";
+import { reportOutcome } from "../../src/features/scheduling/outcomeReport.js";
 import { setWordingWriter } from "../../src/features/announcements/announcements.js";
 import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
 import { config, reloadConfig } from "../../src/config.js";
@@ -50,6 +51,7 @@ beforeEach(async () => {
   await startScheduler({
     store,
     runJob: job => runScheduledCall(job, log),
+    reportOutcome: (job, outcome) => reportOutcome(job, outcome, log),
     isSchedulable,
     now: () => new Date(),
     log,
@@ -196,6 +198,68 @@ describe("clock times", () => {
     await vi.waitFor(() => expect(store.all()[0].status).toBe("done"), { timeout: 2_000 });
 
     expect(spokenOnSatellite()).toContain("Time's up: the meat.");
+  });
+});
+
+describe("scheduled actions", () => {
+  const setRun = (label: string, run: Record<string, unknown>) =>
+    schedule({ action: "set", when: { in_minutes: 1 }, label, run });
+  // The outcome is stored first and spoken after, so wait for both: the
+  // spoken lines arrive over real HTTP to the fake Home Assistant.
+  const runDue = async (spokenLines: number) => {
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+    await vi.waitFor(() => {
+      expect(store.all().every(job => job.status !== "pending" && job.status !== "running")).toBe(true);
+      expect(spokenOnSatellite()).toHaveLength(spokenLines);
+    }, { timeout: 2_000 });
+  };
+  // Lets any request still on its way to the fake land, so a check that
+  // something wasn't said can't pass just because it hasn't arrived yet.
+  const settle = async () => {
+    for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
+  };
+
+  it("makes the stored call when it's due, and says it was done in Sakke's words", async () => {
+    setWordingWriter(async message => `Very good, sir. ${message}`);
+    await setRun("good night", { tool: "run_routine", args: { script_id: "good_night" } });
+
+    await runDue(1);
+
+    expect(ha.serviceCalls().slice(callsBeforeTest)).toContainEqual({ domain: "script", service: "turn_on", data: { entity_id: "script.good_night" } });
+    expect(store.all()[0].status).toBe("done");
+    expect(spokenOnSatellite()).toEqual(["Very good, sir. It's 12:01: done as scheduled, good night. Routine \"good_night\" started."]);
+  });
+
+  it("says a scheduled action didn't work, and why", async () => {
+    await setRun("lights off", { tool: "control_home_assistant", args: { action: "light_off", area: "nowhere" } });
+
+    await runDue(1);
+
+    expect(store.all()[0].status).toBe("failed");
+    expect(spokenOnSatellite()).toEqual([expect.stringMatching(/^It's 12:01: the scheduled "lights off" didn't work\. No area named "nowhere" exists/)]);
+  });
+
+  it("speaks the outcome as written when the wording fails", async () => {
+    setWordingWriter(async () => { throw new Error("ollama unreachable"); });
+    await setRun("good night", { tool: "run_routine", args: { script_id: "good_night" } });
+
+    await runDue(1);
+
+    expect(spokenOnSatellite()).toEqual(["It's 12:01: done as scheduled, good night. Routine \"good_night\" started."]);
+  });
+
+  it("says a scheduled announcement once, with no report after it", async () => {
+    await setTimer(1, "the pasta");
+
+    await runDue(1);
+    await settle();
+
+    expect(spokenOnSatellite()).toEqual(["Time's up: the pasta."]);
+  });
+
+  it("refuses a call that can't run unattended, storing nothing", async () => {
+    expect(await setRun("check", { tool: "vacuum", args: { action: "status" } })).toBe("vacuum can't be scheduled.");
+    expect(store.all()).toEqual([]);
   });
 });
 

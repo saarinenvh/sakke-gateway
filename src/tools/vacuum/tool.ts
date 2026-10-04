@@ -1,7 +1,7 @@
 import type { Tool } from "../types.js";
 import { toolParameters } from "../parameters.js";
 import { vacuumArgsSchema } from "./schema.js";
-import { READ_ONLY_VACUUM_ACTIONS } from "../../features/tidiness/vacuumActions.js";
+import { READ_ONLY_VACUUM_ACTIONS, SCHEDULABLE_VACUUM_ACTIONS } from "../../features/tidiness/vacuumActions.js";
 import { executeVacuum } from "./vacuum.js";
 
 export const vacuumTool: Tool = {
@@ -14,5 +14,6 @@ export const vacuumTool: Tool = {
     },
   },
   repeatable: args => typeof args.action === "string" && READ_ONLY_VACUUM_ACTIONS.has(args.action),
+  schedulable: args => typeof args.action === "string" && SCHEDULABLE_VACUUM_ACTIONS.has(args.action),
   execute: executeVacuum,
 };

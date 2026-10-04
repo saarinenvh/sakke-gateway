@@ -15,7 +15,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **AI scene designer** — describe a mood, get a full lighting scene (OpenAI gpt-4o). Reads its room layout and lighting notes from the wiki, so a lamp can move without a redeploy
 - **Shopping lists** — add/remove items with automatic store-layout ordering
 - **Spotify** — search by voice and pick from three spoken options; known personal playlists play immediately
-- **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
+- **Timers, reminders and scheduled actions** — "in 10 minutes", "at 4 pm", or "start the vacuum at 11"; set, list and cancel. Sakke announces reminders aloud, says how a scheduled action went, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
 - **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded. Later, on the first PC input after waking (after the watch's wake time on a day without an alarm), Sakke tells the satellite "you actually got up" with today's calendar, tasks and weather, in a structure that changes from day to day
@@ -47,7 +47,7 @@ request may use is its profile's choice. How that fits together:
 | `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
 | `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
 | `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, after a duration or at a clock time, stored in the gateway database |
+| `schedule` | `tools/schedule/` | Set, cancel or list timers, reminders and scheduled actions (the vacuum, lights and devices, routines), after a duration or at a clock time, stored in the gateway database |
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |

@@ -25,10 +25,16 @@ export interface JobRequest {
   label: string;
 }
 
+export const ANNOUNCE_TOOL = "announce";
+
 // What a job does when it was given only a label: Sakke announces it.
 export function defaultAnnouncement(label: string): { tool: string; args: Record<string, unknown> } {
-  return { tool: "announce", args: { message: `Time's up: ${label}.` } };
+  return { tool: ANNOUNCE_TOOL, args: { message: `Time's up: ${label}.` } };
 }
+
+// Tells the owner how a job went, once its outcome is recorded. Injected for
+// the same reason as the runner.
+export type OutcomeReporter = (job: ScheduledJob, outcome: JobOutcome) => Promise<void>;
 
 // Whether a tool call may run unattended. Injected for the same reason as the
 // runner.
@@ -41,6 +47,7 @@ export type ScheduleResult =
 export interface SchedulerDeps {
   store: JobStore;
   runJob: JobRunner;
+  reportOutcome: OutcomeReporter;
   isSchedulable: SchedulabilityCheck;
   now: () => Date;
   log: FastifyBaseLogger;
@@ -150,6 +157,17 @@ export class Scheduler {
 
     const outcome = await this.run(job);
     await this.record(job, outcome.status, outcome.result);
+    await this.report(job, outcome);
+  }
+
+  // After the outcome is stored: a failure to say it doesn't change it.
+  private async report(job: ScheduledJob, outcome: JobOutcome): Promise<void> {
+    try {
+      await this.deps.reportOutcome(job, outcome);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      this.deps.log.error({ jobId: job.id, err: reason }, "Could not report a scheduled job's outcome");
+    }
   }
 
   // Marked running in the database before it runs, so a run cut short by a
