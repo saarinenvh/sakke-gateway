@@ -3,27 +3,27 @@ import type { DataSource } from "typeorm";
 import { buildApp } from "./app.js";
 import { loadEntities } from "./integrations/homeAssistant/registry.js";
 import { setModuleLogger } from "./logger.js";
-import { setWordingWriter } from "./features/announcements/announcer.js";
-import { writeAnnouncementWording } from "./features/announcements/wording.js";
 import { config } from "./config.js";
-import { restoreTidinessState } from "./features/tidiness/store.js";
-import { startTidinessCoach } from "./features/tidiness/coach.js";
-import { liveCoachDeps } from "./features/tidiness/liveDeps.js";
+import { startTidiness } from "./features/tidiness/tidiness.js";
 import { createDataSource } from "./db/dataSource.js";
 import { connectDatabase, DATABASE_RETRY_DELAY_MS } from "./db/database.js";
-import { JobRepository } from "./features/scheduling/jobRepository.js";
+import { JobRepository } from "./features/scheduling/db/jobRepository.js";
 import { importLegacyTimers } from "./features/scheduling/legacyTimers.js";
-import { startScheduler } from "./features/scheduling/scheduler.js";
+import { startScheduler } from "./features/scheduling/scheduling.js";
 import { isSchedulable, runScheduledCall } from "./tools/registry.js";
+import { MorningRepository } from "./features/morning/db/morningRepository.js";
+import { startMorning } from "./features/morning/morning.js";
+import { setSystemPromptBuilder } from "./inference/systemPrompt.js";
+import { buildSystemPrompt } from "./agent/systemPrompt.js";
 
 const app = buildApp();
 
 // Modules without a request logger (scenes.ts, spotify.ts) log through this.
 setModuleLogger(app.log);
 
-// Composition root: wired here so neither announce nor the scheduler has to
-// import the agent or the tool registry, which imports every tool.
-setWordingWriter(writeAnnouncementWording);
+// Composition root. Sakke's system prompt is composed from every tool's
+// prompt section, and inference/ sits below the tools, so it's wired in here.
+setSystemPromptBuilder(buildSystemPrompt);
 
 // Anything missing or implausible in the environment, reported once, up front,
 // instead of surfacing later as an inexplicable runtime failure.
@@ -59,12 +59,14 @@ async function startScheduling(dataSource: DataSource): Promise<void> {
 // connecting, or unreachable. A missing config is already a reported problem.
 if (config.database) {
   void connectDatabase(createDataSource(config.database), DATABASE_RETRY_DELAY_MS)
-    .then(startScheduling)
+    .then(async dataSource => {
+      startMorning(new MorningRepository(dataSource));
+      await startScheduling(dataSource);
+    })
     .catch(err => app.log.error({ err: err instanceof Error ? err.message : String(err) }, "Scheduling failed to start, unavailable until restart"));
 }
 
-// State first, so the first tick knows what was already asked before a restart.
-void restoreTidinessState().then(() => startTidinessCoach(liveCoachDeps));
+void startTidiness();
 
 // Starts either way - a dead HA at boot shouldn't stop the gateway coming up,
 // and refresh_home_data can reload the registry once it's back.

@@ -1,5 +1,7 @@
 import type { Tool } from "../types.js";
-import { readPage, saveNote } from "./wiki.js";
+import { toolParameters, parseToolArgs } from "../parameters.js";
+import { createKnowledgeArgsSchema, getContextArgsSchema } from "./schema.js";
+import { readPage, saveNote } from "../../features/wiki/wiki.js";
 
 export const getContextTool: Tool = {
   definition: {
@@ -7,13 +9,7 @@ export const getContextTool: Tool = {
     function: {
       name: "get_context",
       description: "Load a knowledge base page for detailed context about the user or a topic. Only call when the query is clearly about something in the knowledge base. Check available pages in the system prompt.",
-      parameters: {
-        type: "object",
-        properties: {
-          page: { type: "string", description: "Page path from the knowledge base index, e.g. user/user_profile or discgolf/context. Strip [[ and ]] from wikilinks." },
-        },
-        required: ["page"],
-      },
+      parameters: toolParameters(getContextArgsSchema),
     },
   },
   repeatable: () => true,
@@ -21,7 +17,7 @@ export const getContextTool: Tool = {
   // on, not a failure, and the two ways of missing are worth telling apart in
   // the log even though the model is told the same thing either way.
   execute: async (args, { log }) => {
-    const page = args.page as string;
+    const { page } = parseToolArgs(getContextArgsSchema, args, "get_context");
     const result = await readPage(page);
     if (result.ok) return result.content;
     if (result.reason === "escapes-root") {
@@ -39,19 +35,13 @@ export const createKnowledgeTool: Tool = {
     function: {
       name: "create_knowledge",
       description: "Save a new knowledge note. Use when the user shares something worth remembering — a fact, preference, experience, or piece of info. Pick a short descriptive filename. The note is saved to sakke-knowledge/ and added to sakke-index automatically. Always format content as: '## Title\\n\\nShort description of the fact or preference.'",
-      parameters: {
-        type: "object",
-        properties: {
-          filename: { type: "string", description: "Short descriptive filename without extension, e.g. espoo_disc_golf_courses or prefers_dark_roast_coffee" },
-          content: { type: "string", description: "Markdown content for the note. Include a # title, the fact, and any relevant context." },
-        },
-        required: ["filename", "content"],
-      },
+      parameters: toolParameters(createKnowledgeArgsSchema),
     },
   },
   repeatable: () => false,
   execute: async (args, { log }) => {
-    const { filename, isNew } = await saveNote(args.filename as string, args.content as string);
+    const note = parseToolArgs(createKnowledgeArgsSchema, args, "create_knowledge");
+    const { filename, isNew } = await saveNote(note.filename, note.content);
     log.info({ filename, isNew }, "Knowledge note saved");
     return `Saved note "${filename}".`;
   },

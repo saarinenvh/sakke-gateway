@@ -36,6 +36,7 @@ export const INFERENCE_PROFILES = {
       "set_gaming_mode",
       "get_calendar",
       "vacuum",
+      "coffee",
     ],
     contextOwner: "gateway",
   },
@@ -49,6 +50,25 @@ export const INFERENCE_PROFILES = {
     tools: [],
     contextOwner: "caller",
   },
+  // The morning wake-up's spoken good morning on the phone. Never acts.
+  morning_greeting: {
+    tools: [],
+    contextOwner: "caller",
+  },
+  // The day summary on the satellite once the owner is up. Never acts.
+  morning_brief: {
+    tools: [],
+    contextOwner: "caller",
+  },
 } as const satisfies Record<string, InferenceProfile>;
 
 export type InferenceProfileName = keyof typeof INFERENCE_PROFILES;
+
+type ProfilesOwnedBy<Owner extends ContextOwner> = {
+  [Name in InferenceProfileName]: (typeof INFERENCE_PROFILES)[Name]["contextOwner"] extends Owner ? Name : never;
+}[InferenceProfileName];
+
+/** A live conversation: the agent runs it. */
+export type ConversationProfileName = ProfilesOwnedBy<"gateway">;
+/** One piece of text a feature asks for: writeText writes it. */
+export type CallerProfileName = ProfilesOwnedBy<"caller">;

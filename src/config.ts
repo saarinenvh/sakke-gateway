@@ -19,6 +19,8 @@
 // a module-level const. That last part is what makes a test able to change a
 // value between cases without any module-reset machinery.
 
+import { reasoningEffortSchema, type ReasoningEffort } from "./integrations/openai/schema.js";
+
 // Blank is not the same as unset - see the note above about docker-compose.
 function env(name: string): string | undefined {
   const value = process.env[name];
@@ -68,6 +70,32 @@ export interface TidinessConfig {
   snoozeHours: number;
 }
 
+export interface MorningConfig {
+  // Off by default: the wake-up acts on the home unprompted.
+  enabled: boolean;
+  // The phone's next-alarm sensor (HA Companion app).
+  alarmSensorEntityId: string | undefined;
+  // Only alarms set by this app count, so another app's reminders can't wake the house.
+  alarmPackage: string;
+  // Nothing happens unless this reads "home". Unset means never.
+  presenceEntityId: string | undefined;
+  wakeScriptEntityId: string;
+  // Unset: no coffee step.
+  coffeeSwitchEntityId: string | undefined;
+  // The phone's notify service, without the "notify." domain. Unset: no phone greeting.
+  phoneNotifyService: string | undefined;
+  // An alarm found this long after it rang still wakes the house; later, it's let go.
+  alarmGraceMinutes: number;
+  // A coffee answer counts for the next wake-up only within this window.
+  coffeeAnswerHours: number;
+  // The watch's wake-time sensor: when the owner woke, on a day without an alarm.
+  wakeTimeSensorEntityId: string | undefined;
+  // PC input this soon after the morning starts doesn't count as being up.
+  briefMinDelayMinutes: number;
+  // No day summary from this local time on.
+  briefCutoff: LocalTime;
+}
+
 // The gateway's own database on the MariaDB server. Null when GATEWAY_DB_HOST
 // is unset: the gateway still runs, but anything that needs the database, such
 // as scheduling, reports itself unavailable.
@@ -105,10 +133,20 @@ export interface Config {
   // configuration, not a constant, and tests set it to zero.
   tvWakeMs: number;
   spotify: { clientId: string; clientSecret: string };
-  openai: { apiKey: string; lightingModel: string };
+  openai: {
+    // The sakke-public OpenAI project: inputs and outputs are shared with
+    // OpenAI in exchange for free daily usage. Only send it what may be shared.
+    publicApiKey: string;
+    lightingModel: string;
+    lightingReasoningEffort: ReasoningEffort | undefined;
+    // How long scene design may wait for OpenAI. Must stay under the 90 s the
+    // Home Assistant sakke_agent component gives the whole voice turn.
+    lightingTimeoutMs: number;
+  };
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
   tidiness: TidinessConfig;
+  morning: MorningConfig;
   database: DatabaseConfig | null;
   // Anything missing or implausible, collected rather than thrown. index.ts
   // logs these at startup. Deliberately not fatal: this service already starts
@@ -156,6 +194,7 @@ function loadConfig(): Config {
     : null;
 
   const tidiness = loadTidinessConfig(problems);
+  const morning = loadMorningConfig(problems);
   const database = loadDatabaseConfig(problems);
 
   const classifierBaseUrl = env("OLLAMA_CLASSIFIER_BASE_URL");
@@ -195,8 +234,10 @@ function loadConfig(): Config {
       clientSecret: env("SPOTIFY_CLIENT_SECRET") ?? "",
     },
     openai: {
-      apiKey: env("OPENAI_API_KEY") ?? "",
+      publicApiKey: env("OPENAI_PUBLIC_API_KEY") ?? "",
       lightingModel: env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o",
+      lightingReasoningEffort: parseReasoningEffort(env("OPENAI_LIGHTING_REASONING_EFFORT"), problems),
+      lightingTimeoutMs: parseLightingTimeoutMs(env("OPENAI_LIGHTING_TIMEOUT_MS"), problems),
     },
     search: { searxngUrl: env("SEARXNG_URL") ?? "http://searxng:8080" },
     weather: {
@@ -204,6 +245,7 @@ function loadConfig(): Config {
       lon: env("WEATHER_LON") ?? "24.7339",
     },
     tidiness,
+    morning,
     database,
     problems,
   };
@@ -253,20 +295,94 @@ function loadTidinessConfig(problems: string[]): TidinessConfig {
   };
 }
 
+const DEFAULT_ALARM_PACKAGE = "com.google.android.deskclock";
+
+function loadMorningConfig(problems: string[]): MorningConfig {
+  const enabled = bool("MORNING_ENABLED") ?? false;
+  const alarmSensorEntityId = env("MORNING_ALARM_SENSOR");
+  const presenceEntityId = env("MORNING_PRESENCE_ENTITY_ID");
+  if (enabled && alarmSensorEntityId === undefined) {
+    problems.push("MORNING_ALARM_SENSOR is not set - the morning wake-up is enabled but no alarm will ever wake the house");
+  }
+  if (enabled && presenceEntityId === undefined) {
+    problems.push("MORNING_PRESENCE_ENTITY_ID is not set - the morning wake-up is enabled but will never run");
+  }
+
+  return {
+    enabled,
+    alarmSensorEntityId,
+    alarmPackage: env("MORNING_ALARM_PACKAGE") ?? DEFAULT_ALARM_PACKAGE,
+    presenceEntityId,
+    wakeScriptEntityId: env("MORNING_WAKE_SCRIPT") ?? "script.morning_routine",
+    coffeeSwitchEntityId: env("MORNING_COFFEE_SWITCH"),
+    phoneNotifyService: env("MORNING_PHONE_NOTIFY_SERVICE"),
+    alarmGraceMinutes: num("MORNING_ALARM_GRACE_MINUTES", 10),
+    coffeeAnswerHours: num("MORNING_COFFEE_ANSWER_HOURS", 18),
+    wakeTimeSensorEntityId: env("MORNING_WAKE_TIME_SENSOR"),
+    briefMinDelayMinutes: num("MORNING_BRIEF_MIN_DELAY_MINUTES", 5),
+    briefCutoff: parseBriefCutoff(env("MORNING_BRIEF_CUTOFF"), problems),
+  };
+}
+
+function parseReasoningEffort(raw: string | undefined, problems: string[]): ReasoningEffort | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = reasoningEffortSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  problems.push(
+    `OPENAI_LIGHTING_REASONING_EFFORT "${raw}" is not one of ${reasoningEffortSchema.options.join(", ")} - using the model's default`,
+  );
+  return undefined;
+}
+
+// Long enough for gpt-5.x at high reasoning effort, with room left for the
+// Ollama turns around the tool call inside Home Assistant's 90 s.
+const DEFAULT_LIGHTING_TIMEOUT_MS = 75_000;
+// Home Assistant abandons the voice turn at 90 s, so a longer wait only hides
+// the failure. The cap also keeps the value far below Node's timer limit, past
+// which AbortSignal.timeout would fire almost immediately.
+const MAX_LIGHTING_TIMEOUT_MS = 90_000;
+
+function parseLightingTimeoutMs(raw: string | undefined, problems: string[]): number {
+  if (raw === undefined) return DEFAULT_LIGHTING_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0 && parsed < MAX_LIGHTING_TIMEOUT_MS) return parsed;
+  problems.push(
+    `OPENAI_LIGHTING_TIMEOUT_MS "${raw}" must be a whole number of milliseconds between 1 and ${MAX_LIGHTING_TIMEOUT_MS - 1} - using ${DEFAULT_LIGHTING_TIMEOUT_MS}`,
+  );
+  return DEFAULT_LIGHTING_TIMEOUT_MS;
+}
+
+const DEFAULT_BRIEF_CUTOFF: LocalTime = { hour: 12, minute: 0 };
+
+function parseBriefCutoff(raw: string | undefined, problems: string[]): LocalTime {
+  if (raw === undefined) return DEFAULT_BRIEF_CUTOFF;
+  const cutoff = parseLocalTime(raw);
+  if (cutoff !== undefined) return cutoff;
+  problems.push(`MORNING_BRIEF_CUTOFF "${raw}" is not an HH:MM time - using 12:00`);
+  return DEFAULT_BRIEF_CUTOFF;
+}
+
 // "10:00,18:00" -> sorted times; a malformed list falls back to the default.
 function parseAskTimes(raw: string, problems: string[]): LocalTime[] {
   const times: LocalTime[] = [];
   for (const part of raw.split(",")) {
-    const match = part.trim().match(/^(\d{1,2}):(\d{2})$/);
-    const hour = Number(match?.[1]);
-    const minute = Number(match?.[2]);
-    if (!match || hour > 23 || minute > 59) {
+    const time = parseLocalTime(part);
+    if (time === undefined) {
       problems.push(`TIDINESS_ASK_TIMES "${raw}" is not a list of HH:MM times - using ${DEFAULT_ASK_TIMES}`);
       return parseAskTimes(DEFAULT_ASK_TIMES, problems);
     }
-    times.push({ hour, minute });
+    times.push(time);
   }
   return times.sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
+}
+
+// "07:30" -> { hour: 7, minute: 30 }; undefined unless a valid HH:MM.
+function parseLocalTime(raw: string): LocalTime | undefined {
+  const match = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
+  const hour = Number(match?.[1]);
+  const minute = Number(match?.[2]);
+  if (!match || hour > 23 || minute > 59) return undefined;
+  return { hour, minute };
 }
 
 export const config: Config = loadConfig();

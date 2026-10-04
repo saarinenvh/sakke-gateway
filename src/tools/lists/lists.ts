@@ -1,5 +1,5 @@
 import { callService, getAllStates, getTodoItems } from "../../integrations/homeAssistant/client.js";
-import type { TodoItem } from "../../integrations/homeAssistant/schemas.js";
+import type { TodoItem } from "../../integrations/homeAssistant/schema.js";
 
 const STORE_LAYOUT = [
   { section: "Electronics & Household", keywords: ["battery", "bulb", "cable", "charger", "adapter", "tape", "glue", "pen", "bag", "wrap", "foil", "candle", "match", "lighter"] },

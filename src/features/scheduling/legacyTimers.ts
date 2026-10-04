@@ -3,8 +3,8 @@ import { join } from "path";
 import { z } from "zod";
 import type { FastifyBaseLogger } from "fastify";
 import { parseOrThrow } from "../../util/validation.js";
-import type { ScheduledJob } from "./ScheduledJob.entity.js";
-import { defaultAnnouncement, type JobStore } from "./scheduler.js";
+import type { ScheduledJob } from "./db/ScheduledJob.entity.js";
+import { defaultAnnouncement, type JobStore } from "./scheduling.js";
 
 // Where the file-based timer scheduler kept its timers, in the state dir.
 export const LEGACY_TIMERS_FILE = "timers.json";

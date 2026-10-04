@@ -1,8 +1,8 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
 import { INFERENCE_PROFILES, type InferenceProfile, type InferenceProfileName } from "../inference/profiles.js";
-import type { ScheduledJob } from "../features/scheduling/ScheduledJob.entity.js";
-import type { JobOutcome } from "../features/scheduling/scheduler.js";
+import type { ScheduledJob } from "../features/scheduling/db/ScheduledJob.entity.js";
+import type { JobOutcome } from "../features/scheduling/scheduling.js";
 
 import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
 import { webSearchTool } from "./search/tool.js";
@@ -16,6 +16,7 @@ import { scheduleTool } from "./schedule/tool.js";
 import { setGamingModeTool } from "./gpu/tool.js";
 import { vacuumTool } from "./vacuum/tool.js";
 import { announceTool } from "./announce/tool.js";
+import { coffeeTool } from "./coffee/tool.js";
 
 // Every tool, in the order the model is shown them. Which ones a request may
 // use is its profile's choice (inference/profiles.ts). The order is what the
@@ -40,6 +41,7 @@ const ALL: Tool[] = [
   getCalendarTool,
   vacuumTool,
   announceTool,
+  coffeeTool,
 ];
 
 const byName = new Map<string, Tool>();
@@ -106,7 +108,7 @@ export async function runScheduledCall(job: ScheduledJob, log: FastifyBaseLogger
   if (!isSchedulable(job.tool, job.args)) {
     return { status: "failed", result: `${job.tool} can't be run by the scheduler` };
   }
-  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`);
+  const run = await runTool(job.tool, job.args, log, `schedule-${job.id}`, job.runAt);
   switch (run.kind) {
     case "ok":
       return { status: "done", result: run.result };
@@ -137,6 +139,7 @@ export async function runTool(
   args: Record<string, unknown>,
   log: FastifyBaseLogger,
   conversationId: string,
+  scheduledFor?: Date,
 ): Promise<ToolRun> {
   const tool = byName.get(name);
   if (!tool) {
@@ -146,7 +149,7 @@ export async function runTool(
 
   log.info({ conversationId, tool: name, args }, "Tool call");
   try {
-    const result = await tool.execute(args, { log, conversationId });
+    const result = await tool.execute(args, { log, conversationId, scheduledFor });
     log.info({ conversationId, tool: name, result: preview(result) }, "Tool result");
     return { kind: "ok", result };
   } catch (err) {

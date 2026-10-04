@@ -1,18 +1,18 @@
 import type { FastifyBaseLogger } from "fastify";
 import { executeTool, isRepeatable, isToolInProfile, toolsForProfile } from "../tools/registry.js";
-import { INFERENCE_PROFILES, type InferenceProfileName } from "../inference/profiles.js";
+import type { ConversationProfileName } from "../inference/profiles.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
-import { broadcastState, speakingDurationMs, type SakkeState } from "../features/display/displayState.js";
+import { broadcastState, speakingDurationMs } from "../features/display/display.js";
 import { classifyFollowUp, recentExchanges, type FollowUpVerdict } from "./continuationCheck.js";
-import { cleanForSpeech } from "./voiceText.js";
-import { getOllamaTarget } from "./ollamaRouter.js";
+import { cleanForSpeech } from "../inference/voiceText.js";
+import { getOllamaTarget } from "../inference/ollamaRouter.js";
+import { buildSakkeRequest } from "../inference/ollamaRequest.js";
 import type { OllamaTargetConfig } from "../config.js";
 import { ollamaChat } from "../integrations/ollama/client.js";
 import type { Message, OllamaToolCall } from "../integrations/ollama/types.js";
 import type { ToolDefinition } from "../tools/types.js";
 import {
   type Conversation,
-  RESPONSE_RESERVE_TOKENS,
   getConversation,
   saveConversation,
   clearAwaitingContinuation,
@@ -23,11 +23,11 @@ import {
 } from "./conversationStore.js";
 
 const MAX_ITERATIONS = 6;
-const MAIN_AGENT_TEMPERATURE = 0.7;
 
 export interface AgentOptions {
-  // Which tools the model is offered and may call.
-  profile: InferenceProfileName;
+  // Which tools the model is offered and may call. A tool-less piece of text
+  // for a feature is inference/writeText's job, not a conversation.
+  profile: ConversationProfileName;
   // Context from whoever started the conversation, e.g. the question the
   // tidiness coach just asked; the reply arrives as a new conversation.
   extraSystemPrompt?: string;
@@ -51,43 +51,23 @@ type LoopOutcome =
 
 type ToolBatchOutcome = "executed" | "repeated";
 
-// What a turn does beyond answering: keep the conversation, and show it on
-// the display. Only a live conversation does either; a request whose context
-// its caller owns leaves no trace, even if it finishes after the caller gave up
-// waiting for it.
-interface TurnEffects {
-  live: boolean;
-  broadcast(state: SakkeState, autoIdleAfterMs?: number): void;
-  save: typeof saveConversation;
-}
-
-const LIVE_TURN: TurnEffects = { live: true, broadcast: broadcastState, save: saveConversation };
-const CALLER_OWNED_TURN: TurnEffects = { live: false, broadcast: () => {}, save: () => {} };
-
-function turnEffects(profile: InferenceProfileName): TurnEffects {
-  return INFERENCE_PROFILES[profile].contextOwner === "gateway" ? LIVE_TURN : CALLER_OWNED_TURN;
-}
-
 export async function runAgent(
   userMessage: string,
   conversationId: string,
   log: FastifyBaseLogger,
   options: AgentOptions,
 ): Promise<AgentResult> {
-  const effects = turnEffects(options.profile);
-  if (effects.live) pruneStale();
+  pruneStale();
 
-  const turn = effects.live
-    ? await resolveIncomingTurn(userMessage, conversationId, log, options.extraSystemPrompt)
-    : { kind: "proceed" as const, messages: await buildMessages(undefined, userMessage, options.extraSystemPrompt) };
+  const turn = await resolveIncomingTurn(userMessage, conversationId, log, options.extraSystemPrompt);
 
   if (turn.kind === "reset") {
-    effects.broadcast("speaking", speakingDurationMs(turn.reply));
+    broadcastState("speaking", speakingDurationMs(turn.reply));
     return { content: turn.reply, continueConversation: false };
   }
 
   if (turn.kind === "silence") {
-    effects.broadcast("idle");
+    broadcastState("idle");
     return { content: "", continueConversation: false };
   }
 
@@ -101,18 +81,18 @@ export async function runAgent(
     { conversationId, userMessage, model: target.model, baseUrl: target.baseUrl, turns: messages.length - 1 },
     "Agent started",
   );
-  effects.broadcast("thinking");
+  broadcastState("thinking");
 
   let outcome: LoopOutcome;
   try {
     outcome = await runToolCallingLoop(messages, target, conversationId, userMessage, log, options.profile);
   } catch (err) {
     // Only the speaking/idle broadcasts clear "thinking" - a throw must too.
-    effects.broadcast("idle");
+    broadcastState("idle");
     throw err;
   }
 
-  return completeTurn(outcome, messages, target.model, conversationId, effects, log);
+  return completeTurn(outcome, messages, target.model, conversationId, log);
 }
 
 // --- Turn setup -------------------------------------------------------
@@ -202,7 +182,7 @@ async function runToolCallingLoop(
   conversationId: string,
   userMessage: string,
   log: FastifyBaseLogger,
-  profile: InferenceProfileName,
+  profile: ConversationProfileName,
 ): Promise<LoopOutcome> {
   const completedToolCalls = new Set<string>();
   const tools = toolsForProfile(profile);
@@ -230,26 +210,13 @@ async function runToolCallingLoop(
   return { kind: "exhausted" };
 }
 
-// An empty tool list sends no schema at all, which is what makes the model
-// answer in prose.
 function callOllama(
   messages: Message[],
   target: OllamaTargetConfig,
   tools: ToolDefinition[],
   log: FastifyBaseLogger,
 ): Promise<Message> {
-  return ollamaChat(
-    target.baseUrl,
-    {
-      model: target.model,
-      messages,
-      ...(tools.length > 0 && { tools }),
-      ...(target.think !== undefined && { think: target.think }),
-      ...(target.keepAlive !== undefined && { keep_alive: target.keepAlive }),
-      options: { temperature: MAIN_AGENT_TEMPERATURE, num_predict: RESPONSE_RESERVE_TOKENS, num_ctx: target.numCtx },
-    },
-    log,
-  );
+  return ollamaChat(target.baseUrl, buildSakkeRequest(messages, target, tools), log);
 }
 
 // Keys are marked completed as the batch is processed, not in bulk
@@ -265,7 +232,7 @@ async function executeToolBatch(
   assistantContent: string,
   messages: Message[],
   completedToolCalls: Set<string>,
-  profile: InferenceProfileName,
+  profile: ConversationProfileName,
   conversationId: string,
   log: FastifyBaseLogger,
 ): Promise<ToolBatchOutcome> {
@@ -310,7 +277,7 @@ async function executeToolBatch(
 // A registered tool outside the profile gets the same answer as a made-up one.
 function executeToolInProfile(
   call: OllamaToolCall,
-  profile: InferenceProfileName,
+  profile: ConversationProfileName,
   conversationId: string,
   log: FastifyBaseLogger,
 ): Promise<string> {
@@ -347,20 +314,19 @@ function completeTurn(
   messages: Message[],
   model: string,
   conversationId: string,
-  effects: TurnEffects,
   log: FastifyBaseLogger,
 ): AgentResult {
   if (outcome.kind === "exhausted") {
-    effects.broadcast("idle");
+    broadcastState("idle");
     return { content: "I got confused trying to answer that.", continueConversation: false };
   }
 
   const content = cleanForSpeech(outcome.rawContent, outcome.toolsWereWithheld);
 
   messages.push({ role: "assistant", content });
-  effects.save(conversationId, { messages, awaitingContinuation: true });
+  saveConversation(conversationId, { messages, awaitingContinuation: true });
 
   log.info({ conversationId, model, turns: messages.length - 1, response: content }, "Agent response");
-  effects.broadcast("speaking", speakingDurationMs(content));
-  return { content, continueConversation: effects.live };
+  broadcastState("speaking", speakingDurationMs(content));
+  return { content, continueConversation: true };
 }

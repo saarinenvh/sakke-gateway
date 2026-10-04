@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
 import { executeTool } from "../../src/tools/registry.js";
 import { reloadConfig } from "../../src/config.js";
+import { setCoffeeAnswerStore } from "../../src/features/morning/coffee.js";
 
 // The tool layer's Home Assistant paths - TV control, device state, routines.
 // Written against executeTool(name, args, log, conversationId) deliberately:
@@ -79,7 +80,8 @@ describe("open_tv_app", () => {
   it("refuses an app it doesn't know, without calling Home Assistant", async () => {
     ha.setState("remote.living_room_tv", "on");
     const result = await run("open_tv_app", { app: "myspace" });
-    expect(result).toContain("Unknown app");
+    expect(result).toMatch(/^open_tv_app failed: .*failed validation/);
+    expect(result).toContain('"netflix"');
     expect(ha.serviceCalls()).toHaveLength(0);
   });
 });
@@ -102,7 +104,8 @@ describe("tv_remote_command", () => {
 
   it("refuses an unknown command without calling Home Assistant", async () => {
     const result = await run("tv_remote_command", { command: "eject" });
-    expect(result).toContain("Unknown remote command");
+    expect(result).toMatch(/^tv_remote_command failed: .*failed validation/);
+    expect(result).toContain('"home"');
     expect(ha.serviceCalls()).toHaveLength(0);
   });
 });
@@ -114,6 +117,22 @@ describe("tv_send_text", () => {
       domain: "remote", service: "send_command",
       data: { entity_id: "remote.living_room_tv", command: "text:ensiferum" },
     });
+  });
+});
+
+describe("coffee", () => {
+  // Runs before any store is set: the database hasn't connected yet.
+  it("says it can't record the answer before the database is connected", async () => {
+    expect(await run("coffee", { action: "set_loaded", loaded: true })).toContain("isn't available");
+  });
+
+  it("records whether the coffee maker is loaded", async () => {
+    const saved: boolean[] = [];
+    setCoffeeAnswerStore({ saveCoffeeAnswer: async loaded => { saved.push(loaded); } });
+
+    expect(await run("coffee", { action: "set_loaded", loaded: true })).toContain("starts with the morning alarm");
+    expect(await run("coffee", { action: "set_loaded", loaded: false })).toContain("stays off");
+    expect(saved).toEqual([true, false]);
   });
 });
 
@@ -141,7 +160,7 @@ describe("registry", () => {
     // silently possible.
     const { tools, toolNames } = await import("../../src/tools/registry.js");
     expect(tools.map(t => t.function.name).sort()).toEqual(toolNames().sort());
-    expect(tools).toHaveLength(19);
+    expect(tools).toHaveLength(20);
   });
 });
 
@@ -156,10 +175,12 @@ describe("inference profiles", () => {
     expect(offered.sort()).toEqual(toolNames().filter(name => !SCHEDULER_ONLY.includes(name)).sort());
   });
 
-  it("offers an announcement and the tidiness nag no tools at all", async () => {
+  it("offers an announcement, the tidiness nag and the morning greeting and brief no tools at all", async () => {
     const { toolsForProfile } = await import("../../src/tools/registry.js");
     expect(toolsForProfile("announcement")).toEqual([]);
     expect(toolsForProfile("tidiness_nag")).toEqual([]);
+    expect(toolsForProfile("morning_greeting")).toEqual([]);
+    expect(toolsForProfile("morning_brief")).toEqual([]);
   });
 
   it("keeps the registry's order, which is what the model is used to", async () => {

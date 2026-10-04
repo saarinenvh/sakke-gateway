@@ -5,7 +5,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 ## Features
 
 - **Multi-turn agent** — conversation history per session, follow-up questions work naturally
-- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 18 tools, each owned by the feature it belongs to
+- **Tool calling** — the LLM picks the tools; results feed back into the conversation. 20 tools, each owned by the feature it belongs to
 - **Follow-up classification** — a second, deliberately small model decides whether the next utterance is a continuation, an unrelated new request, or room noise. Noise gets silence: when Sakke has to guess, it fails quiet
 - **GPU routing** — inference goes to the dev PC's GPU while it's idle and falls back to the server's own Ollama otherwise. Decided once per turn, and fails closed — "busy" and "unknown" both mean the server
 - **Home control** — lights, scenes, switches, media via the Home Assistant API
@@ -18,6 +18,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Timers and reminders** — set, list and cancel; Sakke announces them aloud through the satellite when they're due, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
+- **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded. Later, on the first PC input after waking (after the watch's wake time on a day without an alarm), Sakke tells the satellite "you actually got up" with today's calendar, tasks and weather, in a structure that changes from day to day
 - **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
 - **Web search** — SearXNG with Brave as the backing engine
 - **Google Tasks / Calendar** — query tasks and events by voice, via HA's todo and calendar integrations
@@ -46,11 +47,12 @@ request may use is its profile's choice. How that fits together:
 | `create_knowledge` | `tools/wiki/` | Save a note to `sakke-knowledge/` in the vault |
 | `get_context` | `tools/wiki/` | Load a wiki knowledge page on demand |
 | `get_tasks` | `tools/reminders/` | Pending Google Tasks for today / tomorrow / this_week / next_week |
-| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, stored in the gateway database |
+| `schedule` | `tools/schedule/` | Set, cancel or list timers and reminders, after a duration or at a clock time, stored in the gateway database |
 | `refresh_home_data` | `tools/homeControl/` | Reload areas, scenes and routines from HA |
 | `set_gaming_mode` | `tools/gpu/` | Stop routing inference to the PC's GPU, and free its VRAM |
 | `get_calendar` | `tools/reminders/` | Google Calendar events for the same periods |
 | `vacuum` | `tools/vacuum/` | Start / stop / dock / status, plus answers to a cleaning reminder |
+| `coffee` | `tools/coffee/` | Record whether the coffee maker is loaded for the morning wake-up |
 | `announce` | `tools/announce/` | Speak a message on the satellite in Sakke's words. In no profile: only the scheduler runs it |
 
 ## Routes
@@ -60,12 +62,11 @@ request may use is its profile's choice. How that fits together:
 | POST | `/v1/chat/completions` | Main agent endpoint (OpenAI-compatible). Optional `extra_system_prompt` is added to that turn - how a satellite-initiated question's answer knows what it answers |
 | POST | `/scene` | AI-powered scene designer |
 | POST | `/scene/save` | Save current light state as a scene |
-| GET | `/reminders/morning` | Morning greeting with tasks + calendar (for HA automations) |
 | GET | `/reminders/check` | Pending tasks check — returns null if all done (for HA automations) |
 | GET | `/display` | Tablet animation display (idle/listening/thinking/speaking orb) |
 | GET | `/display/events` | SSE stream of state changes for the display |
 | GET, POST | `/display/state` | Read or push a display state change |
-| GET, POST | `/internal/gpu-status` | The PC pushes its GPU status here; GET reports what's currently known |
+| GET, POST | `/internal/gpu-status` | The PC pushes its GPU status and idle time here; GET reports what's currently known, including `lastInputAt` |
 | GET | `/health` | Healthcheck |
 
 ## Architecture
@@ -85,7 +86,7 @@ Three places, and the choice is not arbitrary:
 
 - **TypeScript 5** — Fastify HTTP server
 - **Ollama** — local LLM inference, model per `OLLAMA_MODEL`; a separate, smaller `OLLAMA_CLASSIFIER_MODEL` for follow-up classification
-- **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o)
+- **OpenAI** — scene designer (`OPENAI_LIGHTING_MODEL`, default gpt-4o; optional `OPENAI_LIGHTING_REASONING_EFFORT` for gpt-5.x and o-series models; `OPENAI_LIGHTING_TIMEOUT_MS`, default 75000, kept under Home Assistant's 90 s per voice turn). Uses the `sakke-public` project key, whose traffic is shared with OpenAI
 - **Home Assistant** — smart home backend
 - **MariaDB 10.11 + TypeORM** — the gateway's own database, for scheduled jobs; see [docs/architecture/data.md](docs/architecture/data.md)
 - **Open-Meteo** — weather API
@@ -111,8 +112,9 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | GPU routing (optional) | `PC_OLLAMA_BASE_URL`, `PC_OLLAMA_MODEL`, `PC_OLLAMA_NUM_CTX`, `PC_OLLAMA_THINK`, `PC_OLLAMA_KEEP_ALIVE` |
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
-| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_API_KEY`, `OPENAI_LIGHTING_MODEL`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_PUBLIC_API_KEY`, `OPENAI_LIGHTING_MODEL`, `OPENAI_LIGHTING_REASONING_EFFORT`, `OPENAI_LIGHTING_TIMEOUT_MS`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
 | Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
+| Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS`, `MORNING_WAKE_TIME_SENSOR`, `MORNING_BRIEF_MIN_DELAY_MINUTES`, `MORNING_BRIEF_CUTOFF` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |
 
 Leaving `PC_OLLAMA_BASE_URL` unset disables GPU routing entirely and everything
@@ -175,10 +177,11 @@ npm start
 npm test
 ```
 
-Unit tests sit next to the code as `*.test.ts`; integration tests live in
-`tests/`, driving the real Fastify app through `app.inject()` against fake
-Ollama and Home Assistant servers in `tests/fixtures/`. No test reaches the
-network.
+Unit tests sit in a `tests/` folder in the module they test, as `*.test.ts`
+(a test fails if one sits anywhere else). Integration tests live in the
+top-level `tests/integration/`, driving the real Fastify app through
+`app.inject()` against fake Ollama and Home Assistant servers in
+`tests/fixtures/`. No test reaches the network.
 
 `tests/integration/database.test.ts` runs the migrations and entities against
 a real MariaDB, and is skipped unless `TEST_DB_HOST` is set. CI provides a

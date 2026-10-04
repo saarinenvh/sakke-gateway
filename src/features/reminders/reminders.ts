@@ -1,0 +1,109 @@
+import { config } from "../../config.js";
+import { haGet, getTodoItems } from "../../integrations/homeAssistant/client.js";
+import {
+  calendarEventsSchema,
+  type CalendarEvent,
+  type TodoItem,
+} from "../../integrations/homeAssistant/schema.js";
+
+async function getTodayEvents(calendarEntityId: string, start?: Date, end?: Date): Promise<CalendarEvent[]> {
+  const now = new Date();
+  const s = start ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const e = end ?? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  return haGet(
+    `/api/calendars/${calendarEntityId}?start=${s.toISOString()}&end=${e.toISOString()}`,
+    calendarEventsSchema,
+  );
+}
+
+// Compares the date portion only. start/end are date-only ("2026-09-25"), but a
+// due value carrying a time ("2026-09-25T10:00:00") is a longer string that
+// sorts AFTER the plain date - so a plain `due <= end` was false for anything
+// due at a specific time today, and it vanished from the briefing rather than
+// being reported late. An undated task always counts.
+export function isDueInRange(due: string | undefined, start: string, end: string): boolean {
+  if (!due) return true;
+  const day = due.slice(0, 10);
+  return day >= start && day <= end;
+}
+
+export function getDateRange(period: string): { start: string; end: string } {
+  const now = new Date();
+  const todayStr = now.toLocaleDateString("sv-SE", { timeZone: config.timezone });
+
+  if (period === "tomorrow") {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowStr = tomorrow.toLocaleDateString("sv-SE", { timeZone: config.timezone });
+    return { start: tomorrowStr, end: tomorrowStr };
+  }
+
+  if (period === "this_week") {
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return {
+      start: monday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+      end: sunday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+    };
+  }
+
+  if (period === "next_week") {
+    const day = now.getDay();
+    const nextMonday = new Date(now);
+    nextMonday.setDate(now.getDate() + (day === 0 ? 1 : 8 - day));
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+    return {
+      start: nextMonday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+      end: nextSunday.toLocaleDateString("sv-SE", { timeZone: config.timezone }),
+    };
+  }
+
+  return { start: todayStr, end: todayStr };
+}
+
+async function getPendingTasks(period = "today"): Promise<TodoItem[]> {
+  const items = await getTodoItems(config.ha.tasksTodo);
+  const { start, end } = getDateRange(period);
+  return items.filter(i => i.status !== "completed" && isDueInRange(i.due, start, end));
+}
+
+function formatEventTime(event: CalendarEvent): string {
+  if (!("dateTime" in event.start)) return event.summary;
+  const dt = event.start.dateTime;
+  const time = new Date(dt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: config.timezone });
+  return `${event.summary} at ${time}`;
+}
+
+export async function getTasksText(period = "today"): Promise<string> {
+  const tasks = await getPendingTasks(period);
+  if (tasks.length === 0) return `No tasks for ${period}.`;
+  return `Tasks (${period}): ` + tasks.map(t => t.summary).join(", ") + ".";
+}
+
+export async function getCalendarText(period = "today"): Promise<string> {
+  const { start, end } = getDateRange(period);
+  const startDt = new Date(`${start}T00:00:00`);
+  const endDt = new Date(`${end}T23:59:59`);
+  const parts: string[] = [];
+  for (const calendarId of config.ha.calendarEntities) {
+    const events = await getTodayEvents(calendarId, startDt, endDt);
+    if (events.length > 0) {
+      parts.push(...events.map(formatEventTime));
+    }
+  }
+  if (parts.length === 0) return `Nothing on the calendar for ${period}.`;
+  return `Events (${period}): ` + parts.join(", ") + ".";
+}
+
+export async function getPendingReminder(): Promise<string | null> {
+  const tasks = await getPendingTasks();
+  if (tasks.length === 0) return null;
+
+  const list = tasks.map(t => t.summary).join(", ");
+  return `Still pending: ${list}.`;
+}

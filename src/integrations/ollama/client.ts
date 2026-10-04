@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Message } from "./types.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { parseJsonResponse } from "../../util/validation.js";
-import { chatResponseSchema } from "./schemas.js";
+import { chatResponseSchema } from "./schema.js";
 
 // Mirrors homeAssistant/client.ts and openai/client.ts: one place for the
 // request/response/error handling that agent.ts and continuationCheck.ts

@@ -3,32 +3,42 @@
 A tool is something the model can call. How one is built, how calls are run,
 and which requests may use which tools.
 
-## The four layers
+## A tool is only the model's interface
 
-A tool is split like an HTTP API, one layer per file:
+A tool folder holds what the model sees and the code that answers it, nothing
+the rest of the gateway needs:
 
 | File | Like | Holds |
 | --- | --- | --- |
 | `tools/<name>/prompt.ts` (optional) | API usage guide | when the model should use the tool; added to the system prompt |
-| `tools/<name>/tool.ts` | the OpenAPI document | name, description, parameters, `repeatable`; points at the executor |
-| `tools/<name>/<name>.ts` | the request handler | validates the arguments, calls services, words the result for the model |
-| `features/<feature>/` | the service layer | business logic, database access, anything more than one call |
+| `tools/<name>/schema.ts` | the request schema | the arguments as a Zod schema, with an example call |
+| `tools/<name>/tool.ts` | the OpenAPI document | name, description, `repeatable`, and `parameters` generated from the schema; points at the executor |
+| `tools/<name>/<name>.ts` (optional) | the request handler | parses the arguments, does what only this tool needs, words the result for the model |
 
-`tools/search/` is the plain case: the executor makes one HTTP request and
-formats the results. As soon as a tool needs a database, state, or logic other
-code also uses, that part is a service in `features/`, and the executor calls
-it. `tools/announce/` is that case: the executor parses `{ message }`, and
-`features/announcements/announcer.ts` does the work.
+Where the rest goes:
+
+- **A feature** (`features/<feature>/`) holds anything with state, a route, a
+  schedule, a database, or a second caller. The tool calls it. `tools/announce/`
+  parses `{ message }`, and `features/announcements/` does the work;
+  `tools/reminders/` calls `features/reminders/`, which also serves
+  `/reminders/check` and the morning brief.
+- **An integration** (`integrations/<service>/`) holds every HTTP call to an
+  outside service, with its `schema.ts`, even when only one tool uses it.
+  `tools/search/` has no feature: it calls `integrations/searxng/` and formats
+  the results.
+- **Logic that only this tool needs** may stay in its executor, as in
+  `tools/lists/` (matching and reordering list items) and `tools/homeControl/`
+  (the dispatcher). It moves to a feature when a second caller appears.
+
+Nothing outside `tools/` imports a tool folder's internals: the registry
+imports each `tool.ts`, and `agent/systemPrompt.ts` each `prompt.ts`.
 
 Why: the definition is what the model sees, and changes to it change how the
 model behaves; the executor is the boundary where untrusted model output is
-validated; the service is plain code that other features and the scheduler can
-call without going through the model. Keeping them apart means each can change
-without touching the others.
-
-Older tools (`vacuum/`, `lists/`, …) still keep some logic next to the
-executor. New tools follow the layers; old ones move when they're changed for
-another reason.
+validated; a feature is plain code that other features, routes and the
+scheduler can call without going through the model; an integration is the one
+place that knows a service's URLs, timeouts and shapes. Keeping them apart
+means each can change without touching the others.
 
 ## The registry
 
@@ -38,10 +48,12 @@ free change.
 
 It runs a call two ways:
 
-- `runTool(name, args, log, conversationId)` returns what happened:
-  `{ kind: "ok", result }`, `{ kind: "failed", error }` or `{ kind: "unknown" }`.
-  It never throws. The scheduler uses it, so it can tell a failure without
-  reading text.
+- `runTool(name, args, log, conversationId, scheduledFor?)` returns what
+  happened: `{ kind: "ok", result }`, `{ kind: "failed", error }` or
+  `{ kind: "unknown" }`. It never throws. The scheduler uses it, through
+  `runScheduledCall`, so it can tell a failure without reading text; it also
+  passes the time the job was due, which a tool reads as `ctx.scheduledFor`
+  (`announce` uses it to say a late announcement is late).
 - `executeTool(...)` is the same, worded for the model: the result, or
   "`<name>` failed: …", or "Unknown tool: …". The agent loop uses it.
 
@@ -69,22 +81,25 @@ classification and model limits to the same profiles.
 | `sakke` | conversations (`/v1/chat/completions`) | every tool except `announce` | gateway |
 | `announcement` | wording an announcement | none | caller |
 | `tidiness_nag` | the tidiness coach's question | none | caller |
+| `morning_greeting` | the morning wake-up's good morning on the phone | none | caller |
+| `morning_brief` | the day summary on the satellite | none | caller |
 
 - **Named after the caller or the act**, not the kind of work. The bot's
   profiles will be named the same way (e.g. `telegram`, `sakariheitaja`) when it
   moves onto the scheduler.
-- **`runAgent` requires a profile.** The model is offered only its tools, in
-  registry order. A profile with no tools sends no tool schema at all.
+- **Every model call names a profile.** `runAgent` takes a `gateway` profile
+  and offers the model only its tools, in registry order. `writeText` takes a
+  `caller` profile and sends no tool schema at all.
 - **A call outside the profile is refused** as an unknown tool, even if the
   tool is registered. The model can't grant itself a tool by naming it.
 - **The registry refuses to start** if a profile names a tool that doesn't
   exist, since that would silently take the tool away.
-- **The context owner decides what a turn leaves behind.** A `gateway` request
-  is a live conversation: `runAgent` keeps its history, classifies follow-ups,
-  and shows it on the display. A `caller` request is one piece of text a
-  feature asked for: it starts from the system prompt alone, stores nothing and
-  doesn't touch the display, even if it finishes after the caller stopped
-  waiting. The caller shows Sakke speaking itself, when the satellite actually
+- **The context owner decides what a request leaves behind.** A `gateway`
+  request is a live conversation: `runAgent` (`agent/`) keeps its history,
+  classifies follow-ups, and shows it on the display. A `caller` request is one
+  piece of text a feature asked for: `writeText` (`inference/`) starts it from
+  the system prompt alone, stores nothing and doesn't touch the display, even if
+  it finishes after the caller stopped waiting. The caller shows Sakke speaking itself, when the satellite actually
   speaks (`showSpeakingWhile` in `features/display/`).
 - **`announce` is in no profile.** Sakke already speaks its reply in a
   conversation; announcing is for speech at a scheduled time, run by the
@@ -95,9 +110,16 @@ a new tool can't be registered and silently never offered.
 
 ## Adding a tool
 
-1. `tools/<name>/tool.ts` with the definition, and the executor in
-   `tools/<name>/<name>.ts`, validating its arguments with Zod.
-2. Put anything beyond a single call into a service under `features/`.
+1. `tools/<name>/schema.ts` with the arguments as a Zod schema (each field
+   `.describe()`d) and an example call, plus `tools/<name>/tests/schema.test.ts`
+   that parses it. Then `tools/<name>/tool.ts` with the definition, whose
+   `parameters` come from `toolParameters(schema)`, and the executor in
+   `tools/<name>/<name>.ts`, which parses its arguments with that schema.
+   `tools/tests/__snapshots__/toolDefinitions.json` records what the model sees,
+   so update it on purpose (`vitest -u`) and review the diff.
+2. Put HTTP calls to an outside service in `integrations/<service>/`, and
+   anything with state, a route, a schedule, a database or a second caller in
+   `features/`.
 3. Add it to `ALL` in `tools/registry.ts`, and to the profiles that should
    have it (usually `sakke`).
 4. If it may run from the scheduler, give it `schedulable`, and allow only the

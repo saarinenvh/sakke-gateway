@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { sceneRoutes } from "./features/scenes/route.js";
 import { conversationRoutes } from "./agent/route.js";
-import { reminderRoutes } from "./tools/reminders/route.js";
+import { reminderRoutes } from "./features/reminders/route.js";
 import { displayRoutes } from "./features/display/route.js";
 import { gpuStatusRoutes } from "./features/gpu/route.js";
 

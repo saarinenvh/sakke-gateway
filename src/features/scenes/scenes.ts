@@ -6,10 +6,11 @@ import { moduleLog } from "../../logger.js";
 import { config } from "../../config.js";
 import { getAllStates, callService, haPost, type EntityState } from "../../integrations/homeAssistant/client.js";
 import { chatCompletion } from "../../integrations/openai/client.js";
-import { readWikiDocWithFallback } from "../../tools/wiki/wiki.js";
+import { readWikiDocWithFallback } from "../wiki/wiki.js";
 import { stripCodeFence } from "../../util/text.js";
 import { parseOrThrow } from "../../util/validation.js";
 import { validateScenePlan, InvalidScenePlanError, type ScenePlanIssue } from "./sceneValidator.js";
+import { lightAttributesSchema } from "./schema.js";
 
 export { validateScenePlan, InvalidScenePlanError };
 export type { ScenePlanIssue };
@@ -49,10 +50,6 @@ export interface ApplySceneResult {
   anySucceeded: boolean;
 }
 
-// Scene design is a big single completion, so more generous than the 5-8s used
-// for the quick HA/Spotify calls.
-const SCENE_DESIGN_TIMEOUT_MS = 30000;
-
 // The lamp descriptions live in the wiki when one is mounted, so moving a lamp
 // or re-describing a room is an Obsidian edit rather than a redeploy - see
 // readWikiDocWithFallback for the bundled-copy fallback.
@@ -74,7 +71,11 @@ export async function designScene(description: string): Promise<ScenePlan> {
       { role: "system", content: systemPrompt },
       { role: "user", content: description },
     ],
-    { temperature: 0.7, timeoutMs: SCENE_DESIGN_TIMEOUT_MS },
+    {
+      temperature: 0.7,
+      reasoningEffort: config.openai.lightingReasoningEffort,
+      timeoutMs: config.openai.lightingTimeoutMs,
+    },
   );
 
   moduleLog().info({ model: config.openai.lightingModel }, "OpenAI scene design call completed");
@@ -219,20 +220,6 @@ function summarizeOutcomes(outcomes: SceneDeviceOutcome[]): ApplySceneResult {
 function createSceneId(name: string): string {
   return name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 }
-
-// HA reports null, not a missing key, for the attributes of a light that is
-// off. color_mode stays a plain string: HA has more modes (onoff, white,
-// unknown) than the switch below handles, and those fall to its default.
-const lightAttributesSchema = z.object({
-  brightness: z.number().nullish(),
-  color_mode: z.string().nullish(),
-  color_temp_kelvin: z.number().nullish(),
-  color_temp: z.number().nullish(),
-  rgb_color: z.tuple([z.number(), z.number(), z.number()]).nullish(),
-  hs_color: z.tuple([z.number(), z.number()]).nullish(),
-  xy_color: z.tuple([z.number(), z.number()]).nullish(),
-  effect: z.string().nullish(),
-});
 
 type HomeAssistantLightAttributes = z.output<typeof lightAttributesSchema>;
 
