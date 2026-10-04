@@ -55,13 +55,14 @@ describe("moving the vacuum", () => {
     expect(getTidinessState().nags[0].answer).toBe("yes");
   });
 
-  it("says there is no vacuum rather than pretending to start one", async () => {
+  it("fails, rather than pretending to start one, when there is no vacuum", async () => {
     delete process.env.TIDINESS_VACUUM_ENTITY_ID;
     reloadConfig();
     ha.removeState(VACUUM);
     await loadEntities();
 
-    expect(await run({ action: "start" })).toContain("no robot vacuum");
+    // A failure, not a result: a scheduled start must not be reported as done.
+    expect(await run({ action: "start" })).toBe("vacuum failed: There is no robot vacuum in Home Assistant.");
     expect(ha.serviceCalls()).toEqual([]);
   });
 });

@@ -41,6 +41,16 @@ export const controlHomeAssistantArgsSchema = z.object({
 
 export type ControlHomeAssistantArgs = z.output<typeof controlHomeAssistantArgsSchema>;
 
+// Designing a scene is a long OpenAI round trip, and saving the current lights
+// as a scene at some later time isn't something anyone means; everything else
+// can run at a set time.
+const UNSCHEDULABLE_ACTIONS: ReadonlySet<ControlHomeAssistantArgs["action"]> = new Set(["scene_design", "scene_create"]);
+
+export function isSchedulableControl(args: Record<string, unknown>): boolean {
+  const parsed = controlHomeAssistantArgsSchema.safeParse(args);
+  return parsed.success && !UNSCHEDULABLE_ACTIONS.has(parsed.data.action);
+}
+
 // Model → gateway: the arguments of a get_device_state tool call.
 
 export const getDeviceStateArgsExample = { entity_id: "media_player.bedroom_tv" };

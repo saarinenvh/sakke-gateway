@@ -10,6 +10,8 @@ export type VacuumAction = (typeof VACUUM_ACTIONS)[number];
 
 // Pure reads; every other action moves the vacuum or changes reminder state.
 export const READ_ONLY_VACUUM_ACTIONS: ReadonlySet<string> = new Set<VacuumAction>(["status", "last_cleaned"]);
+// What makes sense at a set time with nobody there: moving it.
+export const SCHEDULABLE_VACUUM_ACTIONS: ReadonlySet<string> = new Set<VacuumAction>(["start", "stop", "dock"]);
 
 // HA services behind the three movement actions.
 const MOVEMENT_SERVICES = {
@@ -45,11 +47,13 @@ export async function runVacuumAction(action: VacuumAction, now: number): Promis
 
 // --- Movement ---------------------------------------------------------------
 
+// Throws when there's no single vacuum to move: the move didn't happen, and a
+// scheduled run must not be reported as done.
 async function moveVacuum(action: keyof typeof MOVEMENT_SERVICES, now: number): Promise<string> {
   const lookup = findVacuum();
-  if (lookup.kind === "none") return "There is no robot vacuum in Home Assistant.";
+  if (lookup.kind === "none") throw new Error("There is no robot vacuum in Home Assistant.");
   if (lookup.kind === "ambiguous") {
-    return `There are several vacuums (${lookup.names.join(", ")}) and none is configured as the one to use.`;
+    throw new Error(`There are several vacuums (${lookup.names.join(", ")}) and none is configured as the one to use.`);
   }
 
   await callService("vacuum", MOVEMENT_SERVICES[action], { entity_id: lookup.vacuum.entity_id });

@@ -97,6 +97,11 @@ export function isRepeatable(name: string, args: Record<string, unknown>): boole
   return byName.get(name)?.repeatable(args) ?? false;
 }
 
+// The tools that can run unattended for at least some arguments.
+export function schedulableToolNames(): string[] {
+  return ALL.filter(tool => tool.schedulable).map(tool => tool.definition.function.name);
+}
+
 // Unknown names are never schedulable.
 export function isSchedulable(name: string, args: Record<string, unknown>): boolean {
   return byName.get(name)?.schedulable?.(args) ?? false;

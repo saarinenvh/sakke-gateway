@@ -3,8 +3,15 @@
 Runs a stored tool call at a set time: after a duration ("in 10 minutes",
 `source: "in"`) or at a clock time ("at 4 pm", `source: "at"`). A job is
 stored before it is armed, so it survives a restart; only a call the tool marks
-`schedulable` is accepted (today only `announce`). Finished jobs stay in the
-table as history.
+`schedulable` is accepted: `announce`, `vacuum` start/stop/dock,
+`control_home_assistant` (not `scene_design` or `scene_create`) and
+`run_routine`. Finished jobs stay in the table as history.
+
+After every scheduled action other than an announcement, Sakke says how it
+went (`outcomeReport.ts`): done, with what the tool reported, or didn't work,
+with why. It goes through `announce`, so it's worded in Sakke's voice, or said
+as written if that fails. The outcome is stored first; failing to say it
+doesn't change it. A tool's failure has to throw to be reported as one.
 
 A spoken clock time is resolved in the configured timezone by `policy.ts`:
 without am/pm an hour of 1-12 is its next upcoming reading, a time already
@@ -35,6 +42,7 @@ the time it was due as `scheduledFor`, so a late announcement says so.
 | `defaultAnnouncement(label)` | `tools/schedule/schedule.ts`, for a job given only a label |
 | `resolveClockTime(time, now, timezone)` | `tools/schedule/schedule.ts`, for `when.at` |
 | `JobRunner`, `SchedulabilityCheck` | injected by `index.ts` from `tools/registry.ts` (`runScheduledCall`, `isSchedulable`) |
+| `OutcomeReporter` | injected by `index.ts`: `reportOutcome` from `outcomeReport.ts` |
 
 ## Data
 
@@ -49,6 +57,8 @@ at the repo root.
 | --- | --- |
 | `scheduling.ts` | `Scheduler`: arm, run, record, cancel; the active instance |
 | `policy.ts` | pure rules: resolving a spoken clock time, and whether a missed job runs late |
+| `outcomeReport.ts` | `reportOutcome`: says how a scheduled action went |
+| `messages.ts` | the text of that report |
 | `legacyTimers.ts` | the one-time import of `timers.json` |
 | `db/ScheduledJob.entity.ts` | the `scheduled_job` row |
 | `db/jobRepository.ts` | `JobRepository`, the only writer of `scheduled_job` |

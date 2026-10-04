@@ -3,7 +3,7 @@ import { dispatch } from "./dispatcher.js";
 import { getState, callService } from "../../integrations/homeAssistant/client.js";
 import { loadEntities, getAreas, getScenes, getScripts } from "../../integrations/homeAssistant/registry.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";
-import { controlHomeAssistantArgsSchema, getDeviceStateArgsSchema, refreshHomeDataArgsSchema, runRoutineArgsSchema } from "./schema.js";
+import { controlHomeAssistantArgsSchema, getDeviceStateArgsSchema, isSchedulableControl, refreshHomeDataArgsSchema, runRoutineArgsSchema } from "./schema.js";
 
 export const controlHomeAssistantTool: Tool = {
   definition: {
@@ -15,6 +15,7 @@ export const controlHomeAssistantTool: Tool = {
     },
   },
   repeatable: () => false,
+  schedulable: isSchedulableControl,
   execute: args => dispatch({
     ...parseToolArgs(controlHomeAssistantArgsSchema, args, "control_home_assistant"),
     raw: JSON.stringify(args),
@@ -48,6 +49,7 @@ export const runRoutineTool: Tool = {
     },
   },
   repeatable: () => false,
+  schedulable: args => runRoutineArgsSchema.safeParse(args).success,
   execute: async args => {
     const { script_id } = parseToolArgs(runRoutineArgsSchema, args, "run_routine");
     await callService("script", "turn_on", { entity_id: `script.${script_id}` });
