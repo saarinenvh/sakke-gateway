@@ -69,7 +69,7 @@ tables or queries.
 - **The entity is the row's type.** There is no second type for the same row.
   Code that needs to swap the storage (the scheduler, in tests) depends on the
   repository's shape (`Pick<JobRepository, …>`), not on a parallel interface.
-  That named shape (`JobStore` in `scheduler.ts`) lives with its callers, not
+  That named shape (`JobStore` in `scheduling.ts`) lives with its callers, not
   in `db/`.
 
 The one exception to plain TypeORM typing: its insert types can't express a

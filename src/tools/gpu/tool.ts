@@ -1,5 +1,5 @@
 import type { Tool } from "../types.js";
-import { setManualOverride, clearManualOverride } from "../../features/gpu/gpuStatus.js";
+import { setManualOverride, clearManualOverride } from "../../features/gpu/gpu.js";
 import { config } from "../../config.js";
 import { unloadPcOllamaModels } from "../../integrations/pcStatus/client.js";
 import { toolParameters, parseToolArgs } from "../parameters.js";

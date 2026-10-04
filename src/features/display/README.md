@@ -17,7 +17,7 @@ the gateway sets it itself while it thinks and speaks.
 | Export | Called by |
 | --- | --- |
 | `broadcastState`, `speakingDurationMs` | `agent/agent.ts`, during a conversation turn |
-| `showSpeakingWhile(text, speak)` | `features/announcements/announcer.ts`, `features/tidiness/tidiness.ts` |
+| `showSpeakingWhile(text, speak)` | `features/announcements/announcements.ts`, `features/tidiness/tidiness.ts` |
 
 `showSpeakingWhile` shows `speaking` for roughly as long as the text takes to
 say, and goes back to `idle` if speaking fails, unless the state has changed
@@ -31,6 +31,6 @@ Memory only; lost on restart.
 
 | File | Does |
 | --- | --- |
-| `displayState.ts` | the current state, SSE clients, `broadcastState`, `showSpeakingWhile` |
+| `display.ts` | the current state, SSE clients, `broadcastState`, `showSpeakingWhile` |
 | `route.ts` | the routes, and the page's HTML and script |
 | `schema.ts` | the `POST /display/state` body |

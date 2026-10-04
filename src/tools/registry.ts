@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Tool, ToolDefinition } from "./types.js";
 import { INFERENCE_PROFILES, type InferenceProfile, type InferenceProfileName } from "../inference/profiles.js";
 import type { ScheduledJob } from "../features/scheduling/db/ScheduledJob.entity.js";
-import type { JobOutcome } from "../features/scheduling/scheduler.js";
+import type { JobOutcome } from "../features/scheduling/scheduling.js";
 
 import { controlHomeAssistantTool, getDeviceStateTool, runRoutineTool, refreshHomeDataTool } from "./homeControl/tool.js";
 import { webSearchTool } from "./search/tool.js";

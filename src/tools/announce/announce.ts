@@ -1,7 +1,7 @@
 import { parseToolArgs } from "../parameters.js";
 import type { ToolContext } from "../types.js";
 import { config } from "../../config.js";
-import { announce } from "../../features/announcements/announcer.js";
+import { announce } from "../../features/announcements/announcements.js";
 import { localTimeOfDay } from "../../util/time.js";
 import { announceArgsSchema } from "./schema.js";
 

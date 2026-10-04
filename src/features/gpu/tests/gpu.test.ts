@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // production code.
 async function freshModule() {
   vi.resetModules();
-  return import("../gpuStatus.js");
+  return import("../gpu.js");
 }
 
 let gpu: Awaited<ReturnType<typeof freshModule>>;

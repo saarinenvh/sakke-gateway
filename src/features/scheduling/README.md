@@ -40,14 +40,14 @@ the time it was due as `scheduledFor`, so a late announcement says so.
 
 Owns the `scheduled_job` table (`db/ScheduledJob.entity.ts`), written only by
 `db/jobRepository.ts`. The scheduler depends on the repository's shape
-(`JobStore` in `scheduler.ts`), so tests use `tests/fixtures/fakeJobStore.ts`
+(`JobStore` in `scheduling.ts`), so tests use `tests/fixtures/fakeJobStore.ts`
 at the repo root.
 
 ## Files
 
 | File | Does |
 | --- | --- |
-| `scheduler.ts` | `Scheduler`: arm, run, record, cancel; the active instance |
+| `scheduling.ts` | `Scheduler`: arm, run, record, cancel; the active instance |
 | `policy.ts` | pure rules: resolving a spoken clock time, and whether a missed job runs late |
 | `legacyTimers.ts` | the one-time import of `timers.json` |
 | `db/ScheduledJob.entity.ts` | the `scheduled_job` row |

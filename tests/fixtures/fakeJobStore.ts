@@ -1,6 +1,6 @@
 import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
 import { FINISHED_FROM, type FinishedStatus } from "../../src/features/scheduling/db/jobRepository.js";
-import type { JobStore } from "../../src/features/scheduling/scheduler.js";
+import type { JobStore } from "../../src/features/scheduling/scheduling.js";
 
 // JobRepository's contract in memory. The real repository is tested against
 // MariaDB in tests/integration/database.test.ts.

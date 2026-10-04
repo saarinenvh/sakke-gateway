@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fakeHomeAssistant.js";
 import { FakeJobStore } from "../fixtures/fakeJobStore.js";
 import { executeTool, isSchedulable, runScheduledCall } from "../../src/tools/registry.js";
-import { startScheduler, stopScheduler } from "../../src/features/scheduling/scheduler.js";
-import { setWordingWriter } from "../../src/features/announcements/announcer.js";
+import { startScheduler, stopScheduler } from "../../src/features/scheduling/scheduling.js";
+import { setWordingWriter } from "../../src/features/announcements/announcements.js";
 import type { ScheduledJob } from "../../src/features/scheduling/db/ScheduledJob.entity.js";
 import { config, reloadConfig } from "../../src/config.js";
 

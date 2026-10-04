@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { executeTool, isRepeatable, isToolInProfile, toolsForProfile } from "../tools/registry.js";
 import type { ConversationProfileName } from "../inference/profiles.js";
 import { buildSystemPrompt, refreshClock } from "./systemPrompt.js";
-import { broadcastState, speakingDurationMs } from "../features/display/displayState.js";
+import { broadcastState, speakingDurationMs } from "../features/display/display.js";
 import { classifyFollowUp, recentExchanges, type FollowUpVerdict } from "./continuationCheck.js";
 import { cleanForSpeech } from "../inference/voiceText.js";
 import { getOllamaTarget } from "../inference/ollamaRouter.js";
