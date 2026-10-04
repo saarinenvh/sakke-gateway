@@ -139,6 +139,9 @@ export interface Config {
     publicApiKey: string;
     lightingModel: string;
     lightingReasoningEffort: ReasoningEffort | undefined;
+    // How long scene design may wait for OpenAI. Must stay under the 90 s the
+    // Home Assistant sakke_agent component gives the whole voice turn.
+    lightingTimeoutMs: number;
   };
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
@@ -234,6 +237,7 @@ function loadConfig(): Config {
       publicApiKey: env("OPENAI_PUBLIC_API_KEY") ?? "",
       lightingModel: env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o",
       lightingReasoningEffort: parseReasoningEffort(env("OPENAI_LIGHTING_REASONING_EFFORT"), problems),
+      lightingTimeoutMs: parseLightingTimeoutMs(env("OPENAI_LIGHTING_TIMEOUT_MS"), problems),
     },
     search: { searxngUrl: env("SEARXNG_URL") ?? "http://searxng:8080" },
     weather: {
@@ -328,6 +332,18 @@ function parseReasoningEffort(raw: string | undefined, problems: string[]): Reas
     `OPENAI_LIGHTING_REASONING_EFFORT "${raw}" is not one of ${reasoningEffortSchema.options.join(", ")} - using the model's default`,
   );
   return undefined;
+}
+
+// Long enough for gpt-5.x at high reasoning effort, with room left for the
+// Ollama turns around the tool call inside Home Assistant's 90 s.
+const DEFAULT_LIGHTING_TIMEOUT_MS = 75_000;
+
+function parseLightingTimeoutMs(raw: string | undefined, problems: string[]): number {
+  if (raw === undefined) return DEFAULT_LIGHTING_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  problems.push(`OPENAI_LIGHTING_TIMEOUT_MS "${raw}" is not a positive whole number of milliseconds - using ${DEFAULT_LIGHTING_TIMEOUT_MS}`);
+  return DEFAULT_LIGHTING_TIMEOUT_MS;
 }
 
 const DEFAULT_BRIEF_CUTOFF: LocalTime = { hour: 12, minute: 0 };
