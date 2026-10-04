@@ -22,6 +22,8 @@ function inMinutes(minutes: number, label = "pasta"): JobRequest {
 
 let store: FakeJobStore;
 let ran: ScheduledJob[];
+// Each report, with the job's stored status at that moment.
+let reported: { id: string; outcome: JobOutcome; storedStatus: string | undefined }[];
 let nextOutcome: JobOutcome;
 
 const runJob: JobRunner = async job => {
@@ -30,7 +32,16 @@ const runJob: JobRunner = async job => {
 };
 
 function startScheduler(runner: JobRunner = runJob): Scheduler {
-  return new Scheduler({ store, runJob: runner, isSchedulable, now: () => new Date(), log });
+  return new Scheduler({
+    store,
+    runJob: runner,
+    reportOutcome: async (job, outcome) => {
+      reported.push({ id: job.id, outcome, storedStatus: store.get(job.id)?.status });
+    },
+    isSchedulable,
+    now: () => new Date(),
+    log,
+  });
 }
 
 async function scheduleJob(scheduler: Scheduler, request: JobRequest): Promise<ScheduledJob> {
@@ -43,6 +54,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now: START });
   store = new FakeJobStore();
   ran = [];
+  reported = [];
   nextOutcome = { status: "done", result: "Announced." };
 });
 
@@ -102,6 +114,43 @@ describe("running a job", () => {
 
     await vi.advanceTimersByTimeAsync(MINUTE_MS);
     expect(ran).toHaveLength(1);
+  });
+});
+
+describe("reporting the outcome", () => {
+  it("reports how a job went once its outcome is stored", async () => {
+    const scheduler = startScheduler();
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(reported).toEqual([{ id: job.id, outcome: nextOutcome, storedStatus: "done" }]);
+  });
+
+  it("keeps the stored outcome when the report fails", async () => {
+    const scheduler = new Scheduler({
+      store,
+      runJob,
+      reportOutcome: async () => { throw new Error("satellite unreachable"); },
+      isSchedulable,
+      now: () => new Date(),
+      log,
+    });
+    const job = await scheduleJob(scheduler, inMinutes(1));
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(store.get(job.id)?.status).toBe("done");
+  });
+
+  it("reports nothing for a job it didn't run", async () => {
+    const scheduler = startScheduler();
+    await scheduleJob(scheduler, inMinutes(1));
+    store.failNextWrite = true;
+
+    await vi.advanceTimersByTimeAsync(MINUTE_MS);
+
+    expect(reported).toEqual([]);
   });
 });
 

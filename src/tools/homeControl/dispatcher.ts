@@ -8,6 +8,8 @@ async function callService(domain: string, service: string, data: Record<string,
   await haCallService(domain, service, data);
 }
 
+// An action that didn't happen throws, so it's reported as a failure: to the
+// model, and for a scheduled run, out loud.
 export async function dispatch(intent: Intent): Promise<string> {
   const target: Record<string, unknown> = {};
   if (intent.area) {
@@ -18,7 +20,7 @@ export async function dispatch(intent: Intent): Promise<string> {
     const area = resolveArea(intent.area);
     if (!area) {
       const known = getAreas().map(a => a.name).join(", ") || "none loaded";
-      return `No area named "${intent.area}" exists. Known areas: ${known}.`;
+      throw new Error(`No area named "${intent.area}" exists. Known areas: ${known}.`);
     }
     target["area_id"] = area.area_id;
   }
@@ -55,7 +57,7 @@ export async function dispatch(intent: Intent): Promise<string> {
         s.entity_id === intent.scene
       );
       if (!match) {
-        return `No scene named "${intent.scene}" exists. If this is a routine (HA script), use run_routine instead of scene_activate.`;
+        throw new Error(`No scene named "${intent.scene}" exists. If this is a routine (HA script), use run_routine instead of scene_activate.`);
       }
       await callService("scene", "turn_on", { entity_id: match.entity_id });
       if (match.scene_id === "tv_time" || intent.scene === "tv_time") {
@@ -79,7 +81,7 @@ export async function dispatch(intent: Intent): Promise<string> {
 
       if (result.allSucceeded) return `Scene "${plan.name}" applied.`;
       if (result.anySucceeded) return `Scene "${plan.name}" only partially applied - some lights didn't respond.`;
-      return `Couldn't apply the "${plan.name}" scene - none of the lights responded.`;
+      throw new Error(`Couldn't apply the "${plan.name}" scene - none of the lights responded.`);
     }
 
     case "media_play":
@@ -106,7 +108,7 @@ export async function dispatch(intent: Intent): Promise<string> {
       // target's default (every light in the house) would be worse than
       // doing nothing, so an unspecified switch is an error instead.
       if (!intent.device && !intent.area) {
-        return "I need to know which switch - name the device or the area.";
+        throw new Error("I need to know which switch - name the device or the area.");
       }
       const on = intent.action === "switch_on";
       await callService("homeassistant", on ? "turn_on" : "turn_off", target);
@@ -114,6 +116,6 @@ export async function dispatch(intent: Intent): Promise<string> {
     }
 
     default:
-      return "I didn't understand that.";
+      throw new Error("I didn't understand that.");
   }
 }

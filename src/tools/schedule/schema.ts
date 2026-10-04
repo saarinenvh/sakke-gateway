@@ -10,6 +10,17 @@ export const scheduleArgsExample = {
   label: "the pasta",
 };
 
+export const scheduleArgsRunExample = {
+  action: "set",
+  when: { at: { hour: 11, meridiem: "am" } },
+  label: "start the vacuum",
+  run: { tool: "vacuum", args: { action: "start" } },
+};
+
+// The tools the model may name in run: those that can run unattended, other
+// than announce, which is what a job without run does anyway.
+export const RUNNABLE_TOOLS = ["vacuum", "control_home_assistant", "run_routine"] as const;
+
 export const scheduleArgsClockTimeExample = {
   action: "set",
   when: { at: { hour: 4, minute: 30, meridiem: "pm", day: "today" } },
@@ -36,6 +47,12 @@ export const scheduleArgsSchema = z.object({
   }).optional().describe("For set: when it should happen. Either in_minutes or at, never both."),
   label: z.string().optional()
     .describe("For set: what it's for, e.g. 'the pasta' or 'take the meat out of the fridge'. Announced when it's time."),
+  run: z.object({
+    tool: z.enum(RUNNABLE_TOOLS),
+    args: z.record(z.string(), z.unknown())
+      .describe("The arguments, exactly as for calling that tool now, e.g. {action: 'start'} for vacuum."),
+  }).optional()
+    .describe("For set, only to do something at that time instead of just announcing the label: the tool call to make then. You say how it went afterwards."),
   job_id: z.string().optional()
     .describe("For cancel: the id from set or list, or part of the label. Leave out to cancel the only one."),
 });

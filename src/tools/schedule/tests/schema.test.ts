@@ -3,6 +3,7 @@ import { parseOrThrow } from "../../../util/validation.js";
 import {
   scheduleArgsClockTimeExample,
   scheduleArgsExample,
+  scheduleArgsRunExample,
   scheduleArgsSchema,
   scheduleRequestSchema,
 } from "../schema.js";
@@ -12,7 +13,7 @@ const set = (when: unknown) => ({ action: "set", when, label: "the meat" });
 
 describe("schedule schemas", () => {
   it("accept their examples", () => {
-    for (const example of [scheduleArgsExample, scheduleArgsClockTimeExample]) {
+    for (const example of [scheduleArgsExample, scheduleArgsClockTimeExample, scheduleArgsRunExample]) {
       expect(() => parseOrThrow(scheduleArgsSchema, example, "schedule args example")).not.toThrow();
       expect(() => parseRequest(example)).not.toThrow();
     }
