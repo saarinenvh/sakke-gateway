@@ -63,6 +63,7 @@ describe("isShortAnswerToQuestion", () => {
   it("ignores case, punctuation and extra spaces", () => {
     expect(isShortAnswerToQuestion(question, "  Yes,  please! ")).toBe(true);
     expect(isShortAnswerToQuestion(question, "Yeah, do it.")).toBe(true);
+    expect(isShortAnswerToQuestion(question, "Yes,please")).toBe(true);
   });
 
   it("leaves an answer after a plain statement to the model", () => {

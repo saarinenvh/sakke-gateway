@@ -68,7 +68,7 @@ export function isShortAnswerToQuestion(lastAssistantMessage: string, newUtteran
 function normalizeUtterance(utterance: string): string {
   return utterance
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
