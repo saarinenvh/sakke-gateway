@@ -21,7 +21,7 @@ flowchart TD
     Route -->|profile: sakke| Agent[agent/agent.ts<br/>runAgent]
     Agent --> Store[(conversationStore<br/>in memory)]
     Agent --> Classifier[continuationCheck<br/>follow-up or new request]
-    Agent --> Router[ollamaRouter<br/>PC GPU or server]
+    Agent --> Router[inference/ollamaRouter<br/>PC GPU or server]
     Router --> Ollama[(Ollama)]
     Agent -->|tool calls in the profile| Registry[tools/registry.ts<br/>runTool / executeTool]
     Registry --> Executor[tools/&lt;name&gt;/&lt;name&gt;.ts<br/>executor]
@@ -58,8 +58,8 @@ the morning brief speaks already-worded text on the satellite.
 | `index.ts` | startup: wiring, config report, restoring state, connecting the database, listening | business logic |
 | `app.ts` | the HTTP routes, so tests can use `app.inject()` | side effects |
 | `config.ts` | every environment variable, read once, validated, problems logged | reading env anywhere else |
-| `agent/` | the conversation turn: history, follow-ups, prompt, routing, the tool loop | tool logic |
-| `inference/` | request profiles: which tools a kind of request may use | executing anything |
+| `agent/` | the conversation turn: history, follow-ups, the system prompt, the tool loop | tool logic |
+| `inference/` | request profiles, which Ollama a request goes to, the request's shape, and `writeText`: one piece of text in Sakke's voice for a feature | conversations, tools |
 | `tools/` | what the model can call: definitions, executors, the registry | database access, deeper business logic |
 | `features/` | services: business logic, state, a feature's own routes, its tables | the model's tool contract |
 | `integrations/` | talking to Home Assistant, Ollama and OpenAI | deciding anything |
@@ -76,14 +76,18 @@ src/
 ├── db/                   # infrastructure only: dataSource.ts, database.ts (connect
 │                         # with retry), migrations/ - the one ordered schema history
 ├── inference/
-│   └── profiles.ts       # which tools each kind of request may use
+│   ├── profiles.ts       # which tools each kind of request may use
+│   ├── ollamaRouter.ts   # which Ollama a request goes to
+│   ├── ollamaRequest.ts  # the shape of Sakke's requests: model, options, tools
+│   ├── writeText.ts      # one piece of text in Sakke's voice, for a feature
+│   ├── systemPrompt.ts   # the system prompt builder, wired in by index.ts
+│   ├── voiceText.ts      # strips anything that shouldn't be spoken aloud
+│   └── tests/
 ├── agent/
-│   ├── agent.ts          # the tool-calling loop, and nothing else
+│   ├── agent.ts          # the conversation turn: the tool-calling loop
 │   ├── conversationStore.ts  # history, pruning, context-budget trimming
-│   ├── ollamaRouter.ts   # which Ollama this turn goes to
 │   ├── continuationCheck.ts  # the follow-up classifier
 │   ├── systemPrompt.ts   # concatenates the per-feature fragments
-│   ├── voiceText.ts      # strips anything that shouldn't be spoken aloud
 │   ├── prompts/          # persona.md, toolDiscipline.md
 │   └── tests/
 ├── tools/
@@ -144,19 +148,20 @@ and the database.
 
 - **A tool folder never imports `db/` or TypeORM.** It calls the feature that
   owns the data. See [tools.md](tools.md).
-- **Features don't import tools or the agent.** Where a feature needs the
-  agent (announcement wording) or the tool registry (running a scheduled
-  call), `index.ts` injects it at startup: `setWordingWriter`, the
-  scheduler's `JobRunner` and schedulability check, and the morning brief's
-  calendar, task and weather readers. The agent imports every tool, so a
-  direct import would close a cycle.
+- **Features and `inference/` don't import tools or the agent.** A feature
+  that needs text in Sakke's voice calls `inference/writeText`. Two things
+  still come from above, and `index.ts` wires them in at startup: the system
+  prompt builder (it's composed from every tool's `prompt.ts`), and the tool
+  registry for the scheduler (`JobRunner` and the schedulability check). The
+  agent imports every tool, so a direct import would close a cycle.
 - **Nothing outside `tools/` imports a tool folder's internals,** only its
   `tool.ts` (the registry) and `prompt.ts` (the system prompt).
 - **Only the owning module writes a table.** See [data.md](data.md).
 - **Integrations are the only code that talks HTTP** to their service, with
   their own timeouts and error types. Responses are validated with Zod.
   `src/tests/moduleBoundaries.test.ts` fails on a `fetch(` outside
-  `integrations/` and on an import of a tool folder's internals.
+  `integrations/`, on an import of a tool folder's internals, and on
+  `features/` or `inference/` importing the agent or the tools.
 
 ## Boundary schemas
 
@@ -174,7 +179,7 @@ To see what crosses a boundary and what is used, read its `schema.ts`.
 
 `index.ts`, in order:
 
-1. Wires what can't be imported: the announcement wording writer.
+1. Wires in what can't be imported: the system prompt builder, for `inference/`.
 2. Logs every configuration problem, without refusing to start.
 3. Starts connecting to the database in the background; it retries every 30 s
    and runs pending migrations once connected. Then it imports any timers left

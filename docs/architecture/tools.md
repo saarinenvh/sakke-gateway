@@ -85,18 +85,19 @@ classification and model limits to the same profiles.
 - **Named after the caller or the act**, not the kind of work. The bot's
   profiles will be named the same way (e.g. `telegram`, `sakariheitaja`) when it
   moves onto the scheduler.
-- **`runAgent` requires a profile.** The model is offered only its tools, in
-  registry order. A profile with no tools sends no tool schema at all.
+- **Every model call names a profile.** `runAgent` takes a `gateway` profile
+  and offers the model only its tools, in registry order. `writeText` takes a
+  `caller` profile and sends no tool schema at all.
 - **A call outside the profile is refused** as an unknown tool, even if the
   tool is registered. The model can't grant itself a tool by naming it.
 - **The registry refuses to start** if a profile names a tool that doesn't
   exist, since that would silently take the tool away.
-- **The context owner decides what a turn leaves behind.** A `gateway` request
-  is a live conversation: `runAgent` keeps its history, classifies follow-ups,
-  and shows it on the display. A `caller` request is one piece of text a
-  feature asked for: it starts from the system prompt alone, stores nothing and
-  doesn't touch the display, even if it finishes after the caller stopped
-  waiting. The caller shows Sakke speaking itself, when the satellite actually
+- **The context owner decides what a request leaves behind.** A `gateway`
+  request is a live conversation: `runAgent` (`agent/`) keeps its history,
+  classifies follow-ups, and shows it on the display. A `caller` request is one
+  piece of text a feature asked for: `writeText` (`inference/`) starts it from
+  the system prompt alone, stores nothing and doesn't touch the display, even if
+  it finishes after the caller stopped waiting. The caller shows Sakke speaking itself, when the satellite actually
   speaks (`showSpeakingWhile` in `features/display/`).
 - **`announce` is in no profile.** Sakke already speaks its reply in a
   conversation; announcing is for speech at a scheduled time, run by the

@@ -7,6 +7,11 @@ import { dirname, join, relative, resolve, sep } from "path";
 const SRC_DIR = join(__dirname, "..");
 const TOOLS_DIR = join(SRC_DIR, "tools");
 const INTEGRATIONS_DIR = join(SRC_DIR, "integrations");
+const AGENT_DIR = join(SRC_DIR, "agent");
+// Below the agent and the tools: index.ts wires in what they need from above.
+const LOWER_LAYERS = [join(SRC_DIR, "features"), join(SRC_DIR, "inference")];
+// The tool definition type is shared by every layer that talks to the model.
+const SHARED_TOOL_TYPES = join(TOOLS_DIR, "types");
 
 // What the rest of the gateway may use from tools/: the registry and the
 // shared tool types, and per tool its definition and its system prompt part.
@@ -33,7 +38,7 @@ function readSourceFiles(dir: string): SourceFile[] {
 
 function relativeImports(text: string): string[] {
   const found: string[] = [];
-  for (const match of text.matchAll(/(?:from|import\()\s*["'](\.{1,2}\/[^"']+)["']/g)) found.push(match[1]);
+  for (const match of text.matchAll(/(?:\bfrom|\bimport\s*\(|^\s*import)\s*["'](\.{1,2}\/[^"']+)["']/gm)) found.push(match[1]);
   return found;
 }
 
@@ -68,6 +73,19 @@ describe("module boundaries", () => {
         if (!isInside(target, TOOLS_DIR)) continue;
         const internal = toolInternal(target);
         if (internal !== null) violations.push(`${relative(SRC_DIR, file.path)} → tools/${internal}`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps features and inference below the agent and the tools", () => {
+    const violations: string[] = [];
+    for (const file of sources) {
+      if (!LOWER_LAYERS.some(dir => isInside(file.path, dir))) continue;
+      for (const specifier of relativeImports(file.text)) {
+        const target = resolve(dirname(file.path), specifier).replace(/\.js$/, "");
+        const upward = isInside(target, AGENT_DIR) || (isInside(target, TOOLS_DIR) && target !== SHARED_TOOL_TYPES);
+        if (upward) violations.push(`${relative(SRC_DIR, file.path)} → ${relative(SRC_DIR, target)}`);
       }
     }
     expect(violations).toEqual([]);

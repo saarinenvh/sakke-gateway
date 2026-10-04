@@ -6,23 +6,16 @@ const speak = (raw: string | undefined) => cleanForSpeech(raw, false);
 // Each group below is a bug that reached the speaker.
 
 describe("model scaffolding never reaches Piper", () => {
-  it("strips a think block", () => {
-    expect(speak("<think>weighing this up</think>Lights on.")).toBe("Lights on.");
-  });
-
-  it("strips a channel marker and everything after it", () => {
-    expect(speak("Done.<channel|>internal noise")).toBe("Done.");
-  });
-
-  // 2026-09-24: withholding the tool schema stops the runtime PARSING a tool
-  // call, not the model emitting one, so this arrived as content and was read
-  // out verbatim.
-  it("strips a complete tool_call block", () => {
-    expect(speak('<tool_call>{"name": "get_weather", "arguments": {}}</tool_call>Cold.')).toBe("Cold.");
-  });
-
-  it("strips an unterminated tool_call and everything after it", () => {
-    expect(speak('Fine. <tool_call>{"name": "x"')).toBe("Fine.");
+  it.each([
+    ["a think block", "<think>weighing this up</think>Lights on.", "Lights on."],
+    ["a channel marker and everything after it", "Done.<channel|>internal noise", "Done."],
+    // 2026-09-24: withholding the tool schema stops the runtime PARSING a tool
+    // call, not the model emitting one, so this arrived as content and was read
+    // out verbatim.
+    ["a complete tool_call block", '<tool_call>{"name": "get_weather", "arguments": {}}</tool_call>Cold.', "Cold."],
+    ["an unterminated tool_call and everything after it", 'Fine. <tool_call>{"name": "x"', "Fine."],
+  ])("strips %s", (_what, raw, spoken) => {
+    expect(speak(raw)).toBe(spoken);
   });
 
   it("falls back when a tool_call was the entire response", () => {
@@ -32,31 +25,18 @@ describe("model scaffolding never reaches Piper", () => {
 });
 
 describe("markdown never reaches Piper", () => {
-  // ab480f8: Piper read "https://www.time.gov/" out loud, character by character.
-  it("keeps link text and drops the URL", () => {
-    expect(speak("Check [time.gov](https://www.time.gov/) for that.")).toBe("Check time.gov for that.");
-  });
-
-  it("strips bold, italic and underscore emphasis", () => {
-    expect(speak("That is **very** much *not* __happening__.")).toBe("That is very much not happening.");
-  });
-
-  it("strips headers", () => {
-    expect(speak("## Shopping list. Milk.")).toBe("Shopping list. Milk.");
-  });
-
-  it("strips bullet markers", () => {
-    expect(speak("- milk\n- bread")).toBe("milk. bread");
-  });
-
-  it("strips numbered list markers", () => {
-    expect(speak("1. milk\n2. bread")).toBe("milk. bread");
-  });
-
-  it("turns line breaks into sentence breaks rather than running words together", () => {
+  it.each([
+    // ab480f8: Piper read "https://www.time.gov/" out loud, character by character.
+    ["keeps link text and drops the URL", "Check [time.gov](https://www.time.gov/) for that.", "Check time.gov for that."],
+    ["strips bold, italic and underscore emphasis", "That is **very** much *not* __happening__.", "That is very much not happening."],
+    ["strips headers", "## Shopping list. Milk.", "Shopping list. Milk."],
+    ["strips bullet markers", "- milk\n- bread", "milk. bread"],
+    ["strips numbered list markers", "1. milk\n2. bread", "milk. bread"],
     // Spaces here would produce "Found metal Slayer Maiden" as one breathless
     // phrase; sentence breaks give the voice somewhere to pause.
-    expect(speak("Found:\nMetallica\nSlayer")).toBe("Found: Metallica. Slayer");
+    ["turns line breaks into sentence breaks rather than running words together", "Found:\nMetallica\nSlayer", "Found: Metallica. Slayer"],
+  ])("%s", (_what, raw, spoken) => {
+    expect(speak(raw)).toBe(spoken);
   });
 });
 
