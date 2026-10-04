@@ -19,6 +19,8 @@
 // a module-level const. That last part is what makes a test able to change a
 // value between cases without any module-reset machinery.
 
+import { reasoningEffortSchema, type ReasoningEffort } from "./integrations/openai/schema.js";
+
 // Blank is not the same as unset - see the note above about docker-compose.
 function env(name: string): string | undefined {
   const value = process.env[name];
@@ -131,7 +133,13 @@ export interface Config {
   // configuration, not a constant, and tests set it to zero.
   tvWakeMs: number;
   spotify: { clientId: string; clientSecret: string };
-  openai: { apiKey: string; lightingModel: string };
+  openai: {
+    // The sakke-public OpenAI project: inputs and outputs are shared with
+    // OpenAI in exchange for free daily usage. Only send it what may be shared.
+    publicApiKey: string;
+    lightingModel: string;
+    lightingReasoningEffort: ReasoningEffort | undefined;
+  };
   search: { searxngUrl: string };
   weather: { lat: string; lon: string };
   tidiness: TidinessConfig;
@@ -223,8 +231,9 @@ function loadConfig(): Config {
       clientSecret: env("SPOTIFY_CLIENT_SECRET") ?? "",
     },
     openai: {
-      apiKey: env("OPENAI_API_KEY") ?? "",
+      publicApiKey: env("OPENAI_PUBLIC_API_KEY") ?? "",
       lightingModel: env("OPENAI_LIGHTING_MODEL") ?? "gpt-4o",
+      lightingReasoningEffort: parseReasoningEffort(env("OPENAI_LIGHTING_REASONING_EFFORT"), problems),
     },
     search: { searxngUrl: env("SEARXNG_URL") ?? "http://searxng:8080" },
     weather: {
@@ -309,6 +318,16 @@ function loadMorningConfig(problems: string[]): MorningConfig {
     briefMinDelayMinutes: num("MORNING_BRIEF_MIN_DELAY_MINUTES", 5),
     briefCutoff: parseBriefCutoff(env("MORNING_BRIEF_CUTOFF"), problems),
   };
+}
+
+function parseReasoningEffort(raw: string | undefined, problems: string[]): ReasoningEffort | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = reasoningEffortSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  problems.push(
+    `OPENAI_LIGHTING_REASONING_EFFORT "${raw}" is not one of ${reasoningEffortSchema.options.join(", ")} - using the model's default`,
+  );
+  return undefined;
 }
 
 const DEFAULT_BRIEF_CUTOFF: LocalTime = { hour: 12, minute: 0 };

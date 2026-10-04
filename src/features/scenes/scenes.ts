@@ -75,7 +75,11 @@ export async function designScene(description: string): Promise<ScenePlan> {
       { role: "system", content: systemPrompt },
       { role: "user", content: description },
     ],
-    { temperature: 0.7, timeoutMs: SCENE_DESIGN_TIMEOUT_MS },
+    {
+      temperature: 0.7,
+      reasoningEffort: config.openai.lightingReasoningEffort,
+      timeoutMs: SCENE_DESIGN_TIMEOUT_MS,
+    },
   );
 
   moduleLog().info({ model: config.openai.lightingModel }, "OpenAI scene design call completed");

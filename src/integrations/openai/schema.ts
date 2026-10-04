@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+// gateway → OpenAI, the `reasoning_effort` of a request to a reasoning model.
+// Read from the environment, so it is validated like any other boundary value.
+export const reasoningEffortSchema = z.enum(["none", "minimal", "low", "medium", "high"]);
+
+export type ReasoningEffort = z.output<typeof reasoningEffortSchema>;
+
 // OpenAI → gateway, the answer to POST /v1/chat/completions (openai/client.ts).
 
 export const chatCompletionResponseExample = {
