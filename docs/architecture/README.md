@@ -117,7 +117,7 @@ src/
 │   ├── ollama/           # client.ts (request/response/errors), schema.ts, types.ts
 │   ├── openai/           # client.ts, schema.ts
 │   ├── searxng/          # web search
-│   ├── openMeteo/        # the forecast, and its wording (weather.ts)
+│   ├── openMeteo/        # client.ts (the connection), api.ts (the forecast), weather.ts (its wording)
 │   ├── spotify/          # the Spotify Web API (token, search, albums)
 │   └── pcStatus/         # the PC's status service (/unload)
 └── util/                 # async, text, time, validation (parseOrThrow)

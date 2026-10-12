@@ -8,7 +8,7 @@ export const weatherTool: Tool = {
     type: "function",
     function: {
       name: "get_weather",
-      description: "Get current weather and forecast for the user's location (Espoo, Finland)",
+      description: "Get the weather for the user's location (Espoo, Finland): the current conditions, today's forecast for the whole day, and the next 6 hours from now",
       parameters: toolParameters(getWeatherArgsSchema),
     },
   },

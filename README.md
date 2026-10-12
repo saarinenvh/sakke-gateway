@@ -19,7 +19,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
 - **Tidiness coach** — notices finished vacuum runs and, once the house has gone a week without one, asks out loud whether to clean. The asks get more frequent and meaner the longer it goes (day 7, day 9, then twice a day from day 10), and "yes" starts the vacuum. Off by default (`TIDINESS_ENABLED`); stays quiet when nobody is home, the satellite is busy, or it has been told to leave you alone
 - **Morning wake-up** — when the phone's alarm rings, turns on the wake-up lights, starts the coffee maker if it was reported loaded at good night, and says good morning on the phone. Once a day, only with the owner home, and off by default (`MORNING_ENABLED`). Good night asks whether the coffee maker is loaded. Later, on the first PC input after waking (after the watch's wake time on a day without an alarm), Sakke tells the satellite "you actually got up" with today's calendar, tasks and weather, in a structure that changes from day to day
-- **Weather** — current conditions and 6h forecast (Open-Meteo, no API key needed)
+- **Weather** — current conditions, today's forecast for the whole day, and the next 6 hours from now (Open-Meteo, no API key needed)
 - **Web search** — SearXNG with Brave as the backing engine
 - **Google Tasks / Calendar** — query tasks and events by voice, via HA's todo and calendar integrations
 - **Wiki context system** — personal knowledge base (Obsidian vault) mounted at `/wiki`; the index is always in the system prompt, `get_context` loads pages on demand, `create_knowledge` saves new notes silently
@@ -36,7 +36,7 @@ request may use is its profile's choice. How that fits together:
 |---|---|---|
 | `control_home_assistant` | `tools/homeControl/` | Lights, scenes, switches, media |
 | `web_search` | `tools/search/` | Web search via local SearXNG |
-| `get_weather` | `tools/weather/` | Current weather + 6h forecast |
+| `get_weather` | `tools/weather/` | Current weather, today's forecast and the next 6 hours |
 | `spotify` | `tools/spotify/` | Suggest / play / pause / next / previous / volume |
 | `manage_list` | `tools/lists/` | HA todo lists — read, add, complete, remove, sort by store layout |
 | `open_tv_app` | `tools/tv/` | Launch Netflix, YouTube, Spotify or DGN on the living room TV |
