@@ -59,6 +59,7 @@ export function buildBriefRequest(facts: BriefFacts): string {
     "You already said good morning on their phone. Now, out loud on the speaker, open by noting they actually got up, then brief them on the day.",
     `Facts. ${facts.day.calendar} ${facts.day.tasks} Weather: ${facts.day.weather.replace(/\n/g, "; ")}.`,
     `Structure: ${facts.structureHint}`,
+    facts.day.weather.includes("Today:") ? "For the weather, tell how the whole day looks from the Today line, not just the next hours." : "",
     facts.yesterdayBrief ? `Yesterday you said: "${facts.yesterdayBrief}" Don't open the same way.` : "",
     "Keep it to a few spoken sentences, mention only these facts, and ask nothing. Write only what you'll say. Do not call any tools.",
   ].filter(Boolean).join(" ");

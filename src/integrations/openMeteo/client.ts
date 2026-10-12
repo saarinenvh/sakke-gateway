@@ -1,20 +1,26 @@
-import { config } from "../../config.js";
-import { parseJsonResponse } from "../../util/validation.js";
-import { weatherReadingSchema, type WeatherReading } from "./schema.js";
+// The connection to Open-Meteo: the base URL, the timeout, and a failed request or a reply that isn't
+// JSON turned into a result. It knows no endpoints; api.ts does. No API key is needed.
 
-const FORECAST_TIMEOUT_MS = 5000;
+const BASE_URL = "https://api.open-meteo.com/v1";
+const TIMEOUT_MS = 5000;
 
-export async function fetchForecast(): Promise<WeatherReading> {
-  const url = new URL("https://api.open-meteo.com/v1/forecast");
-  url.searchParams.set("latitude", config.weather.lat);
-  url.searchParams.set("longitude", config.weather.lon);
-  url.searchParams.set("current", "temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_gusts_10m,weather_code");
-  url.searchParams.set("hourly", "temperature_2m,precipitation_probability,wind_speed_10m");
-  url.searchParams.set("forecast_days", "1");
-  url.searchParams.set("timezone", "auto");
+export type OpenMeteoResponse = { kind: "ok"; body: unknown } | { kind: "failed"; reason: string };
 
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(FORECAST_TIMEOUT_MS) });
-  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
+/** GET `path` with `query` (each value already a string), as parsed JSON or why it failed. */
+export async function get(path: string, query: Record<string, string>): Promise<OpenMeteoResponse> {
+  const url = `${BASE_URL}${path}?${new URLSearchParams(query)}`;
 
-  return parseJsonResponse(res, weatherReadingSchema, "Open-Meteo forecast");
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  } catch (err) {
+    return { kind: "failed", reason: `Open-Meteo request failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (!res.ok) return { kind: "failed", reason: `Open-Meteo HTTP ${res.status}` };
+
+  try {
+    return { kind: "ok", body: JSON.parse(await res.text()) };
+  } catch {
+    return { kind: "failed", reason: "Open-Meteo reply is not JSON" };
+  }
 }

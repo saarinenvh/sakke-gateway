@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { formatWeather } from "../weather.js";
+import type { WeatherReading } from "../schema.js";
 
-const reading = (overrides: any = {}) => ({
+interface ReadingOverrides {
+  current?: Partial<WeatherReading["current"]>;
+  hourly?: Partial<WeatherReading["hourly"]>;
+}
+
+const reading = (overrides: ReadingOverrides = {}): WeatherReading => ({
   current: {
     weather_code: 3,
     temperature_2m: 14.7,
@@ -36,8 +42,6 @@ describe("formatWeather", () => {
     expect(formatWeather(reading({ current: { weather_code: 42 } }))).toContain("code 42");
   });
 
-  // Finding #16. Math.max() with no arguments is -Infinity, and Sakke read out
-  // "max rain chance minus Infinity percent".
   it("reports zero rather than -Infinity when the forecast is missing", () => {
     const out = formatWeather(reading({ hourly: { precipitation_probability: undefined } }));
     expect(out).toContain("max rain chance 0%");
@@ -50,8 +54,7 @@ describe("formatWeather", () => {
     expect(out).not.toContain("NaN");
   });
 
-  it("looks only at the next six hours", () => {
-    // A downpour tomorrow should not show up in a six-hour outlook.
+  it("looks only at the first six hours if the series is ever longer", () => {
     const out = formatWeather(reading({
       hourly: { precipitation_probability: [5, 5, 5, 5, 5, 5, 99, 99] },
     }));
@@ -64,5 +67,32 @@ describe("formatWeather", () => {
     }));
     expect(out).toContain("max rain chance 30%");
     expect(out).toContain("max wind 0 km/h");
+  });
+
+  it("puts today's summary between the current conditions and the next hours", () => {
+    const out = formatWeather({ ...reading(), daily: {
+      weather_code: [61], temperature_2m_max: [13.1], temperature_2m_min: [6.3], precipitation_sum: [2.4],
+      precipitation_probability_max: [41], wind_speed_10m_max: [17.2], wind_gusts_10m_max: [33.8],
+    } });
+
+    expect(out.split("\n")).toEqual([
+      "Conditions: overcast",
+      "Temperature: 14.7°C (feels like 12.7°C)",
+      "Wind: 16.6 km/h, gusts up to 31.7 km/h",
+      "Current precipitation: 0 mm",
+      "Today: high 13.1°C, low 6.3°C, light rain, 2.4 mm of precipitation, max chance of precipitation 41%, wind up to 17.2 km/h, gusts 33.8 km/h",
+      "Next 6h: max rain chance 41%, max wind 10.4 km/h",
+    ]);
+  });
+
+  it("leaves out today's missing values, and the whole line when there are none", () => {
+    const partial = formatWeather({ ...reading(), daily: { temperature_2m_max: [13.1], precipitation_sum: [null] } });
+    expect(partial).toContain("Today: high 13.1°C\n");
+
+    const chanceOnly = formatWeather({ ...reading(), daily: { precipitation_sum: [null], precipitation_probability_max: [41] } });
+    expect(chanceOnly).toContain("Today: max chance of precipitation 41%\n");
+
+    expect(formatWeather({ ...reading(), daily: {} })).not.toContain("Today");
+    expect(formatWeather(reading())).not.toContain("Today");
   });
 });
