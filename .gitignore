@@ -3,3 +3,4 @@ dist/
 .eval-dist/
 .env
 data/
+.idea/
