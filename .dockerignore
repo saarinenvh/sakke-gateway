@@ -1,5 +1,10 @@
 .env
+.env.*
 node_modules/
 dist/
+coverage/
+.eval-dist/
 data/
 .git
+.idea/
+*.log
