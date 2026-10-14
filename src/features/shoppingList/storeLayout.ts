@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import { config } from "../../config.js";
 import { moduleLog } from "../../logger.js";
 import { readWikiDocWithFallback, stripFrontmatter } from "../wiki/wiki.js";
 
@@ -15,13 +16,37 @@ export interface StoreSection {
   keywords: string[];
 }
 
-export function loadStoreLayout(): StoreSection[] {
-  let source = "";
-  const layout = parseStoreLayout(readWikiDocWithFallback(WIKI_DIR, LAYOUT_FILE, BUNDLED_DIR, path => (source = path)));
-  if (layout.length > 0) return layout;
+type LayoutSource = "wiki" | "no-wiki-page" | "no-sections";
 
-  moduleLog().warn({ source }, "Store layout has no sections, using the bundled copy");
+// The layout is read on every conversation turn, so the source is logged only
+// when it changes rather than every time.
+let lastSource: LayoutSource | undefined;
+
+export function loadStoreLayout(): StoreSection[] {
+  const wikiPath = join(config.wikiRoot, WIKI_DIR, LAYOUT_FILE);
+  let readFrom = "";
+  const layout = parseStoreLayout(readWikiDocWithFallback(WIKI_DIR, LAYOUT_FILE, BUNDLED_DIR, path => (readFrom = path)));
+
+  if (readFrom !== wikiPath) {
+    reportSource("no-wiki-page", wikiPath);
+    return layout;
+  }
+  if (layout.length > 0) {
+    reportSource("wiki", wikiPath);
+    return layout;
+  }
+
+  reportSource("no-sections", wikiPath);
   return parseStoreLayout(stripFrontmatter(readFileSync(join(BUNDLED_DIR, LAYOUT_FILE), "utf-8")));
+}
+
+function reportSource(source: LayoutSource, wikiPath: string): void {
+  if (source === lastSource) return;
+  lastSource = source;
+
+  if (source === "wiki") moduleLog().info({ wikiPath }, "Store layout read from the wiki");
+  else if (source === "no-wiki-page") moduleLog().warn({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
+  else moduleLog().warn({ wikiPath }, "Store layout in the wiki has no sections, using the bundled copy");
 }
 
 // Each "## " heading starts a section, in store order; the comma-separated
