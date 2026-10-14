@@ -25,7 +25,9 @@ earlier section, and an item matching none sorts last.
 
 None in the gateway. The list itself lives in Home Assistant. The store order
 is the wiki page `home/context/store_layout.md`, or the bundled
-`store_layout.md` when the wiki has none or the page has no sections.
+`store_layout.md` when the wiki has none or the page has no sections. Falling back logs
+a warning, and getting the wiki page back logs an info line; each is logged
+once, when the source changes, not on every turn.
 
 ## Files
 

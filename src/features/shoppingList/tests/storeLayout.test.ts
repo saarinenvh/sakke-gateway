@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { FastifyBaseLogger } from "fastify";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { reloadConfig } from "../../../config.js";
+import { setModuleLogger } from "../../../logger.js";
 import { categorizeItem } from "../policy.js";
 import { loadStoreLayout, parseStoreLayout } from "../storeLayout.js";
 
@@ -71,5 +73,37 @@ describe("loadStoreLayout", () => {
     writeWikiLayout("apple, milk\n");
 
     expect(loadStoreLayout()[0].section).toBe("Electronics & Household");
+  });
+
+  it("logs where the layout came from only when that changes", () => {
+    const log = { info: vi.fn(), warn: vi.fn() };
+    setModuleLogger(log as unknown as FastifyBaseLogger);
+    const wikiPath = join(wikiRoot, "home/context/store_layout.md");
+    const logged = () => [...log.info.mock.calls, ...log.warn.mock.calls].map(call => call[1]);
+
+    try {
+      writeWikiLayout("## Maito\nmaito\n");
+      loadStoreLayout();
+      log.info.mockClear();
+
+      rmSync(wikiPath);
+      loadStoreLayout();
+      loadStoreLayout();
+      expect(log.warn).toHaveBeenCalledExactlyOnceWith({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
+
+      writeWikiLayout("apple, milk\n");
+      loadStoreLayout();
+      loadStoreLayout();
+      expect(log.warn).toHaveBeenLastCalledWith({ wikiPath }, "Store layout in the wiki has no sections, using the bundled copy");
+
+      writeWikiLayout("## Maito\nmaito\n");
+      loadStoreLayout();
+      loadStoreLayout();
+      expect(log.info).toHaveBeenCalledExactlyOnceWith({ wikiPath }, "Store layout read from the wiki");
+
+      expect(logged()).toHaveLength(3);
+    } finally {
+      setModuleLogger(console as unknown as FastifyBaseLogger);
+    }
   });
 });
