@@ -13,7 +13,7 @@ AI Gateway for the Sakke home assistant. Receives natural language commands via 
 - **TV control** — launch Netflix, YouTube, Spotify or DGN, send remote keycodes, type into a focused field
 - **Device state queries** — ask if something is on, what's playing, which app the TV is in
 - **AI scene designer** — describe a mood, get a full lighting scene (OpenAI gpt-4o). Reads its room layout and lighting notes from the wiki, so a lamp can move without a redeploy
-- **Shopping lists** — add/remove items with automatic store-layout ordering
+- **Shopping lists** — add/remove items; the shopping list is kept in store order, read from the wiki (`home/context/store_layout.md`)
 - **Spotify** — search by voice and pick from three spoken options; known personal playlists play immediately
 - **Timers, reminders and scheduled actions** — "in 10 minutes", "at 4 pm", or "start the vacuum at 11"; set, list and cancel. Sakke announces reminders aloud, says how a scheduled action went, and they survive a restart
 - **Robot vacuum** — "clean the house", stop, send it home, and status (state, battery, when the house was last cleaned)
@@ -38,7 +38,7 @@ request may use is its profile's choice. How that fits together:
 | `web_search` | `tools/search/` | Web search via local SearXNG |
 | `get_weather` | `tools/weather/` | Current weather, today's forecast and the next 6 hours |
 | `spotify` | `tools/spotify/` | Suggest / play / pause / next / previous / volume |
-| `manage_list` | `tools/lists/` | HA todo lists — read, add, complete, remove, sort by store layout |
+| `manage_list` | `tools/lists/` | HA todo lists — read, add, complete, remove; the shopping list is sorted by store layout (`features/shoppingList/`) |
 | `open_tv_app` | `tools/tv/` | Launch Netflix, YouTube, Spotify or DGN on the living room TV |
 | `tv_remote_command` | `tools/tv/` | Send home / back / mute / search to the TV |
 | `tv_send_text` | `tools/tv/` | Type into the TV's focused input field |
@@ -112,7 +112,7 @@ Everything it reads goes through `src/config.ts`, which is the complete list:
 | GPU routing (optional) | `PC_OLLAMA_BASE_URL`, `PC_OLLAMA_MODEL`, `PC_OLLAMA_NUM_CTX`, `PC_OLLAMA_THINK`, `PC_OLLAMA_KEEP_ALIVE` |
 | Home Assistant | `HA_BASE_URL`, `HA_TOKEN`, `ASSIST_SATELLITE_ENTITY_ID` |
 | Server | `PORT`, `TZ`, `STATE_DIR`, `WIKI_ROOT` |
-| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_PUBLIC_API_KEY`, `OPENAI_LIGHTING_MODEL`, `OPENAI_LIGHTING_REASONING_EFFORT`, `OPENAI_LIGHTING_TIMEOUT_MS`, `TASKS_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
+| Features | `SEARXNG_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `OPENAI_PUBLIC_API_KEY`, `OPENAI_LIGHTING_MODEL`, `OPENAI_LIGHTING_REASONING_EFFORT`, `OPENAI_LIGHTING_TIMEOUT_MS`, `TASKS_TODO`, `SHOPPING_LIST_TODO`, `CALENDAR_ENTITIES`, `WEATHER_LAT`, `WEATHER_LON`, `TV_WAKE_MS` |
 | Gateway database | `GATEWAY_DB_HOST`, `GATEWAY_DB_PORT`, `GATEWAY_DB_NAME`, `GATEWAY_DB_USERNAME`, `GATEWAY_DB_PASSWORD` |
 | Morning wake-up | `MORNING_ENABLED`, `MORNING_ALARM_SENSOR`, `MORNING_ALARM_PACKAGE`, `MORNING_PRESENCE_ENTITY_ID`, `MORNING_WAKE_SCRIPT`, `MORNING_COFFEE_SWITCH`, `MORNING_PHONE_NOTIFY_SERVICE`, `MORNING_ALARM_GRACE_MINUTES`, `MORNING_COFFEE_ANSWER_HOURS`, `MORNING_WAKE_TIME_SENSOR`, `MORNING_BRIEF_MIN_DELAY_MINUTES`, `MORNING_BRIEF_CUTOFF` |
 | Tidiness coach | `TIDINESS_ENABLED`, `TIDINESS_VACUUM_ENTITY_ID`, `TIDINESS_PRESENCE_ENTITY_ID`, `TIDINESS_ASK_TIMES` (e.g. `10:00,18:00`), `TIDINESS_MIN_RUN_MINUTES`, `TIDINESS_SNOOZE_HOURS` |

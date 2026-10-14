@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parseOrThrow } from "../../../util/validation.js";
 import {
+  authMessageExample,
+  authMessageSchema,
   calendarEventsExample,
   calendarEventsSchema,
+  commandResultExample,
+  commandResultSchema,
   entityStateExample,
   entityStateSchema,
   entityStatesSchema,
@@ -25,6 +29,8 @@ describe("Home Assistant boundary schemas", () => {
       "HA todo.get_items example",
     )).not.toThrow();
     expect(() => parseOrThrow(calendarEventsSchema, calendarEventsExample, "HA calendar events example")).not.toThrow();
+    expect(() => parseOrThrow(authMessageSchema, authMessageExample, "HA WebSocket auth example")).not.toThrow();
+    expect(() => parseOrThrow(commandResultSchema, commandResultExample, "HA WebSocket result example")).not.toThrow();
   });
 });
 

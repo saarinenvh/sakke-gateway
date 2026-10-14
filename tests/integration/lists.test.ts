@@ -3,13 +3,11 @@ import { startFakeHomeAssistant, type FakeHomeAssistant } from "../fixtures/fake
 import { addToList, sortList, readList, removeFromList, completeInList } from "../../src/tools/lists/lists.js";
 import { reloadConfig } from "../../src/config.js";
 
-// Finding #3 was the worst bug in the review: adding one item removed every
-// pending item and re-added them sorted, so any failure between the two loops
-// destroyed the list. These tests exercise the real HTTP client against a fake
-// that keeps actual list state, so what survives a failure can be inspected
-// rather than inferred.
+// These tests run the real HTTP and WebSocket clients against a fake that keeps
+// actual list state, so what survives a failure can be inspected rather than
+// inferred.
 
-const LIST = "todo.shopping";
+const LIST = "todo.shopping_list";
 let ha: FakeHomeAssistant;
 
 beforeAll(async () => {
@@ -61,8 +59,6 @@ describe("addToList", () => {
 });
 
 describe("when Home Assistant fails part-way through", () => {
-  // The old implementation removed every item before re-adding any, so an
-  // injected failure after two calls lost four of six items permanently.
   it("loses nothing", async () => {
     const original = ["water", "milk", "bread", "chicken", "apples", "soap"];
     ha.setItems(LIST, pending(...original));
@@ -73,51 +69,48 @@ describe("when Home Assistant fails part-way through", () => {
     expect(summaries().sort()).toEqual([...original].sort());
   });
 
-  it("loses nothing when the failure lands during an add", async () => {
+  it("keeps the added item and says the sort failed", async () => {
     ha.setItems(LIST, pending("water", "milk", "bread"));
     ha.failAfter(1);
 
-    await expect(addToList(LIST, ["apples"])).rejects.toThrow();
+    const result = await addToList(LIST, ["apples"]);
 
-    // Everything that was there is still there. The new item may or may not
-    // have made it, which is fine - what must not happen is losing the rest.
-    for (const item of ["water", "milk", "bread"]) {
-      expect(summaries()).toContain(item);
-    }
-  });
-
-  it("never holds more than one item out of the list at a time", async () => {
-    // The property behind the fix: remove is always immediately followed by the
-    // matching add, so a failure can strand at most one item.
-    ha.setItems(LIST, pending("soap", "apples", "bread", "milk"));
-    await sortList(LIST);
-
-    const calls = ha.calls();
-    const removes = calls.filter(c => c.startsWith("remove_item"));
-    for (const remove of removes) {
-      const item = remove.split(":")[1];
-      const removeAt = calls.indexOf(remove);
-      const addAt = calls.indexOf(`add_item:${item}`, removeAt);
-      expect(addAt, `${item} was removed but never re-added`).toBeGreaterThan(removeAt);
-      // Nothing else is removed in between.
-      expect(calls.slice(removeAt + 1, addAt).some(c => c.startsWith("remove_item"))).toBe(false);
-    }
+    expect(summaries().sort()).toEqual(["apples", "bread", "milk", "water"]);
+    expect(result).toContain("sorting it failed");
   });
 });
 
-describe("item fields survive a reorder", () => {
-  it("keeps a due date and completed status", async () => {
-    // remove_item/add_item carry only the summary, so anything else set on an
-    // item would otherwise be lost every time the list was sorted.
+describe("sorting", () => {
+  it("only moves items, never removes one", async () => {
+    ha.setItems(LIST, pending("bread", "milk", "apples", "chicken"));
+
+    await sortList(LIST);
+
+    // Vegetables & Fruits, Meat & Fish, Dairy & Eggs, Bakery.
+    expect(summaries()).toEqual(["apples", "chicken", "milk", "bread"]);
+    expect(ha.calls().every(call => call.startsWith("move_item:"))).toBe(true);
+  });
+
+  it("keeps an item's due date, description and status", async () => {
     ha.setItems(LIST, [
       { summary: "soap", status: "needs_action" },
-      { summary: "apples", status: "needs_action", due: "2026-09-30" },
+      { summary: "apples", status: "needs_action", due: "2026-09-30", description: "Granny Smith" },
+      { summary: "bread", status: "completed" },
+      { summary: "beer", status: "completed" },
     ]);
 
     await sortList(LIST);
 
-    const apples = ha.items(LIST).find(i => i.summary === "apples");
-    expect(apples?.due).toBe("2026-09-30");
+    expect(ha.items(LIST).find(i => i.summary === "apples")).toMatchObject({ due: "2026-09-30", description: "Granny Smith" });
+    expect(ha.items(LIST).filter(i => i.status === "completed").map(i => i.summary)).toEqual(["beer", "bread"]);
+  });
+
+  it("leaves other lists in the order they are", async () => {
+    ha.setItems("todo.chores", pending("soap", "apples"));
+
+    await addToList("todo.chores", ["bread"]);
+
+    expect(ha.items("todo.chores").map(i => i.summary)).toEqual(["soap", "apples", "bread"]);
   });
 });
 

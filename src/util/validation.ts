@@ -27,8 +27,11 @@ export function parseOrThrow<S extends z.ZodType>(schema: S, value: unknown, sou
 // something this code can't use - so both become a ValidationError. A failure
 // to read the body (a dropped connection) still propagates as itself.
 export async function parseJsonResponse<S extends z.ZodType>(res: Response, schema: S, source: string): Promise<z.output<S>> {
-  const text = await res.text();
+  return parseJsonText(await res.text(), schema, source);
+}
 
+// For JSON that arrives as text, such as a WebSocket message.
+export function parseJsonText<S extends z.ZodType>(text: string, schema: S, source: string): z.output<S> {
   let body: unknown;
   try {
     body = JSON.parse(text);

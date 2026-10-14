@@ -27,8 +27,10 @@ Where the rest goes:
   `tools/search/` has no feature: it calls `integrations/searxng/` and formats
   the results.
 - **Logic that only this tool needs** may stay in its executor, as in
-  `tools/lists/` (matching and reordering list items) and `tools/homeControl/`
-  (the dispatcher). It moves to a feature when a second caller appears.
+  `tools/lists/` (matching an item by name) and `tools/homeControl/` (the
+  dispatcher). It moves to a feature when a second caller appears, or when it
+  grows into rules of its own: the shopping list's store order and sorting
+  live in `features/shoppingList/`, and `tools/lists/` calls it.
 
 Nothing outside `tools/` imports a tool folder's internals: the registry
 imports each `tool.ts`, and `agent/systemPrompt.ts` each `prompt.ts`.

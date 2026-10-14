@@ -1,4 +1,5 @@
-import { getTodoLists, STORE_LAYOUT_SECTIONS } from "./lists.js";
+import { storeSections } from "../../features/shoppingList/shoppingList.js";
+import { getTodoLists } from "./lists.js";
 
 export async function listsPrompt(): Promise<string> {
   // getTodoLists makes a live HA call on every turn. A momentary outage used to
@@ -14,5 +15,5 @@ Available lists:
 ${lists}
 
 Shopping list store layout (items are auto-sorted in this order when added):
-${STORE_LAYOUT_SECTIONS.map((s, i) => `  ${i + 1}. ${s}`).join("\n")}`;
+${storeSections().map((section, i) => `  ${i + 1}. ${section}`).join("\n")}`;
 }

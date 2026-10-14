@@ -126,6 +126,7 @@ export interface Config {
     token: string;
     satelliteEntityId: string;
     tasksTodo: string;
+    shoppingList: string;
     calendarEntities: string[];
   };
   // How long to wait after waking the living room TV before sending it an app
@@ -226,6 +227,7 @@ function loadConfig(): Config {
       token: require("HA_TOKEN", "every Home Assistant call will be rejected"),
       satelliteEntityId: env("ASSIST_SATELLITE_ENTITY_ID") ?? "assist_satellite.home_assistant_voice",
       tasksTodo: env("TASKS_TODO") ?? "todo.sakke_tasks",
+      shoppingList: env("SHOPPING_LIST_TODO") ?? "todo.shopping_list",
       calendarEntities: (env("CALENDAR_ENTITIES") ?? "").split(",").map(s => s.trim()).filter(Boolean),
     },
     tvWakeMs: num("TV_WAKE_MS", 5000),

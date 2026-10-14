@@ -103,14 +103,15 @@ src/
 │                         # in integrations/ (see tools.md)
 ├── features/
 │   └── scenes/  display/  gpu/  tidiness/  announcements/  scheduling/  morning/
-│       reminders/  wiki/  spotify/
+│       reminders/  wiki/  spotify/  shoppingList/
 │                         # services with their own routes, logic and tables, not in
 │                         # tools/registry.ts - nothing the model calls directly.
 │                         # Each has a README.md (what it does, entry points, the
 │                         # tables it owns) and tests/; scheduling/ and morning/
 │                         # keep their entities and repositories in db/
 ├── integrations/
-│   ├── homeAssistant/client.ts  # the only place that talks HTTP to HA
+│   ├── homeAssistant/client.ts  # every call to HA: REST, and the moves over websocket.ts
+│   ├── homeAssistant/websocket.ts  # one short WebSocket connection for commands REST lacks (todo/item/move)
 │   ├── homeAssistant/schema.ts  # what HA sends back: full examples + Zod schemas
 │   ├── homeAssistant/registry.ts  # areas, scenes, scripts, entities
 │   ├── homeAssistant/phone.ts     # spoken notifications on the phone (Companion app)

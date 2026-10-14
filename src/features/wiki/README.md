@@ -11,8 +11,8 @@ a bundled copy when the vault has none.
 | Export | Called by |
 | --- | --- |
 | `readPage(page)`, `saveNote(filename, content)` | `tools/wiki/tool.ts` (`get_context`, `create_knowledge`) |
-| `readWikiDocWithFallback(...)` | `features/scenes/scenes.ts`, for the lighting documents |
-| `stripFrontmatter(content)` | `readWikiDocWithFallback` |
+| `readWikiDocWithFallback(...)` | `features/scenes/scenes.ts`, for the lighting documents; `features/shoppingList/storeLayout.ts`, for the store layout (`home/context/store_layout.md`) |
+| `stripFrontmatter(content)` | `readWikiDocWithFallback`, `features/shoppingList/storeLayout.ts` |
 
 ## Data
 

@@ -1,91 +1,101 @@
-import { describe, it, expect } from "vitest";
-import { categorizeItem, itemsToMove, STORE_LAYOUT_SECTIONS } from "../lists.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { config } from "../../../config.js";
+import { callService, getTodoItems, moveTodoItems } from "../../../integrations/homeAssistant/client.js";
+import type { TodoItem } from "../../../integrations/homeAssistant/schema.js";
+import { addToList, sortList } from "../lists.js";
 
-describe("categorizeItem", () => {
-  it("puts an item in its aisle", () => {
-    const section = (name: string) => STORE_LAYOUT_SECTIONS[categorizeItem(name)];
-    expect(section("milk")).toBe("Dairy & Eggs");
-    expect(section("chicken")).toBe("Meat & Fish");
-    expect(section("bread")).toBe("Bakery");
-    expect(section("apples")).toBe("Vegetables & Fruits");
-  });
+vi.mock("../../../integrations/homeAssistant/client.js", () => ({
+  callService: vi.fn(),
+  getAllStates: vi.fn(),
+  getTodoItems: vi.fn(),
+  moveTodoItems: vi.fn(),
+}));
 
-  it("matches on a substring, so plurals and descriptions still land", () => {
-    const section = (name: string) => STORE_LAYOUT_SECTIONS[categorizeItem(name)];
-    expect(section("free range eggs")).toBe("Dairy & Eggs");
-    expect(section("Bananas")).toBe("Vegetables & Fruits");
-  });
+describe("manage_list replies", () => {
+  const SHOPPING_LIST = config.ha.shoppingList;
 
-  it("sorts an unrecognised item last rather than dropping it", () => {
-    expect(categorizeItem("flux capacitor")).toBe(STORE_LAYOUT_SECTIONS.length);
-  });
+  // An HA to-do list that keeps its items in order and applies service calls
+  // and moves to them.
+  let list: TodoItem[];
+  let moveFails: boolean;
 
-  it("takes the first matching section when keywords overlap", () => {
-    // "olive oil" is listed under Sauces & Oils, but "oil" also appears under
-    // Canned & Dry Goods, which comes first. Documenting the actual behaviour
-    // rather than the intended one - worth revisiting if it ever matters.
-    const section = STORE_LAYOUT_SECTIONS[categorizeItem("olive oil")];
-    expect(STORE_LAYOUT_SECTIONS).toContain(section);
-  });
-});
-
-// The reorder algorithm. HA's REST API has no "move item", so changing order
-// means remove-and-append; the previous implementation did that for the whole
-// list on every add, and a failure part-way destroyed it. This picks the
-// smallest set that has to move.
-describe("itemsToMove", () => {
-  it("moves nothing when the list is already in order", () => {
-    expect(itemsToMove(["a", "b", "c"], ["a", "b", "c"])).toEqual([]);
-  });
-
-  it("moves nothing when a new item already sorts last", () => {
-    expect(itemsToMove(["a", "b", "c"], ["a", "b", "c"])).toHaveLength(0);
-  });
-
-  it("moves only the items that have to move", () => {
-    // b is already after a, so only c needs re-appending.
-    expect(itemsToMove(["a", "c", "b"], ["a", "b", "c"])).toEqual(["c"]);
-  });
-
-  it("moves everything after the first item that is out of place", () => {
-    expect(itemsToMove(["c", "b", "a"], ["a", "b", "c"])).toEqual(["b", "c"]);
-  });
-
-  it("handles an empty list", () => {
-    expect(itemsToMove([], [])).toEqual([]);
-  });
-
-  // The property that matters: applying the moves must actually produce the
-  // target order. Verified exhaustively rather than on hand-picked cases,
-  // because this replaced an algorithm that was correct but destructive.
-  it("always produces the target order, across every permutation of up to 5 items", () => {
-    const permutations = <T>(xs: T[]): T[][] =>
-      xs.length <= 1 ? [xs] : xs.flatMap((x, i) =>
-        permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map(rest => [x, ...rest]));
-
-    let checked = 0;
-    let worst = 0;
-    // Capped at 5: 120 permutations means 14,400 ordered pairs, which is as
-    // convincing as 6's 518,400 and keeps the whole suite under a second.
-    for (let n = 0; n <= 5; n++) {
-      const items = Array.from({ length: n }, (_, i) => `item${i}`);
-      const perms = permutations(items);
-      for (const current of perms) {
-        for (const target of perms) {
-          const moves = itemsToMove(current, target);
-          // Simulate what reorderList does: remove each, re-append in order.
-          const result = [...current.filter(x => !moves.includes(x)), ...moves];
-          expect(result, `current=${current} target=${target}`).toEqual(target);
-          checked++;
-          worst = Math.max(worst, moves.length);
-        }
+  beforeEach(() => {
+    vi.mocked(getTodoItems).mockImplementation(async () => list.map(item => ({ ...item })));
+    vi.mocked(callService).mockImplementation(async (_domain, service, data = {}) => {
+      if (service !== "add_item") throw new Error(`unexpected service ${service}`);
+      list.push({ uid: `uid-${String(data.item)}`, summary: String(data.item), status: "needs_action" });
+    });
+    vi.mocked(moveTodoItems).mockImplementation(async (_entityId, moves) => {
+      if (moveFails) throw new Error("HA WebSocket: connection failed");
+      for (const move of moves) {
+        const item = list.splice(list.findIndex(i => i.uid === move.uid), 1)[0];
+        const at = move.previousUid === undefined ? 0 : list.findIndex(i => i.uid === move.previousUid) + 1;
+        list.splice(at, 0, item);
       }
-    }
-    expect(checked).toBeGreaterThan(1000);
-    expect(worst).toBeLessThanOrEqual(5);
+    });
+    moveFails = false;
   });
 
-  it("never moves more items than there are", () => {
-    expect(itemsToMove(["c", "b", "a"], ["a", "b", "c"]).length).toBeLessThanOrEqual(3);
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function pendingSummaries(): string[] {
+    return list.filter(i => i.status === "needs_action").map(i => i.summary);
+  }
+
+  it("adds new items to the shopping list and sorts it, without removing anything", async () => {
+    list = [
+      { uid: "uid-milk", summary: "milk", status: "needs_action" },
+      { uid: "uid-beer", summary: "beer", status: "needs_action" },
+    ];
+
+    const reply = await addToList(SHOPPING_LIST, ["apples", "bread"]);
+
+    expect(pendingSummaries()).toEqual(["apples", "milk", "bread", "beer"]);
+    expect(vi.mocked(callService).mock.calls.map(call => call[1])).toEqual(["add_item", "add_item"]);
+    expect(reply).toBe("Added apples, bread. List has 4 items sorted by store layout.");
+  });
+
+  it("keeps the added items and says so when sorting fails", async () => {
+    list = [{ uid: "uid-beer", summary: "beer", status: "needs_action" }];
+    moveFails = true;
+
+    const reply = await addToList(SHOPPING_LIST, ["milk"]);
+
+    expect(pendingSummaries()).toEqual(["beer", "milk"]);
+    expect(reply).toBe("Added milk. List has 2 items, but sorting it failed: HA WebSocket: connection failed");
+  });
+
+  it("adds to another list without sorting it", async () => {
+    list = [{ uid: "uid-milk", summary: "milk", status: "needs_action" }];
+
+    const reply = await addToList("todo.chores", ["apples"]);
+
+    expect(pendingSummaries()).toEqual(["milk", "apples"]);
+    expect(moveTodoItems).not.toHaveBeenCalled();
+    expect(reply).toBe("Added apples. List has 2 items.");
+  });
+
+  it("says how many items a sort put in order", async () => {
+    list = [
+      { uid: "uid-milk", summary: "milk", status: "needs_action" },
+      { uid: "uid-soap", summary: "soap", status: "completed" },
+    ];
+
+    await expect(sortList(SHOPPING_LIST)).resolves.toBe("Sorted 1 items by store layout, 1 completed items alphabetically.");
+  });
+
+  it("says so when the list to sort is empty", async () => {
+    list = [];
+
+    await expect(sortList(SHOPPING_LIST)).resolves.toBe("List is empty.");
+  });
+
+  it("refuses to sort another list", async () => {
+    list = [{ uid: "uid-milk", summary: "milk", status: "needs_action" }];
+
+    await expect(sortList("todo.chores")).resolves.toBe("Only the shopping list is sorted.");
+    expect(getTodoItems).not.toHaveBeenCalled();
   });
 });
