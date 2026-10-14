@@ -10,6 +10,7 @@ import {
   type EntityState,
   type TodoItem,
 } from "./schema.js";
+import { sendCommands } from "./websocket.js";
 
 export type { EntityState };
 
@@ -102,6 +103,25 @@ export async function callServiceWithResponse<S extends z.ZodType>(
 export async function getTodoItems(entityId: string, options?: RequestOptions): Promise<TodoItem[]> {
   const response = await callServiceWithResponse("todo", "get_items", { entity_id: entityId }, todoGetItemsResponseSchemaFor(entityId), options);
   return response[entityId].items;
+}
+
+export interface TodoMove {
+  uid: string;
+  // Absent moves the item to the top of the list.
+  previousUid: string | undefined;
+}
+
+// Only over the WebSocket API. All moves share one connection.
+export async function moveTodoItems(entityId: string, moves: TodoMove[], options?: RequestOptions): Promise<void> {
+  if (moves.length === 0) return;
+
+  const commands = moves.map(move => ({
+    type: "todo/item/move",
+    entity_id: entityId,
+    uid: move.uid,
+    ...(move.previousUid !== undefined && { previous_uid: move.previousUid }),
+  }));
+  await sendCommands(commands, options);
 }
 
 export async function renderTemplate(template: string, options?: RequestOptions): Promise<string> {

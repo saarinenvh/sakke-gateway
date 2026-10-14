@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-// HA → gateway, the answers to the gateway's REST calls (homeAssistant/client.ts).
+// HA → gateway, the answers to the gateway's REST calls (homeAssistant/client.ts)
+// and to its WebSocket commands (homeAssistant/websocket.ts).
 // Zod strips undeclared fields, so a new HA field can't leak into the domain
 // types by accident.
 
@@ -145,3 +146,33 @@ export const calendarEventsSchema = z.array(
 );
 
 export type CalendarEvent = z.output<typeof calendarEventsSchema>[number];
+
+// HA → gateway over the WebSocket API (homeAssistant/websocket.ts).
+
+// The handshake: auth_required when the connection opens, then auth_ok or
+// auth_invalid (with a message) after the gateway sends its token.
+export const authMessageExample = {
+  type: "auth_required",
+  ha_version: "2026.10.1", // ignored
+};
+
+export const authMessageSchema = z.object({
+  type: z.enum(["auth_required", "auth_ok", "auth_invalid"]),
+  message: z.string().optional(),
+});
+
+// The answer to one command, matched to it by id. A failed command carries an
+// error instead of a result.
+export const commandResultExample = {
+  id: 1,
+  type: "result",
+  success: false,
+  error: { code: "not_found", message: "Unable to find to-do list item: 5c1f0b2e" },
+};
+
+export const commandResultSchema = z.object({
+  id: z.number(),
+  type: z.literal("result"),
+  success: z.boolean(),
+  error: z.object({ code: z.string(), message: z.string() }).optional(),
+});

@@ -1,14 +1,16 @@
 import http from "http";
 import type { AddressInfo } from "net";
+import { WebSocketServer, type WebSocket } from "ws";
 
-// A stand-in for the slice of Home Assistant's REST API this service uses:
-// the todo services, and /api/states.
+// A stand-in for the slice of Home Assistant's API this service uses: the todo
+// services and /api/states over REST, and todo/item/move over the WebSocket.
 //
 // It keeps real list state, so an operation's effect can be inspected rather
 // than inferred from which calls were made - which matters for the list code,
 // where the bug was that a failure part-way through destroyed data.
 
 export interface TodoItem {
+  uid?: string;
   summary: string;
   status: "needs_action" | "completed";
   due?: string;
@@ -17,13 +19,13 @@ export interface TodoItem {
 
 export interface FakeHomeAssistant {
   url: string;
-  /** Replace the contents of a list. */
+  /** Replace the contents of a list. Items without a uid get one. */
   setItems(entityId: string, items: TodoItem[]): void;
   /** Current contents, in list order. */
   items(entityId: string): TodoItem[];
-  /** Fail every service call after this many have succeeded. */
+  /** Fail every service call and move after this many have succeeded. */
   failAfter(calls: number): void;
-  /** Service calls made so far, e.g. "add_item:milk". */
+  /** Service calls and moves made so far, e.g. "add_item:milk", "move_item:milk". */
   calls(): string[];
   /** Every service call as {domain, service, data}, for non-todo domains too. */
   serviceCalls(): { domain: string; service: string; data: Record<string, unknown> }[];
@@ -40,6 +42,8 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
   const callLog: string[] = [];
   const services: { domain: string; service: string; data: Record<string, unknown> }[] = [];
   const states = new Map<string, { state: string; attributes: Record<string, unknown> }>();
+  let uidCount = 0;
+  const newUid = () => `uid-${++uidCount}`;
 
   const server = http.createServer((req, res) => {
     let raw = "";
@@ -105,7 +109,7 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
 
       if (url.endsWith("/add_item")) {
         callLog.push(`add_item:${body.item}`);
-        items.push({ summary: body.item, status: "needs_action" });
+        items.push({ uid: newUid(), summary: body.item, status: "needs_action" });
       } else if (url.endsWith("/remove_item")) {
         callLog.push(`remove_item:${body.item}`);
         const i = items.findIndex(x => x.summary === body.item);
@@ -128,13 +132,42 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
     });
   });
 
+  // Like HA: auth_required on connect, auth_ok for any token, then one result
+  // per command.
+  const websockets = new WebSocketServer({ server, path: "/api/websocket" });
+  websockets.on("connection", (socket: WebSocket) => {
+    socket.send(JSON.stringify({ type: "auth_required", ha_version: "2026.10.1" }));
+    socket.on("message", data => {
+      const message = JSON.parse(String(data));
+      if (message.type === "auth") return socket.send(JSON.stringify({ type: "auth_ok", ha_version: "2026.10.1" }));
+      socket.send(JSON.stringify({ id: message.id, type: "result", ...answerCommand(message) }));
+    });
+  });
+
+  function answerCommand(message: Record<string, unknown>): Record<string, unknown> {
+    if (message.type !== "todo/item/move") return { success: false, error: { code: "unknown_command", message: "Unknown command." } };
+
+    callCount++;
+    if (callCount > failThreshold) return { success: false, error: { code: "home_assistant_error", message: "fake HA: injected failure" } };
+
+    const items = lists.get(String(message.entity_id)) ?? [];
+    const from = items.findIndex(i => i.uid === message.uid);
+    if (from < 0) return { success: false, error: { code: "not_found", message: "Item not found" } };
+
+    const [item] = items.splice(from, 1);
+    const at = message.previous_uid === undefined ? 0 : items.findIndex(i => i.uid === message.previous_uid) + 1;
+    items.splice(at, 0, item);
+    callLog.push(`move_item:${item.summary}`);
+    return { success: true, result: null };
+  }
+
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
 
   return {
     url: `http://127.0.0.1:${port}`,
     setItems: (entityId, items) => {
-      lists.set(entityId, items.map(i => ({ ...i })));
+      lists.set(entityId, items.map(i => ({ uid: newUid(), ...i })));
       callCount = 0;
       failThreshold = Infinity;
       callLog.length = 0;
@@ -146,6 +179,10 @@ export async function startFakeHomeAssistant(): Promise<FakeHomeAssistant> {
     removeState: entityId => { states.delete(entityId); },
     failAfter: calls => { failThreshold = calls; },
     calls: () => callLog,
-    close: () => new Promise<void>(resolve => server.close(() => resolve())),
+    close: async () => {
+      for (const client of websockets.clients) client.terminate();
+      await new Promise<void>(resolve => websockets.close(() => resolve()));
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    },
   };
 }
