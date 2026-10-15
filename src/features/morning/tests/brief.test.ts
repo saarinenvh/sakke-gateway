@@ -62,7 +62,7 @@ function fakeWorld(): FakeWorld {
       return "Events (today): Dentist at 14:00.";
     },
     readTasks: async () => "Tasks (today): buy oat milk.",
-    readWeather: async () => "Conditions: light rain\nTemperature: 9°C (feels like 6°C)\nWind: 12 km/h",
+    readWeather: async () => "Conditions: light rain\nTemperature: 9 degrees, feels like 6\nWind: 3 meters per second",
     writeBrief: async request => {
       requests.push(request);
       if (failures.brief) throw failures.brief;
@@ -248,7 +248,7 @@ describe("the words", () => {
     world.failures.brief = new Error("Ollama timed out");
 
     expect(await runBriefTick(world.deps)).toMatchObject({ wording: "fallback", delivery: "delivered" });
-    expect(world.spoken).toEqual(["Good, you're up. Events (today): Dentist at 14:00. Tasks (today): buy oat milk. Conditions: light rain, Temperature: 9°C (feels like 6°C)."]);
+    expect(world.spoken).toEqual(["Good, you're up. Events (today): Dentist at 14:00. Tasks (today): buy oat milk. light rain, 9 degrees, feels like 6."]);
   });
 
   it("still briefs when one source can't be read, and says so", async () => {

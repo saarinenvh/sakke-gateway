@@ -17,6 +17,7 @@ export async function getForecast(): Promise<ForecastResult> {
     forecast_hours: String(FORECAST_HOURS),
     daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max",
     forecast_days: "1",
+    wind_speed_unit: "ms",
     timezone: "auto",
   });
   if (response.kind === "failed") return response;

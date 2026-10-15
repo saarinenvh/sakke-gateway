@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Open-Meteo → gateway, GET /v1/forecast with the variables client.ts asks for: the current
 // conditions, the hourly series for the next six hours from the current hour, and today's daily
-// summary, in the location's own time zone (timezone=auto).
+// summary, in the location's own time zone (timezone=auto), with wind in m/s (wind_speed_unit=ms).
 
 export const weatherReadingExample = {
   latitude: 60.17, // ignored
@@ -18,8 +18,8 @@ export const weatherReadingExample = {
     temperature_2m: "°C",
     apparent_temperature: "°C",
     precipitation: "mm",
-    wind_speed_10m: "km/h",
-    wind_gusts_10m: "km/h",
+    wind_speed_10m: "m/s",
+    wind_gusts_10m: "m/s",
     weather_code: "wmo code",
   },
   current: {
@@ -28,14 +28,14 @@ export const weatherReadingExample = {
     temperature_2m: 12.8,
     apparent_temperature: 10.6,
     precipitation: 0,
-    wind_speed_10m: 15.9,
-    wind_gusts_10m: 31.2,
+    wind_speed_10m: 4.4,
+    wind_gusts_10m: 8.7,
     weather_code: 3,
   },
   hourly_units: { // ignored
     time: "iso8601",
     precipitation_probability: "%",
-    wind_speed_10m: "km/h",
+    wind_speed_10m: "m/s",
   },
   hourly: {
     time: [ // ignored
@@ -43,7 +43,7 @@ export const weatherReadingExample = {
       "2026-10-03T17:00", "2026-10-03T18:00", "2026-10-03T19:00",
     ],
     precipitation_probability: [22, 15, 10, 8, 5, 5],
-    wind_speed_10m: [15.9, 14.4, 12.7, 11.5, 10.6, null],
+    wind_speed_10m: [4.4, 4, 3.5, 3.2, 2.9, null],
   },
   daily_units: { // ignored
     time: "iso8601",
@@ -52,8 +52,8 @@ export const weatherReadingExample = {
     temperature_2m_min: "°C",
     precipitation_sum: "mm",
     precipitation_probability_max: "%",
-    wind_speed_10m_max: "km/h",
-    wind_gusts_10m_max: "km/h",
+    wind_speed_10m_max: "m/s",
+    wind_gusts_10m_max: "m/s",
   },
   daily: {
     time: ["2026-10-03"], // ignored
@@ -62,8 +62,8 @@ export const weatherReadingExample = {
     temperature_2m_min: [6.3],
     precipitation_sum: [2.4],
     precipitation_probability_max: [41],
-    wind_speed_10m_max: [17.2],
-    wind_gusts_10m_max: [33.8],
+    wind_speed_10m_max: [4.8],
+    wind_gusts_10m_max: [9.4],
   },
 };
 

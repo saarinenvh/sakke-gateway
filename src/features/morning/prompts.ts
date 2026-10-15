@@ -65,9 +65,9 @@ export function buildBriefRequest(facts: BriefFacts): string {
   ].filter(Boolean).join(" ");
 }
 
-// Spoken when the model can't write the brief.
+// Spoken when the model can't write the brief; the weather's labels ("Conditions:") are dropped.
 export function fallbackBrief(day: DayFacts): string {
-  const conditions = day.weather.split("\n").slice(0, 2).join(", ");
+  const conditions = day.weather.split("\n").slice(0, 2).map(line => line.replace(/^[^:]*:\s*/, "")).join(", ");
   return `Good, you're up. ${day.calendar} ${day.tasks} ${conditions}.`;
 }
 

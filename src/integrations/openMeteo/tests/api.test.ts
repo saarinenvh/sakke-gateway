@@ -11,7 +11,7 @@ beforeEach(() => {
 });
 
 describe("getForecast", () => {
-  it("asks for the next six hours from now and today's summary, not the day's hours from midnight", async () => {
+  it("asks for the next six hours from now and today's summary, not the day's hours from midnight, with wind in m/s", async () => {
     await getForecast();
 
     const [path, query] = mocks.get.mock.calls[0];
@@ -20,6 +20,7 @@ describe("getForecast", () => {
       forecast_hours: "6",
       hourly: "precipitation_probability,wind_speed_10m",
       forecast_days: "1",
+      wind_speed_unit: "ms",
       timezone: "auto",
     });
     expect(query.daily.split(",")).toEqual([
