@@ -18,8 +18,9 @@ export interface StoreSection {
 
 type LayoutSource = "wiki" | "no-wiki-page" | "no-sections";
 
-// The layout is read on every conversation turn, so the source is logged only
-// when it changes rather than every time.
+// A fallback warns on every read, so a missing page can't hide behind one old
+// log line. Reading from the wiki is the normal case, logged only when it
+// starts, since the layout is read on every conversation turn.
 let lastSource: LayoutSource | undefined;
 
 export function loadStoreLayout(): StoreSection[] {
@@ -41,11 +42,12 @@ export function loadStoreLayout(): StoreSection[] {
 }
 
 function reportSource(source: LayoutSource, wikiPath: string): void {
-  if (source === lastSource) return;
+  const previous = lastSource;
   lastSource = source;
 
-  if (source === "wiki") moduleLog().info({ wikiPath }, "Store layout read from the wiki");
-  else if (source === "no-wiki-page") moduleLog().warn({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
+  if (source === "wiki") {
+    if (previous !== "wiki") moduleLog().info({ wikiPath }, "Store layout read from the wiki");
+  } else if (source === "no-wiki-page") moduleLog().warn({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
   else moduleLog().warn({ wikiPath }, "Store layout in the wiki has no sections, using the bundled copy");
 }
 
