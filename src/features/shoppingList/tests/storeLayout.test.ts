@@ -75,7 +75,7 @@ describe("loadStoreLayout", () => {
     expect(loadStoreLayout()[0].section).toBe("Electronics & Household");
   });
 
-  it("logs where the layout came from only when that changes", () => {
+  it("warns on every fallback, and logs reading from the wiki only when it starts", () => {
     const log = { info: vi.fn(), warn: vi.fn() };
     setModuleLogger(log as unknown as FastifyBaseLogger);
     const wikiPath = join(wikiRoot, "home/context/store_layout.md");
@@ -89,11 +89,13 @@ describe("loadStoreLayout", () => {
       rmSync(wikiPath);
       loadStoreLayout();
       loadStoreLayout();
-      expect(log.warn).toHaveBeenCalledExactlyOnceWith({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
+      expect(log.warn).toHaveBeenCalledTimes(2);
+      expect(log.warn).toHaveBeenLastCalledWith({ wikiPath }, "Store layout not in the wiki, using the bundled copy");
 
       writeWikiLayout("apple, milk\n");
       loadStoreLayout();
       loadStoreLayout();
+      expect(log.warn).toHaveBeenCalledTimes(4);
       expect(log.warn).toHaveBeenLastCalledWith({ wikiPath }, "Store layout in the wiki has no sections, using the bundled copy");
 
       writeWikiLayout("## Maito\nmaito\n");
@@ -101,7 +103,7 @@ describe("loadStoreLayout", () => {
       loadStoreLayout();
       expect(log.info).toHaveBeenCalledExactlyOnceWith({ wikiPath }, "Store layout read from the wiki");
 
-      expect(logged()).toHaveLength(3);
+      expect(logged()).toHaveLength(5);
     } finally {
       setModuleLogger(console as unknown as FastifyBaseLogger);
     }
