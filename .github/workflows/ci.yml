@@ -31,7 +31,7 @@ jobs:
       TEST_DB_USERNAME: sakke_gateway_test
       TEST_DB_PASSWORD: ci-only-password
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -64,6 +64,6 @@ jobs:
     # pass against source that the image could still fail to produce.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the Docker image
         run: docker build -t ci-check .
