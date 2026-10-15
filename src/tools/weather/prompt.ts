@@ -3,5 +3,5 @@
 // in systemPrompt.ts, which is how the run_routine rules and the routine tool
 // drifted apart (see CODE_REVIEW.md #12).
 export function weatherPrompt(): string {
-  return `Weather: use get_weather. Your training data has no idea what it is doing outside right now.`;
+  return `Weather: use get_weather. Your training data has no idea what it is doing outside right now. Say the weather the way a person would, in a sentence or two, with units in words ("degrees", "meters per second"), never as symbols.`;
 }
