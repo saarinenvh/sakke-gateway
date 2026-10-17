@@ -1,12 +1,12 @@
 # Spotify
 
 Plays music through Home Assistant's Spotify media player. A named request is
-searched on the Spotify Web API (`integrations/spotify/`) and answered with three numbered options; the
-options are remembered per conversation, so a pick only needs its number. A
-known personal playlist plays at once, matched by name with room for STT
-mishearings, since search can't find it. When nothing is playing anywhere,
-playback first wakes the living room TV and opens Spotify on it so there is a
-Connect device to play on.
+searched on the Spotify Web API (`integrations/spotify/`) and answered with
+three numbered options. The options are remembered per conversation, so a pick
+only needs its number. Search can't find the owner's personal playlists, so a
+known one plays at once, matched by name with room for STT mishearings. When
+nothing is playing anywhere, playback first wakes the living room TV and opens
+Spotify on it, so there is a Connect device to play on.
 
 ## Entry points
 

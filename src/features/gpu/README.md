@@ -4,7 +4,8 @@ Keeps the dev PC's GPU status, pushed by the PC's status service
 (`scripts/gpu-router/status-service.ps1` in sakke-workspace), and decides
 whether the PC is `available`, `busy` or `unknown`. Without a recent heartbeat
 the state is `unknown`, and callers fall back to the server. A manual
-override can force `busy` or `available` for a while (a default set in `gpu.ts`).
+override can force `busy` or `available` for a limited time, with the default
+duration set in `gpu.ts`.
 
 ## Entry points
 

@@ -10,7 +10,7 @@ What the gateway stores, where, and who may change it.
 | Conversations | memory (`agent/conversationStore.ts`) | no, by design |
 | GPU status, display state | memory | no; reported again |
 
-`tidiness.json` moves into the database in a follow-up ticket.
+`tidiness.json` will move into the database in a follow-up ticket.
 
 ## The gateway database
 
@@ -21,9 +21,9 @@ Neither service can read the other's data.
 - **Access:** TypeORM 1.x, `type: "mariadb"`, on the `mysql2` driver.
 - **Times** are stored as UTC `DATETIME(3)` (`timezone: "Z"`); local time only
   appears when a time is resolved or spoken.
-- **Charset** `utf8mb4`, since text can be Finnish.
-- **Idle connections:** the pool keeps none (`mysql2` `maxIdle: 0`), so every
-  connection is closed after 60 s idle.
+- **Charset:** `utf8mb4`, since text can be Finnish.
+- **Idle connections:** the pool keeps none (`mysql2` `maxIdle: 0`), so it
+  closes every connection after 60 s idle.
 
 Why these choices:
 
@@ -40,10 +40,11 @@ Why these choices:
 
 ## Startup and outages
 
-`db/database.ts` connects in the background at startup and retries every 30 s
-until MariaDB answers. The gateway serves requests meanwhile: voice and every
-tool that doesn't need the database keep working, and what does need it reports
-itself unavailable. With `GATEWAY_DB_HOST` unset there is no database at all,
+`db/database.ts` connects in the background at startup, retries every 30 s
+until MariaDB answers, and runs pending migrations (`src/db/migrations/`) once
+connected. The gateway serves requests meanwhile: voice and every tool that
+doesn't need the database keep working, and what does need it reports itself
+unavailable. With `GATEWAY_DB_HOST` unset there is no database at all,
 reported as a configuration problem at startup.
 
 ## Who owns a table
@@ -59,7 +60,7 @@ tables or queries.
   `morning_day` and `morning_brief`. Each feature's `README.md` lists the tables
   it owns.
 - **Other features read through the owner's repository**, never the table
-  directly, so the owner's rules (for example: only a pending job can be
+  directly, so the owner's rules (for example, that only a pending job can be
   finished) hold for every caller.
 - **A concept several features use, with no single owner**, gets a module of
   its own rather than living in one of its users.
