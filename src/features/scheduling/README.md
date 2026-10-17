@@ -2,29 +2,31 @@
 
 Runs a stored tool call at a set time: after a duration ("in 10 minutes",
 `source: "in"`) or at a clock time ("at 4 pm", `source: "at"`). A job is
-stored before it is armed, so it survives a restart; only a call the tool marks
-`schedulable` is accepted: `announce`, `vacuum` start/stop/dock,
+stored before it is armed, so it survives a restart. Only a call that its tool
+marks `schedulable` is accepted: `announce`, `vacuum` start/stop/dock,
 `control_home_assistant` (not `scene_design` or `scene_create`) and
 `run_routine`. Finished jobs stay in the table as history.
 
 After every scheduled action other than an announcement, Sakke says how it
 went (`outcomeReport.ts`): done, with what the tool reported, or didn't work,
-with why. It goes through `announce`, so it's worded in Sakke's voice, or said
-as written if that fails. The outcome is stored first; failing to say it
-doesn't change it. A tool's failure has to throw to be reported as one.
+with why. The report goes through `announce`, so it is worded in Sakke's voice,
+or said as written if the wording fails. The outcome is stored first, and
+failing to say it doesn't change it. A tool must throw for its failure to be
+reported as one.
 
-A spoken clock time is resolved in the configured timezone by `policy.ts`:
-without am/pm an hour of 1-12 is its next upcoming reading, a time already
-passed today is tomorrow's unless "today" was said, and a daylight saving
-change moves a skipped time forward by the gap and takes the first of a
-repeated one.
+`policy.ts` resolves a spoken clock time in the configured timezone:
+
+- Without am/pm, an hour of 1-12 takes its next upcoming reading.
+- A time already passed today means tomorrow, unless "today" was said.
+- On a daylight saving change, a skipped time moves forward by the gap, and a
+  repeated time takes its first occurrence.
 
 A job runs at most once. When it comes due it is first claimed in the
 database (`pending` → `running`), then run, then recorded as `done` or
 `failed`. A job can only be cancelled while it's still `pending`, so a cancel
 that loses the race with the claim doesn't report success. If the claim can't
-be written, the job doesn't run then and stays
-`pending`; a duplicated announcement is the worse failure than a missed one.
+be written, the job doesn't run then and stays `pending`, because a duplicated
+announcement is worse than a missed one.
 
 On startup the scheduler records any job still `running` as failed (it was
 cut short, and isn't run again), then arms every pending job. One that came

@@ -1,12 +1,12 @@
 # sakke-gateway architecture
 
 How the gateway works inside: what happens to a request, which module owns
-what, and the rules that keep it that way. The whole system (Home Assistant,
-the voice satellite, the bot, the server) is described in
+what, and the rules that keep it that way. For the whole system (Home Assistant,
+the voice satellite, the bot, the server), see
 [sakke-workspace's architecture docs](https://github.com/saarinenvh/sakke-workspace/tree/main/docs/architecture).
 
-This describes the code as it is. A change to the structure or the data flow
-updates these files in the same pull request.
+These files describe the code as it is. A change to the structure or the data
+flow updates them in the same pull request.
 
 | File | Covers |
 | --- | --- |
@@ -37,19 +37,21 @@ flowchart TD
    the follow-up classifier decides whether this is an answer, a new request or
    noise; noise gets silence. A new conversation starts with the system
    prompt, built from every feature's `prompt.ts`.
-3. **Routing** picks an Ollama once per turn: the dev PC's GPU when it reports
-   itself available, otherwise the server.
+3. **Routing** picks an Ollama once per turn: the dev PC's GPU when the PC
+   reports it available, otherwise the server.
 4. **The tool loop** offers the model only the profile's tools. Each call goes
    through the registry to the tool's executor, and its result is fed back
    until the model answers in prose, repeats itself, or runs out of iterations.
 5. **The answer** is cleaned for speech, stored with the conversation, and
    returned. The display is told what Sakke is doing throughout.
 
-Proactive speech takes other paths: the tidiness coach asks through
-`assist_satellite.start_conversation`, announcements go through
-`features/announcements/`, used by timers and scheduled jobs, the morning
-wake-up speaks a phone notification (`integrations/homeAssistant/phone.ts`), and
-the morning brief speaks already-worded text on the satellite.
+Proactive speech takes other paths:
+
+- The tidiness coach asks through `assist_satellite.start_conversation`.
+- Timers and scheduled jobs announce through `features/announcements/`.
+- The morning wake-up speaks a phone notification
+  (`integrations/homeAssistant/phone.ts`).
+- The morning brief speaks already-worded text on the satellite.
 
 ## Modules
 
@@ -130,9 +132,9 @@ tests/                    # tests that cross modules
 
 What each feature does, and what it owns, is in its `README.md`.
 
-The layout follows the folder-structure convention in sakke-workspace's
-[`.agents/code-style.md`](https://github.com/saarinenvh/sakke-workspace/blob/main/.agents/code-style.md)
-("Folder structure"): fixed names for a feature's parts (`route.ts`,
+The layout follows the "Folder structure" convention in sakke-workspace's
+[`.agents/code-style.md`](https://github.com/saarinenvh/sakke-workspace/blob/main/.agents/code-style.md):
+fixed names for a feature's parts (`route.ts`,
 `schema.ts`, `policy.ts`, `prompts.ts`, `db/`, `tests/`), every module's tests
 in a `tests/` subfolder, and fakes used by one module in that module's
 `tests/`. `tsconfig.build.json` leaves every `tests/` folder out of the build,
@@ -151,15 +153,15 @@ and the database.
   owns the data. See [tools.md](tools.md).
 - **Features and `inference/` don't import tools or the agent.** A feature
   that needs text in Sakke's voice calls `inference/writeText`. Two things
-  still come from above, and `index.ts` wires them in at startup: the system
-  prompt builder (it's composed from every tool's `prompt.ts`), and the tool
+  still come from above, so `index.ts` wires them in at startup: the system
+  prompt builder, which is composed from every tool's `prompt.ts`, and the tool
   registry for the scheduler (`JobRunner` and the schedulability check). The
-  agent imports every tool, so a direct import would close a cycle.
+  agent imports every tool, so importing them directly would close a cycle.
 - **Nothing outside `tools/` imports a tool folder's internals,** only its
   `tool.ts` (the registry) and `prompt.ts` (the system prompt).
 - **Only the owning module writes a table.** See [data.md](data.md).
-- **Integrations are the only code that talks HTTP** to their service, with
-  their own timeouts and error types. Responses are validated with Zod.
+- **Only integrations talk HTTP** to their service, with their own timeouts
+  and error types, and they validate responses with Zod.
   `src/tests/moduleBoundaries.test.ts` fails on a `fetch(` outside
   `integrations/`, on an import of a tool folder's internals, and on
   `features/` or `inference/` importing the agent or the tools.
@@ -168,11 +170,11 @@ and the database.
 
 Every place data crosses into the gateway has a `schema.ts` next to the code
 that owns it: an integration's responses, a route's request body, a tool's
-arguments. Each file starts by naming who sends what over which transport. It
-then holds, per payload, an exported `…Example` with the **full** payload,
-including fields the gateway ignores (marked `// ignored`), and the Zod schema
-that declares only what the code reads. A `schema.test.ts` in the module's
-`tests/` folder parses every example, so an example can't drift away from its schema.
+arguments. Each file starts by naming who sends what over which transport. Then, for each
+payload, it holds an exported `…Example` with the **full** payload, including
+fields the gateway ignores (marked `// ignored`), and a Zod schema that declares
+only what the code reads. A `schema.test.ts` in the module's `tests/` folder
+parses every example, so an example can't drift from its schema.
 
 To see what crosses a boundary and what is used, read its `schema.ts`.
 
@@ -182,14 +184,15 @@ To see what crosses a boundary and what is used, read its `schema.ts`.
 
 1. Wires in what can't be imported: the system prompt builder, for `inference/`.
 2. Logs every configuration problem, without refusing to start.
-3. Starts connecting to the database in the background; it retries every 30 s
-   and runs pending migrations once connected. Then it imports any timers left
-   in `timers.json` and starts the scheduler, which arms every pending job.
-   Until then, scheduling reports itself unavailable. The morning wake-up
-   and brief start at the same point, since all their state is in the database.
+3. Starts connecting to the database in the background (see
+   [Startup and outages](data.md#startup-and-outages)). Once connected, it
+   imports any timers left in `timers.json` and starts the scheduler, which
+   arms every pending job; until then, scheduling reports itself unavailable.
+   The morning wake-up and brief start at the same point, since all their
+   state is in the database.
 4. Restores the tidiness coach's state and starts it.
 5. Loads the Home Assistant entity registry, and listens whether or not that
    worked.
 
-Nothing waits on Home Assistant or the database: the gateway comes up and says
-what's missing.
+Nothing waits for Home Assistant or the database: the gateway comes up and
+reports what's missing.
