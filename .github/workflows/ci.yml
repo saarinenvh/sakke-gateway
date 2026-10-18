@@ -40,7 +40,7 @@ jobs:
           # CI never pushes to git, so the token needn't stay in .git/config.
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # Matches the Dockerfile, so CI can't pass on a runtime the image
           # doesn't use.
