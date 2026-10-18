@@ -35,7 +35,7 @@ jobs:
       TEST_DB_USERNAME: sakke_gateway_test
       TEST_DB_PASSWORD: ci-only-password
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           # CI never pushes to git, so the token needn't stay in .git/config.
           persist-credentials: false
