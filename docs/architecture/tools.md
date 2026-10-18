@@ -1,7 +1,7 @@
 # Tools
 
-A tool is something the model can call. How one is built, how calls are run,
-and which requests may use which tools.
+A tool is something the model can call. This file covers how a tool is built,
+how calls run, and which requests may use which tools.
 
 ## A tool is only the model's interface
 
@@ -18,8 +18,9 @@ the rest of the gateway needs:
 Where the rest goes:
 
 - **A feature** (`features/<feature>/`) holds anything with state, a route, a
-  schedule, a database, or a second caller. The tool calls it. `tools/announce/`
-  parses `{ message }`, and `features/announcements/` does the work;
+  schedule, a database, or a second caller, and the tool calls it. For example,
+  `tools/announce/` parses `{ message }` and `features/announcements/` does the
+  work;
   `tools/reminders/` calls `features/reminders/`, which also serves
   `/reminders/check` and the morning brief.
 - **An integration** (`integrations/<service>/`) holds every HTTP call to an
@@ -79,9 +80,9 @@ returned as an ordinary result would be reported as done.
 ## Request profiles
 
 A profile says what one kind of request may do: which tools it gets, and who
-owns its context. They live in `inference/profiles.ts`. The inference scheduler (see
+owns its context. Profiles live in `inference/profiles.ts`. The inference scheduler (see
 sakke-workspace's `docs/roadmap/inference-scheduler/`) will add priority,
-classification and model limits to the same profiles.
+classification and model limits to them.
 
 | Profile | Used by | Tools | Context owner |
 | --- | --- | --- | --- |
@@ -106,8 +107,9 @@ classification and model limits to the same profiles.
   classifies follow-ups, and shows it on the display. A `caller` request is one
   piece of text a feature asked for: `writeText` (`inference/`) starts it from
   the system prompt alone, stores nothing and doesn't touch the display, even if
-  it finishes after the caller stopped waiting. The caller shows Sakke speaking itself, when the satellite actually
-  speaks (`showSpeakingWhile` in `features/display/`).
+  it finishes after the caller stopped waiting. The caller shows Sakke speaking
+  on the display itself, when the satellite actually speaks
+  (`showSpeakingWhile` in `features/display/`).
 - **`announce` is in no profile.** Sakke already speaks its reply in a
   conversation; announcing is for speech at a scheduled time, run by the
   scheduler through `runTool` without a model or a profile.
@@ -131,5 +133,5 @@ a new tool can't be registered and silently never offered.
    have it (usually `sakke`).
 4. If it may run from the scheduler, give it `schedulable`, and allow only the
    actions that make sense unattended.
-5. If the model needs guidance, a `prompt.ts`, added to the system prompt's
-   sections.
+5. If the model needs guidance, write a `prompt.ts` and add it to the system
+   prompt's sections (`agent/systemPrompt.ts`).
