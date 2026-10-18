@@ -62,8 +62,73 @@ jobs:
   image:
     # The artifact that actually gets deployed. Type-checking and tests both
     # pass against source that the image could still fail to produce.
+    #
+    # Pull requests only build it. Pushes to main also push it to GHCR, tagged
+    # by the git tree it was built from, so the same files never build twice
+    # and a release can reuse the image that already ran (sakke-workspace
+    # docs/roadmap/kubernetes/README.md, Images).
+    needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/saarinenvh/sakke-gateway
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build the Docker image
-        run: docker build -t ci-check .
+
+      - name: Work out the tags
+        id: tags
+        run: |
+          echo "tree=tree-$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip the build if this tree's image exists
+        id: existing
+        if: env.PUSH == 'true'
+        run: |
+          tree_ref="$IMAGE:${{ steps.tags.outputs.tree }}"
+          sha_ref="$IMAGE:${{ steps.tags.outputs.sha }}"
+          if output=$(docker buildx imagetools inspect "$tree_ref" 2>&1); then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$tree_ref already exists; not rebuilding, only adding $sha_ref."
+            docker buildx imagetools create --tag "$sha_ref" "$tree_ref"
+
+          # Before a package's first push, GHCR may answer "denied" or "403
+          # Forbidden" instead of "not found". Once the package exists, drop
+          # those two, so that an auth problem fails the run instead of
+          # rebuilding over a tag that already points at an image.
+          elif grep -qiE 'not found|manifest unknown|denied|403 Forbidden' <<< "$output"; then
+            echo "$tree_ref doesn't exist yet; building it."
+          else
+            echo "$output" >&2
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v4
+        if: steps.existing.outputs.exists != 'true'
+
+      - name: Build the image, and push it on main
+        if: steps.existing.outputs.exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ env.PUSH == 'true' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.tags.outputs.tree }}
+            ${{ env.IMAGE }}:${{ steps.tags.outputs.sha }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          # Layers cached in GitHub's cache between runs, so a source-only
+          # change reuses the dependency layers. A pull request's cache is
+          # never read by main.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
