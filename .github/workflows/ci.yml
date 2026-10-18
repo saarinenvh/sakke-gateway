@@ -35,7 +35,7 @@ jobs:
       TEST_DB_USERNAME: sakke_gateway_test
       TEST_DB_PASSWORD: ci-only-password
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # CI never pushes to git, so the token needn't stay in .git/config.
           persist-credentials: false
@@ -83,7 +83,7 @@ jobs:
       IMAGE: ghcr.io/saarinenvh/sakke-gateway
       PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # CI never pushes to git, so the token needn't stay in .git/config.
           persist-credentials: false
