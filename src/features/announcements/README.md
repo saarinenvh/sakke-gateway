@@ -2,8 +2,9 @@
 
 Speaks a message on the voice satellite (`assist_satellite.announce`). The
 message is first reworded in Sakke's own voice (`inference/writeText` with
-the `announcement` profile); if that fails, comes back empty, or takes too long,
-the message is spoken as it is. Failing to reach the satellite throws.
+the `announcement` profile). If the rewording fails, comes back empty, or takes
+too long, the message is spoken as given. Failing to reach the satellite
+throws.
 
 ## Entry points
 

@@ -1,10 +1,11 @@
 # Wiki
 
-Reads and writes the Obsidian vault mounted at `config.wikiRoot`. A page asked
-for by the model is resolved inside the vault or refused; a saved note goes to
-`sakke-knowledge/` and is linked from `sakke-knowledge/sakke-index.md` the
-first time. Docs other features read lose their frontmatter, and fall back to
-a bundled copy when the vault has none.
+Reads and writes the Obsidian vault mounted at `config.wikiRoot`. A page the
+model asks for must resolve inside the vault, or the read is refused. A saved
+note goes to `sakke-knowledge/` and is linked from
+`sakke-knowledge/sakke-index.md` the first time. Documents that other features
+read have their frontmatter stripped, and come from a bundled copy when the
+vault has none.
 
 ## Entry points
 
