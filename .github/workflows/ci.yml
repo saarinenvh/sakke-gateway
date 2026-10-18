@@ -105,9 +105,14 @@ jobs:
       - name: Skip the build if this tree's image exists
         id: existing
         if: env.PUSH == 'true'
+        # Values reach the script as environment variables, never pasted into
+        # its text, so the shell can't run them as code.
+        env:
+          TREE_TAG: ${{ steps.tags.outputs.tree }}
+          SHA_TAG: ${{ steps.tags.outputs.sha }}
         run: |
-          tree_ref="$IMAGE:${{ steps.tags.outputs.tree }}"
-          sha_ref="$IMAGE:${{ steps.tags.outputs.sha }}"
+          tree_ref="$IMAGE:$TREE_TAG"
+          sha_ref="$IMAGE:$SHA_TAG"
           if output=$(docker buildx imagetools inspect "$tree_ref" 2>&1); then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "$tree_ref already exists; not rebuilding, only adding $sha_ref."
