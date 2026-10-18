@@ -1,4 +1,5 @@
 version: 2
+# Every entry waits 7 days after a release before proposing it.
 updates:
   # Minor/patch bumps are grouped into one weekly PR so they don't repeat the
   # 12-stale-PR situation sakariheitaja had. A major bump is excluded from the
@@ -8,6 +9,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     groups:
       npm-minor-and-patch:
         update-types:
@@ -22,3 +25,5 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
