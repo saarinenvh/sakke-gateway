@@ -118,11 +118,10 @@ jobs:
             echo "$tree_ref already exists; not rebuilding, only adding $sha_ref."
             docker buildx imagetools create --tag "$sha_ref" "$tree_ref"
 
-          # Before a package's first push, GHCR may answer "denied" or "403
-          # Forbidden" instead of "not found". Once the package exists, drop
-          # those two, so that an auth problem fails the run instead of
-          # rebuilding over a tag that already points at an image.
-          elif grep -qiE 'not found|manifest unknown|denied|403 Forbidden' <<< "$output"; then
+          # Only a missing tag builds. Any other error, such as an auth or
+          # network problem, fails the run instead of rebuilding over a tag
+          # that already points at an image.
+          elif grep -qiE 'not found|manifest unknown' <<< "$output"; then
             echo "$tree_ref doesn't exist yet; building it."
           else
             echo "$output" >&2
