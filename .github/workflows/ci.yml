@@ -85,10 +85,10 @@ jobs:
     # The artifact that actually gets deployed. Type-checking and tests both
     # pass against source that the image could still fail to produce.
     #
-    # Pull requests only build it. Pushes to main also push it to GHCR, tagged
-    # by the git tree it was built from, so the same files never build twice
-    # and a release can reuse the image that already ran (sakke-workspace
-    # docs/roadmap/kubernetes/README.md, Images).
+    # Pull requests only build it. Pushes to dev and main also push it to
+    # GHCR, tagged by the git tree it was built from, so the same files never
+    # build twice and a release can reuse the image that already ran in dev
+    # (sakke-workspace docs/roadmap/kubernetes/README.md, Images).
     needs: [test, zizmor]
     runs-on: ubuntu-latest
     permissions:
@@ -96,7 +96,7 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/saarinenvh/sakke-gateway
-      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -146,7 +146,7 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: steps.existing.outputs.exists != 'true'
 
-      - name: Build the image, and push it on main
+      - name: Build the image, and push it on dev and main
         if: steps.existing.outputs.exists != 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
