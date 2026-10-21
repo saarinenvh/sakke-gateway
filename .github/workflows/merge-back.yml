@@ -4,6 +4,11 @@ name: Merge back
 # straight to main: documentation, urgent fixes and releases (sakke-workspace
 # docs/roadmap/kubernetes/README.md, Branches and releases). A conflict fails
 # the run, and is fixed by hand with a PR to dev.
+#
+# It pushes with the merge-back deploy key (secret MERGE_BACK_KEY), which dev's
+# ruleset lets bypass its required checks: main's commits passed them already,
+# and the merge commit is tested on dev right after. Unlike a GITHUB_TOKEN
+# push, a deploy key's push starts ci.yml on dev, which builds dev's image.
 on:
   push:
     branches: [main]
@@ -19,24 +24,17 @@ concurrency:
 jobs:
   merge-back:
     runs-on: ubuntu-latest
-    permissions:
-      # Pushes the merge to dev.
-      contents: write
-      # Starts ci.yml on dev: a push made with GITHUB_TOKEN starts no
-      # workflows, so dev's new head would otherwise go untested and get no
-      # image.
-      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: dev
+          ssh-key: ${{ secrets.MERGE_BACK_KEY }}
           # The whole history, which the merge needs to find the common base.
           fetch-depth: 0
-          # Kept, unlike in ci.yml: this job pushes to dev.
+          # Kept, unlike in ci.yml: the push below uses the key.
           persist-credentials: true
 
       - name: Merge main into dev
-        id: merge
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -45,15 +43,6 @@ jobs:
 
           if [ "$(git rev-parse HEAD)" = "$before" ]; then
             echo "dev already has everything in main."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git push origin dev
-            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Test dev's new head and build its image
-        if: steps.merge.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: gh workflow run ci.yml --repo "$REPO" --ref dev

@@ -3,9 +3,6 @@ name: CI
 on:
   push:
   pull_request:
-  # Started by merge-back.yml on dev: its push, made with GITHUB_TOKEN, starts
-  # no workflows by itself.
-  workflow_dispatch:
 
 # Read-only by default; a job that needs more asks for it.
 permissions:
@@ -88,10 +85,10 @@ jobs:
     # The artifact that actually gets deployed. Type-checking and tests both
     # pass against source that the image could still fail to produce.
     #
-    # Pull requests only build it. Runs on dev and main (pushes, and the
-    # merge-back's dispatch) also push it to GHCR, tagged by the git tree it
-    # was built from, so the same files never build twice and a release can
-    # reuse the image that already ran in dev (sakke-workspace
+    # Pull requests only build it. Pushes to dev and main, the merge-back's
+    # included, also push it to GHCR, tagged by the git tree it was built
+    # from, so the same files never build twice and a release can reuse the
+    # image that already ran in dev (sakke-workspace
     # docs/roadmap/kubernetes/README.md, Images).
     needs: [test, zizmor]
     runs-on: ubuntu-latest
@@ -100,7 +97,7 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/saarinenvh/sakke-gateway
-      PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') }}
+      PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
