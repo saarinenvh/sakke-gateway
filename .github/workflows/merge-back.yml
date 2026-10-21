@@ -1,0 +1,59 @@
+name: Merge back
+
+# Merges main into dev on every push to main, so dev never misses what went
+# straight to main: documentation, urgent fixes and releases (sakke-workspace
+# docs/roadmap/kubernetes/README.md, Branches and releases). A conflict fails
+# the run, and is fixed by hand with a PR to dev.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One merge at a time; a push that lands meanwhile waits for the running one.
+concurrency:
+  group: merge-back
+  cancel-in-progress: false
+
+jobs:
+  merge-back:
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushes the merge to dev.
+      contents: write
+      # Starts ci.yml on dev: a push made with GITHUB_TOKEN starts no
+      # workflows, so dev's new head would otherwise go untested and get no
+      # image.
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: dev
+          # The whole history, which the merge needs to find the common base.
+          fetch-depth: 0
+          # Kept, unlike in ci.yml: this job pushes to dev.
+          persist-credentials: true
+
+      - name: Merge main into dev
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          before=$(git rev-parse HEAD)
+          git merge --no-edit origin/main
+
+          if [ "$(git rev-parse HEAD)" = "$before" ]; then
+            echo "dev already has everything in main."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git push origin dev
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test dev's new head and build its image
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh workflow run ci.yml --repo "$REPO" --ref dev
