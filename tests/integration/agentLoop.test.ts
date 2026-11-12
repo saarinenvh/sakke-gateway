@@ -1,13 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { startFakeOllama, toolCall, type FakeOllama } from "../fixtures/fakeOllama.js";
 import { runAgent } from "../../src/agent/agent.js";
 import { broadcastState, getCurrentState } from "../../src/features/display/display.js";
 import { getConversation } from "../../src/agent/conversationStore.js";
 import { reloadConfig } from "../../src/config.js";
+import type { ForecastResult } from "../../src/integrations/openMeteo/api.js";
+import { weatherReadingExample, weatherReadingSchema } from "../../src/integrations/openMeteo/schema.js";
 
 // The tool-calling loop against a scripted model. Everything here is a bug that
 // reached production; the loop is the one piece of this service with real
 // state, and none of it was covered before.
+
+vi.mock("../../src/integrations/openMeteo/api.js", async importOriginal => ({
+  ...await importOriginal<typeof import("../../src/integrations/openMeteo/api.js")>(),
+  getForecast: async (): Promise<ForecastResult> => ({ kind: "forecast", reading: weatherReadingSchema.parse(weatherReadingExample) }),
+}));
 
 let ollama: FakeOllama;
 
@@ -42,6 +49,22 @@ afterAll(async () => {
 
 beforeEach(() => ollama.script());
 
+// A turn outlives a test that times out, and would use up the next test's
+// scripted replies. Each test waits for its turns to end before the next one
+// scripts its own.
+let turnsInFlight: Promise<unknown>[] = [];
+
+const runTurn: typeof runAgent = (...args) => {
+  const turn = runAgent(...args);
+  turnsInFlight.push(turn);
+  return turn;
+};
+
+afterEach(async () => {
+  await Promise.allSettled(turnsInFlight);
+  turnsInFlight = [];
+});
+
 describe("a normal turn", () => {
   it("calls a tool, feeds the result back, and answers in prose", async () => {
     ollama.script(
@@ -49,7 +72,7 @@ describe("a normal turn", () => {
       { content: "Grey and damp. Wear a coat." },
     );
 
-    const result = await runAgent("what is the weather", nextId(), log, SAKKE);
+    const result = await runTurn("what is the weather", nextId(), log, SAKKE);
 
     expect(result.content).toBe("Grey and damp. Wear a coat.");
     expect(result.continueConversation).toBe(true);
@@ -57,12 +80,13 @@ describe("a normal turn", () => {
     const [first, second] = ollama.requests();
     expect(first.hasTools).toBe(true);
     // The tool's result must be in context for the second call.
-    expect(second.messages.some(m => m.role === "tool")).toBe(true);
+    const toolResult = second.messages.find(m => m.role === "tool");
+    expect(toolResult?.content).toContain("Conditions:");
   });
 
   it("sanitises the reply before returning it", async () => {
     ollama.script({ content: "<think>hmm</think>It is **cold**." });
-    const result = await runAgent("weather", nextId(), log, SAKKE);
+    const result = await runTurn("weather", nextId(), log, SAKKE);
     expect(result.content).toBe("It is cold.");
   });
 });
@@ -80,7 +104,7 @@ describe("when the model repeats a tool call", () => {
       { content: "Done. Obviously." },
     );
 
-    const result = await runAgent("good night", nextId(), log, SAKKE);
+    const result = await runTurn("good night", nextId(), log, SAKKE);
 
     expect(result.content).toBe("Done. Obviously.");
     expect(result.content).not.toContain("I got confused");
@@ -99,7 +123,7 @@ describe("when the model repeats a tool call", () => {
       { content: '<tool_call>{"name": "run_routine", "arguments": {}}</tool_call>' },
     );
 
-    const result = await runAgent("good night", nextId(), log, SAKKE);
+    const result = await runTurn("good night", nextId(), log, SAKKE);
     expect(result.content).not.toContain("tool_call");
     expect(result.content).toBe("That didn't work. Ask me again.");
   });
@@ -114,7 +138,7 @@ describe("when the model repeats a tool call", () => {
       { content: "Still off." },
     );
 
-    const result = await runAgent("check the light again", nextId(), log, SAKKE);
+    const result = await runTurn("check the light again", nextId(), log, SAKKE);
     expect(result.content).toBe("Still off.");
 
     const passes = ollama.requests();
@@ -141,7 +165,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("good night", nextId(), log, SAKKE);
+    const result = await runTurn("good night", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const passes = ollama.requests();
@@ -162,7 +186,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("good night twice", nextId(), log, SAKKE);
+    const result = await runTurn("good night twice", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[1].messages.filter(m => m.role === "tool");
@@ -181,7 +205,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("check and run", nextId(), log, SAKKE);
+    const result = await runTurn("check and run", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
@@ -203,7 +227,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("set a timer for tea, twice", nextId(), log, SAKKE);
+    const result = await runTurn("set a timer for tea, twice", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const toolMessages = ollama.requests()[2].messages.filter(m => m.role === "tool");
@@ -227,7 +251,7 @@ describe("duplicate tool calls within or across a batch", () => {
       { content: "Done." },
     );
 
-    const result = await runAgent("add milk twice, then check the list", nextId(), log, SAKKE);
+    const result = await runTurn("add milk twice, then check the list", nextId(), log, SAKKE);
     expect(result.content).toBe("Done.");
 
     const passes = ollama.requests();
@@ -250,13 +274,13 @@ describe("when a turn fails", () => {
     const id = nextId();
 
     ollama.script({ content: "First answer." });
-    await runAgent("turn A", id, log, SAKKE);
+    await runTurn("turn A", id, log, SAKKE);
 
     ollama.script({ status: 500 });
-    await expect(runAgent("turn B", id, log, SAKKE)).rejects.toThrow();
+    await expect(runTurn("turn B", id, log, SAKKE)).rejects.toThrow();
 
     ollama.script({ content: "Third answer." });
-    const third = await runAgent("turn C", id, log, SAKKE);
+    const third = await runTurn("turn C", id, log, SAKKE);
     expect(third.content).toBe("Third answer.");
 
     const history = ollama.requests()[0].messages;
@@ -269,7 +293,7 @@ describe("when a turn fails", () => {
     // "thinking" is broadcast before the loop and only the success path cleared
     // it, so a failure left the tablet spinning until the next good turn.
     ollama.script({ status: 500 });
-    await expect(runAgent("break", nextId(), log, SAKKE)).rejects.toThrow();
+    await expect(runTurn("break", nextId(), log, SAKKE)).rejects.toThrow();
     expect(getCurrentState()).toBe("idle");
   });
 });
@@ -278,10 +302,10 @@ describe("conversation control phrases", () => {
   it("wipes the conversation on a reset phrase without calling the model", async () => {
     const id = nextId();
     ollama.script({ content: "Remembered." });
-    await runAgent("remember this", id, log, SAKKE);
+    await runTurn("remember this", id, log, SAKKE);
 
     ollama.script();  // no scripted replies: any model call would fail
-    const result = await runAgent("lets start fresh", id, log, SAKKE);
+    const result = await runTurn("lets start fresh", id, log, SAKKE);
 
     expect(result.content).toContain("Wiped");
     expect(result.continueConversation).toBe(false);
@@ -293,7 +317,7 @@ describe("tools outside the profile", () => {
   it("never offers a conversation the scheduler-only announce tool", async () => {
     ollama.script({ content: "Noted." });
 
-    await runAgent("remind me later", nextId(), log, SAKKE);
+    await runTurn("remind me later", nextId(), log, SAKKE);
 
     const [request] = ollama.requests();
     expect(request.toolNames).toContain("get_weather");
@@ -306,7 +330,7 @@ describe("tools outside the profile", () => {
       { content: "I can't do that from here." },
     );
 
-    await runAgent("announce hello", nextId(), log, SAKKE);
+    await runTurn("announce hello", nextId(), log, SAKKE);
 
     const [, second] = ollama.requests();
     const toolResult = second.messages.find(m => m.role === "tool");
@@ -322,8 +346,8 @@ describe("a follow-up turn", () => {
     ollama.script({ content: "Clear sky, 12 degrees." }, { content: "Decent golf weather." });
     const id = nextId();
 
-    await runAgent("what is the weather", id, log, SAKKE);
-    await runAgent("is it good for golf?", id, log, SAKKE);
+    await runTurn("what is the weather", id, log, SAKKE);
+    await runTurn("is it good for golf?", id, log, SAKKE);
 
     const [classifierRequest] = ollama.classifierRequests();
     expect(classifierRequest.numCtx).toBe(ollama.requests()[0].numCtx);
@@ -337,8 +361,8 @@ describe("a follow-up turn", () => {
       ollama.script({ content: "Rain is expected. Would you like the hourly forecast?" }, { content: "Here's the hourly forecast." });
       const id = nextId();
 
-      await runAgent("what's the weather tomorrow", id, log, SAKKE);
-      const reply = await runAgent("Yes, please.", id, log, SAKKE);
+      await runTurn("what's the weather tomorrow", id, log, SAKKE);
+      const reply = await runTurn("Yes, please.", id, log, SAKKE);
 
       expect(reply.content).toBe("Here's the hourly forecast.");
       expect(ollama.classifierRequests()).toHaveLength(0);
@@ -354,7 +378,7 @@ describe("whose context a request is", () => {
     ollama.script({ content: "Grey and damp." });
     const id = nextId();
 
-    const result = await runAgent("what is the weather", id, log, SAKKE);
+    const result = await runTurn("what is the weather", id, log, SAKKE);
 
     expect(getConversation(id)).toBeDefined();
     expect(getCurrentState()).toBe("speaking");
