@@ -1,0 +1,50 @@
+name: Dev back to main
+
+# When a PR's deploy-dev label goes away, dev runs main's image again: the
+# label is removed, or the PR is closed without merging. A merge is left to
+# main's run in ci.yml, which moves dev once main has the merged image.
+#
+# When Dependabot closes its own labeled PR (a newer version replaced it), the
+# run gets Dependabot's read-only token and fails. Dev then stays on that PR's
+# image until the next push to main moves it.
+on:
+  pull_request:
+    types: [unlabeled, closed]
+
+permissions: {}
+
+jobs:
+  dev-tag:
+    # Only PRs from this repo push images; a fork's run can't push.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && ((github.event.action == 'unlabeled' && github.event.label.name == 'deploy-dev')
+          || (github.event.action == 'closed' && !github.event.pull_request.merged
+              && contains(github.event.pull_request.labels.*.name, 'deploy-dev')))
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      pull-requests: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Moving a tag onto main's image takes it off the PR's image.
+      - name: Point dev at main's image
+        env:
+          IMAGE: ghcr.io/saarinenvh/sakke-gateway
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # If another PR has the label by now, dev is that PR's.
+          labeled=$(gh pr list --repo "$REPO" --label deploy-dev --state open --json number --jq '.[].number')
+          if [[ -n $labeled ]]; then
+            echo "#$labeled has the label; dev stays on it."
+            exit 0
+          fi
+          docker buildx imagetools create --tag "$IMAGE:dev" "$IMAGE:main"
+          echo "dev -> main"
