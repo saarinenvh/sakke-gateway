@@ -3,6 +3,10 @@ name: Dev back to main
 # When a PR's deploy-dev label goes away, dev runs main's image again: the
 # label is removed, or the PR is closed without merging. A merge is left to
 # main's run in ci.yml, which moves dev once main has the merged image.
+#
+# When Dependabot closes its own labeled PR (a newer version replaced it), the
+# run gets Dependabot's read-only token and fails. Dev then stays on that PR's
+# image until the next push to main moves it.
 on:
   pull_request:
     types: [unlabeled, closed]

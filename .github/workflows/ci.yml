@@ -103,11 +103,12 @@ jobs:
     # can push.
     needs: [test, zizmor]
     runs-on: ubuntu-latest
-    # Runs on main finish in order, so an older one can't move main back.
-    # Each PR run has a group of its own.
+    # Runs on main take turns, and one still waiting is replaced by a newer
+    # one. A PR's newer run cancels its older one, so an older image can't
+    # finish last and move dev back to it.
     concurrency:
-      group: image-${{ github.event_name == 'push' && 'main' || github.run_id }}
-      cancel-in-progress: false
+      group: image-${{ github.event_name == 'push' && 'main' || format('pr-{0}', github.event.pull_request.number) }}
+      cancel-in-progress: ${{ github.event_name != 'push' }}
     permissions:
       contents: read
       packages: write
@@ -200,26 +201,31 @@ jobs:
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          labeled=$(gh pr list --repo "$REPO" --label deploy-dev --state open --json number --jq '.[].number')
-
           if [[ -z $PR_NUMBER ]]; then
             # A re-run of an older run on main tags nothing, so it can't
-            # roll prod back.
-            if [[ $(gh api "repos/$REPO/commits/main" --jq .sha) != "$GITHUB_SHA" ]]; then
+            # roll prod back. Assigned on its own line, so a failed API call
+            # fails the step instead of reading as "main has moved on".
+            head=$(gh api "repos/$REPO/commits/main" --jq .sha)
+            if [[ $head != "$GITHUB_SHA" ]]; then
               echo "main has moved on from $GITHUB_SHA; not moving main."
               exit 0
             fi
             docker buildx imagetools create --tag "$IMAGE:main" "$IMAGE:$TREE_TAG"
             echo "main -> $TREE_TAG"
 
-            # Dev runs main too, unless a PR is being tested there.
+            # Dev runs main too, unless a PR is being tested there. Asked
+            # only now, so a label removed during the run counts.
+            labeled=$(gh pr list --repo "$REPO" --label deploy-dev --state open --json number --jq '.[].number')
             if [[ -z $labeled ]]; then
               docker buildx imagetools create --tag "$IMAGE:dev" "$IMAGE:$TREE_TAG"
               echo "dev -> $TREE_TAG"
             fi
 
-          # The label can be gone by now, if it was removed during the run.
-          elif grep -qx "$PR_NUMBER" <<< "$labeled"; then
-            docker buildx imagetools create --tag "$IMAGE:dev" "$IMAGE:$TREE_TAG"
-            echo "dev -> $TREE_TAG (#$PR_NUMBER)"
+          else
+            # The label can be gone by now, if it was removed during the run.
+            labeled=$(gh pr list --repo "$REPO" --label deploy-dev --state open --json number --jq '.[].number')
+            if grep -qx "$PR_NUMBER" <<< "$labeled"; then
+              docker buildx imagetools create --tag "$IMAGE:dev" "$IMAGE:$TREE_TAG"
+              echo "dev -> $TREE_TAG (#$PR_NUMBER)"
+            fi
           fi
