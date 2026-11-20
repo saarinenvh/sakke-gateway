@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// sakke_agent (sakke-workspace custom_components/sakke_agent/agent.py) →
+// sakke_agent (sakke-workspace deploy/homeassistant/custom_components/sakke_agent/agent.py) →
 // gateway, POST /v1/chat/completions, and the gateway's response back.
 
 export const chatCompletionRequestExample = {
