@@ -19,7 +19,7 @@
     "dotenv": "^16.4.5",
     "fastify": "^5.12.8",
     "js-logger": "^1.6.1",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.5.0",
     "mysql2": "^3.24.6",
     "pino-pretty": "^13.2.0",
     "reflect-metadata": "^0.2.2",
